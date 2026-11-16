@@ -18,11 +18,18 @@ vp run dev --home-dir .t3 --no-seed
 
 `custom-env.ps1` activa Vite+ y resuelve Node y pnpm desde el manifiesto oficial; no cambia el Node global ni el perfil de PowerShell. En la preparación inicial: Vite+ 1.4.0, Node 26.13.1 y pnpm 12.14.0. Es necesario tener Vite+ instalado según [el runbook oficial](docs/operations/development.md).
 
-Abre la URL de emparejamiento que imprime el runner. Incluye una credencial: no la publiques. Los puertos efectivos aparecen en `[dev-runner]`. Para Electron:
+Abre la URL de emparejamiento que imprime el runner. Incluye una credencial: no la publiques. Los puertos efectivos aparecen en `[dev-runner]`. Si no ves la URL (por ejemplo, con la salida redirigida a un archivo, `vp run` no muestra la salida de las tareas), genera otra contra el servidor en marcha desde otra terminal:
+
+````powershell
+. ./docs/personal/custom-env.ps1
+cd apps/server
+node src/bin.ts pair --base-dir ../../.t3 --ttl 1h
+cd ../..
+``` Para Electron:
 
 ```powershell
 vp run dev:desktop --home-dir .t3 --no-seed
-```
+````
 
 La carpeta ignorada `.t3` mantiene los datos de esta copia separados. No arranques desarrollo contra `~/.t3/userdata`, la instalación real. No establezcas `VITE_HTTP_URL` ni `VITE_WS_URL`: Vite ya hace proxy. No hace falta copiar `.env.example` para el uso local; sus variables habilitan servicios cloud opcionales. No se han configurado proveedores de pago ni credenciales de IA. `Replay (dev)` permite probar turnos locales gratuitos en el modo web.
 
@@ -58,7 +65,20 @@ upstream push: DISABLED
 
 `remote.pushDefault=origin` y `push.default=simple`. `main` sigue a `origin/main` y se mantiene idéntica a la base oficial, sin personalizaciones. `custom` sigue a `origin/custom` y contiene esta guía y los scripts personales. Se conserva todo el historial.
 
-La identidad de commits se ha configurado solo en este repo como `GuillermoMGV` con su correo noreply. El helper local `.git/credential-guillermomgv.sh` obtiene las credenciales del almacén de `gh` para esa cuenta explícita; no guarda tokens y no depende de la cuenta activa de otras terminales. Para otro ordenador, autentica `gh` con esa cuenta y configura su helper allí. La configuración Git local no viaja en los commits.
+El fork copió miles de ramas del proyecto oficial. Por eso `origin` solo descarga `main` y `custom`, y `upstream` solo `main`. Para seguir otra rama propia del fork: `git config --add remote.origin.fetch '+refs/heads/<rama>:refs/remotes/origin/<rama>'`.
+
+La identidad de commits se ha configurado solo en este repo como `GuillermoMGV` con su correo noreply. Un helper de credenciales local (en `.git/config`) pide el token al almacén de `gh` para esa cuenta explícita: no guarda tokens y no depende de la cuenta activa de `gh` (en este equipo, la de trabajo). La configuración Git local no viaja en los commits. Para recrearla en un clon nuevo u otro ordenador, autentica `gh` con `GuillermoMGV` y ejecuta:
+
+```powershell
+git clone --branch custom https://github.com/GuillermoMGV/t3code.git t3code
+cd t3code
+./docs/personal/setup-local-git.ps1
+git fetch origin
+git fetch upstream
+git branch --track main origin/main
+```
+
+El script es idempotente y se detiene si algún remoto apunta a otra URL.
 
 ## Desarrollar y publicar
 
@@ -129,48 +149,42 @@ Para cancelar un merge iniciado con checkout limpio: `git merge --abort`. Si el 
 
 ## Compilar Windows
 
-Requisitos oficiales: Python 3, Rust estable (al menos 1.95 para los componentes que lo exigen), target `x86_64-pc-windows-msvc`, Visual Studio Build Tools con **Desktop development with C++**, Windows SDK, MSVC y bibliotecas Spectre x64. NSIS lo descarga electron-builder. WSL no es necesario para el payload Windows; incluir el payload WSL requiere además el archivo Linux descrito en [release.md](docs/operations/release.md).
+Requisitos: Python 3, Rust estable con el target `x86_64-pc-windows-msvc`, Visual Studio Build Tools con **Desktop development with C++**, Windows SDK, MSVC y bibliotecas Spectre x64. NSIS lo descarga electron-builder. WSL no es necesario para el payload Windows; incluir el payload WSL requiere además el archivo Linux descrito en [release.md](docs/operations/release.md).
+
+Con el árbol de trabajo limpio y el servidor de desarrollo detenido:
 
 ```powershell
-. ./docs/personal/custom-env.ps1
-rustup target add x86_64-pc-windows-msvc
-vp run dist:desktop:win --arch x64
+./docs/personal/build-windows.ps1 -BuildVersion 0.1.9-preview.20261117.1
 ```
 
-Los artefactos locales sin firma se generan en `release/`. El script de empaquetado invoca electron-builder con `--publish never`: compilar no publica releases. No instales la prueba encima de una instalación oficial sin revisar las colisiones de identidad y datos.
+El instalador sin firma queda en `release/T3-Code-<versión>-x64.exe`, junto a su `.blockmap`. Electron-builder se invoca con `--publish never`: compilar no publica releases. Usa una versión preview nueva en cada build (fecha y contador) y súbela cuando cambie la base oficial (`apps/desktop/package.json`).
 
-Detén el servidor de desarrollo antes de empaquetar. `--build-version` alinea temporalmente las versiones de cuatro manifiestos durante el build y después restaura sus contenidos; si dev está abierto, sus watchers reinician la aplicación. No confirmes esos cambios temporales.
+Por qué existe el script: el release oficial **no compila Windows en Windows**. Lo empaqueta en Linux y verifica el paquete después en un runner Windows (`.github/workflows/release.yml` y `release-desktop.yml`). En Linux no se puede ejecutar el binario Windows, así que el `afterPack` oficial omite la caché V8 del servidor y se salta el auto-chequeo del bundle. En un host Windows esa caché sí se genera (22 archivos más), el paquete llega a 90 archivos y el validador oficial lo rechaza (límite de 80). El script reproduce el flujo oficial sin tocar código:
 
-Para distinguir una prueba sin cambiar nombres ni identificadores internos, puedes pasar `--build-version 0.1.9-preview.20261116.1` y elegir un directorio con `--output-dir`. Revisa primero `vp run dist:desktop:artifact --help`. El código reconoce las versiones preview y omite la configuración de publicación/actualización correspondiente. La versión y el commit de base identifican el artefacto; actualiza la versión de ejemplo cuando cambie la base.
+1. Compila el monitor Rust del commit actual y lo reutiliza (`T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR=1`). Esto evita un falso negativo del preflight oficial en este equipo: el registro del SDK apunta a `C:\Program Files\Windows Kits\10`, pero el SDK está en `C:\Program Files (x86)\Windows Kits\10`. No se ha cambiado el registro.
+2. Empaqueta con `T3CODE_DESKTOP_UNTRUSTED_BUNDLE=true`, que omite la caché y el auto-chequeo igual que el build en Linux. El validador oficial del payload (límite de archivos y nativos) sí se ejecuta.
+3. Ejecuta `scripts/verify-windows-desktop-artifact.ts`, la misma verificación que el job oficial de Windows: carga del nativo `fff` y auto-chequeo del bundle.
+4. Limpia las variables de entorno y el directorio temporal de staging.
 
-Se conserva `com.t3tools.t3code` y el nombre oficial, tal como se solicitó. Una versión distribuible propia necesitará decidir identidad, protocolo, rutas de datos, nombre, iconos, firma y feed de actualizaciones conjuntamente. No basta cambiar el nombre del archivo: una actualización oficial podría sustituir personalizaciones si se usa su feed. `T3CODE_DESKTOP_UPDATE_REPOSITORY` configura el destino de actualizaciones cuando se decide habilitar uno propio; no se ha modificado. Una compilación local sin firma puede mostrar avisos de SmartScreen y no equivale a una release oficial firmada.
+La única diferencia con un release oficial es la falta de firma y de la caché V8, que el oficial tampoco lleva. Una compilación sin firma puede mostrar avisos de SmartScreen. `--build-version` alinea temporalmente las versiones de varios manifiestos y después las restaura; si dev está abierto, sus watchers reinician la aplicación.
 
-## Validación de este equipo
+Identidad y actualizaciones: se conservan `com.t3tools.t3code` y el nombre oficial, así que instalar este build **sustituye o convive con la instalación oficial** y comparte `~/.t3/userdata`. No lo instales encima de la oficial sin decidirlo antes. El código reconoce las versiones preview y omite la configuración de publicación/actualización correspondiente. Una versión distribuible propia necesita decidir conjuntamente identidad (appId), protocolo, rutas de datos, nombre, iconos, firma y feed de actualizaciones: si usa el feed oficial, una actualización oficial sustituiría tus personalizaciones. `T3CODE_DESKTOP_UPDATE_REPOSITORY` configura el destino de actualizaciones cuando se decida habilitar uno propio; no se ha modificado.
 
-- Fork público creado, relación con `pingdotgg/t3code` y permiso ADMIN verificados.
-- `main`, `origin/main` y `upstream/main` coinciden en la base `c24255826be5aabb0f32ee18f6ac7dec0b3f1347` descargada durante el setup. `custom` está publicada y sigue `origin/custom`.
-- Dependencias instaladas con lockfile congelado; `vp run check:changed --concurrency 1` pasó. Para estos archivos de documentación y operación comprueba el formato; no se ha ejecutado toda la suite del monorepo.
-- Scripts PowerShell analizados sin errores de sintaxis; se verificó que sincronizar con cambios pendientes se detiene. El entorno activado devuelve Node 26.13.1 y pnpm 12.14.0.
-- Desarrollo iniciado con estado aislado en `.t3`; interfaz emparejada en Chrome, navegación, rama Git y turno gratuito Replay verificados, incluida la aprobación y la respuesta final. Replay simula herramientas y no modificó código ni consumió un proveedor de pago.
-- Instalados Vite+ 1.4.0, Rust 1.100.0 mediante rustup 1.29.3 y Visual Studio Build Tools 2022 17.14.45 con C++, SDK y Spectre. Python 3.11 ya estaba instalado. Monitor Rust compilado correctamente, también para `x86_64-pc-windows-msvc`.
-- La dependencia móvil `react-native-enriched-markdown` mostró un aviso al extraer RaTeX para iOS en Windows. No afecta a la instalación del escritorio; iOS no se ha compilado ni probado.
-- El registro del SDK apunta a `C:\Program Files\Windows Kits\10`, pero el SDK se encuentra en `C:\Program Files (x86)\Windows Kits\10`. El preflight oficial de empaquetado devuelve un falso negativo de MSVC/SDK. No se ha cambiado el registro. Rust sí compila con las herramientas instaladas. Alternativa local para empaquetar usando el monitor recién compilado:
+## Problemas conocidos y limitaciones
 
-```powershell
-. ./docs/personal/custom-env.ps1
-cargo build --locked --release --target x86_64-pc-windows-msvc --manifest-path native/resource-monitor/Cargo.toml
-$env:T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR = '1'
-try {
-    vp run dist:desktop:win --arch x64 --build-version 0.1.9-preview.20261116.1
-} finally {
-    Remove-Item Env:T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR -ErrorAction SilentlyContinue
-}
-```
+- `vp run dev` muestra la URL de emparejamiento solo en una terminal interactiva; con la salida redirigida usa el comando `pair` de la sección de arranque.
+- La dependencia móvil `react-native-enriched-markdown` avisa al extraer RaTeX para iOS en Windows durante `vp i`. No afecta al escritorio; iOS no se ha compilado ni probado.
+- `vp i` puede mostrar `Agent skills awaiting approval`. Es una función de pnpm para skills de agentes incluidas en dependencias; no hace falta aprobarlas para desarrollar ni compilar.
+- La cuenta activa de `gh` en este equipo es la de trabajo. Este repo no depende de ella (helper local), pero `gh` sin `--repo` o sin `GH_TOKEN` actuará con esa cuenta.
+- Git del sistema es 2.36; funciona con este flujo, pero conviene actualizarlo cuando sea posible.
 
-No actives reutilización sin compilar primero el monitor del commit actual. El empaquetador exige el binario en el directorio del target; no se ha sustituido por un archivo descargado ni se ha modificado el código oficial para omitir errores.
+## Validación de este equipo (17-11-2026)
 
-Resultado del empaquetado: frontend, servidor, Electron, monitor nativo y generación NSIS completados, pero **la compilación Windows no está validada**. El validador oficial termina con `WindowsPackagedPayloadValidationError: Windows packaged payload contains 90 files; expected at most 80`. No se ha aumentado el límite ni omitido la validación. La comprobación de ejecución del paquete sucede después de este límite y por tanto no llegó a ejecutarse. El instalador no se ha instalado, publicado ni distribuido.
-
-La segunda ejecución usa `--skip-build --keep-stage` para conservar el paquete y estudiar el problema. Es una salida de diagnóstico, no una release verificada. Los recursos incluyen caché del servidor y varias copias de componentes nativos; no se ha determinado todavía qué exclusiones pueden cambiarse sin afectar a su carga. Para obtener un instalador validado hay que resolver ese problema de empaquetado o incorporar una corrección oficial y repetir el build completo.
-
-Ambos intentos terminaron con el mismo límite de 90/80 archivos. Se conserva el instalador **no validado**, el blockmap y el directorio `win-unpacked` en `.t3/build-diagnostics/windows-preview-20261116/`, fuera de Git. No se ha instalado sobre la aplicación oficial.
+- Fork `GuillermoMGV/t3code` reutilizado: público, relación de fork con `pingdotgg/t3code` verificada. La carpeta local se había vaciado, así que se clonó de nuevo y se recreó la configuración local con los valores de `setup-local-git.ps1`.
+- `main`, `origin/main` y `upstream/main` coinciden en `e8e7fb7e9a6770706d54986fcf3ca9a2d0fe3a3e` (fast-forward de 3 commits desde `c24255826b`). `main` se fusionó en `custom` sin conflictos y `custom` sigue a `origin/custom`.
+- Push a `origin` autenticado como `GuillermoMGV`; push a `upstream` rechazado (`DISABLED`).
+- Entorno: Vite+ 1.4.0, Node 26.13.1 y pnpm 12.14.0 desde el manifiesto; Rust 1.100.0 con target MSVC; Visual Studio Build Tools 2022; Python 3.11.
+- `vp i --frozen-lockfile` completado. `vp run check:changed --concurrency 1` y `vp run typecheck` (41 paquetes, 0 errores) pasaron. No se ha ejecutado la suite completa de tests.
+- Desarrollo con estado aislado en `.t3`: interfaz emparejada en el navegador, proyecto y rama Git detectados, turno gratuito `Replay (dev)` completado con streaming y título automático. Replay simula herramientas: el árbol de trabajo quedó limpio.
+- Windows x64: `build-windows.ps1` generó `T3-Code-0.1.9-preview.20261117.1-x64.exe` (~200 MB). Payload validado (67 archivos, 26 nativos) y verificación oficial de Windows superada. El instalador no se ha instalado, publicado ni distribuido. arm64 no se ha probado.
+- Proveedores de IA reales (Codex, Claude, Cursor, etc.) no configurados: se autentican después desde la aplicación y no forman parte de la instalación de T3 Code.
