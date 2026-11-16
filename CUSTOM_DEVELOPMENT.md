@@ -181,10 +181,11 @@ Identidad y actualizaciones: se conservan `com.t3tools.t3code` y el nombre ofici
 ## Validación de este equipo (17-11-2026)
 
 - Fork `GuillermoMGV/t3code` reutilizado: público, relación de fork con `pingdotgg/t3code` verificada. La carpeta local se había vaciado, así que se clonó de nuevo y se recreó la configuración local con los valores de `setup-local-git.ps1`.
-- `main`, `origin/main` y `upstream/main` coinciden en `e8e7fb7e9a6770706d54986fcf3ca9a2d0fe3a3e` (fast-forward de 3 commits desde `c24255826b`). `main` se fusionó en `custom` sin conflictos y `custom` sigue a `origin/custom`.
+- Sincronización manual: fast-forward de `main` de `c24255826b` a `e8e7fb7e9a` (3 commits) y merge en `custom` sin conflictos.
+- `sync-upstream.ps1` probado de punta a punta tras llegar 3 commits oficiales más: `main`, `origin/main` y `upstream/main` coinciden en `b79d277cddaf65858418f29d73b87fcc3d1a19c5`, merge en `custom` sin conflictos, instalación y `check:changed` correctos. `custom` sigue a `origin/custom`.
 - Push a `origin` autenticado como `GuillermoMGV`; push a `upstream` rechazado (`DISABLED`).
 - Entorno: Vite+ 1.4.0, Node 26.13.1 y pnpm 12.14.0 desde el manifiesto; Rust 1.100.0 con target MSVC; Visual Studio Build Tools 2022; Python 3.11.
-- `vp i --frozen-lockfile` completado. `vp run check:changed --concurrency 1` y `vp run typecheck` (41 paquetes, 0 errores) pasaron. No se ha ejecutado la suite completa de tests.
+- `vp i --frozen-lockfile` completado. `vp run check:changed --concurrency 1` y `vp run typecheck` (41 paquetes, 0 errores, repetido sobre `b79d277`) pasaron. No se ha ejecutado la suite completa de tests.
 - Desarrollo con estado aislado en `.t3`: interfaz emparejada en el navegador, proyecto y rama Git detectados, turno gratuito `Replay (dev)` completado con streaming y título automático. Replay simula herramientas: el árbol de trabajo quedó limpio.
-- Windows x64: `build-windows.ps1` generó `T3-Code-0.1.9-preview.20261117.1-x64.exe` (~200 MB). Payload validado (67 archivos, 26 nativos) y verificación oficial de Windows superada. El instalador no se ha instalado, publicado ni distribuido. arm64 no se ha probado.
+- Windows x64 (base `e8e7fb7`): `build-windows.ps1` generó `T3-Code-0.1.9-preview.20261117.2-x64.exe` (~200 MB). Payload validado (67 archivos, 26 nativos) y verificación oficial de Windows superada. El instalador no se ha instalado, publicado ni distribuido. arm64 no se ha probado.
 - Proveedores de IA reales (Codex, Claude, Cursor, etc.) no configurados: se autentican después desde la aplicación y no forman parte de la instalación de T3 Code.
