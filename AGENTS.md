@@ -1,5 +1,7 @@
 # T3 Code
 
+> **Personal fork (GuillermoMGV/t3code).** Work on branch `custom`, push only to `origin`. Before building, installing, syncing with upstream or committing, read the "Para agentes de IA" section of [CUSTOM_DEVELOPMENT.md](CUSTOM_DEVELOPMENT.md). It covers the git rules and the one-command scripts in `docs/personal/`.
+
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Cursor, Grok, OpenCode, Antigravity, Kiro, Pi, Muse Code, fx) and serves web, desktop, and mobile clients.
 
 You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.

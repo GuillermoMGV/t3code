@@ -24,11 +24,62 @@ git add <archivos-revisados>
 git commit -m 'feat: describe el cambio'
 git push origin custom
 
-# 4. Compilar el instalador (árbol limpio, dev cerrado, versión nueva cada vez)
-./docs/personal/build-windows.ps1 -BuildVersion 0.1.9-preview.AAAAMMDD.N
-
-# 5. Instalar: ver «Instalar tu versión»
+# 4. Compilar, verificar e instalar en este equipo (árbol limpio, dev cerrado). ~8 min.
+./docs/personal/build-and-install.ps1
 ```
+
+## Para agentes de IA
+
+Lee esta sección antes de compilar, instalar, sincronizar o hacer commits en este repo. Las normas de código del proyecto están en `AGENTS.md`.
+
+Reglas:
+
+- Trabaja en `custom` (o en una rama creada desde `custom`). Nunca hagas commits en `main`: es una copia exacta de `upstream/main`.
+- Sube solo a `origin` (`GuillermoMGV/t3code`). El push a `upstream` está bloqueado (`DISABLED`); no lo desbloquees ni abras PRs contra `pingdotgg/t3code`.
+- Sin `--force`, `reset --hard` ni reescritura de historia sin permiso explícito del usuario. Integra el oficial con merge, no con rebase.
+- En los conflictos de sincronización, conserva la intención de ambos lados; no elijas ours/theirs en bloque. Los archivos propios del fork son `CUSTOM_DEVELOPMENT.md`, `docs/personal/*` y el bloque inicial de `AGENTS.md`.
+- No pongas en Git `.t3/`, `release/`, `.env`, tokens ni URLs de emparejamiento (llevan credenciales).
+- En desarrollo usa siempre `--home-dir .t3`. Nunca apuntes un servidor de desarrollo a `~/.t3/userdata`: son los datos reales de la app instalada.
+
+Si `git remote -v` no muestra `origin` y `upstream` como arriba (por ejemplo, en un clon nuevo), ejecuta `./docs/personal/setup-local-git.ps1`.
+
+Cada terminal PowerShell nueva necesita el entorno antes de `vp`, `node`, `pnpm` o `cargo`:
+
+```powershell
+. ./docs/personal/custom-env.ps1
+```
+
+| Tarea                              | Comando                                               | Duración aprox. |
+| ---------------------------------- | ----------------------------------------------------- | --------------- |
+| Instalar dependencias              | `vp i --frozen-lockfile`                              | 4 min (en frío) |
+| Comprobaciones de lo cambiado      | `vp run check:changed`                                | < 1 min         |
+| Typecheck de todo el monorepo      | `vp run typecheck`                                    | 3-5 min         |
+| Desarrollo web (servidor + Vite)   | `vp run dev --home-dir .t3 --no-seed`                 | continuo        |
+| Desarrollo escritorio (Electron)   | `vp run dev:desktop --home-dir .t3 --no-seed`         | continuo        |
+| URL de emparejamiento de dev       | ver «Entorno y arranque»                              | segundos        |
+| Solo compilar el instalador        | `./docs/personal/build-windows.ps1 -BuildVersion <v>` | 6-8 min         |
+| Compilar e instalar en este equipo | `./docs/personal/build-and-install.ps1`               | 7-9 min         |
+| Traer novedades oficiales a custom | `./docs/personal/sync-upstream.ps1`                   | 1-5 min         |
+
+Trucos que ahorran tiempo:
+
+- Los scripts de `docs/personal/` ya activan el entorno; se ejecutan directamente.
+- `build-windows.ps1` y `build-and-install.ps1` exigen el árbol limpio: confirma los cambios antes. Detén el servidor de desarrollo antes de compilar.
+- Lanza dev y los builds en segundo plano y vigila su salida. Con la salida redirigida, `vp run` oculta la de las tareas hijas: la URL de emparejamiento no aparece y hay que generarla con el comando `pair`.
+- Las comprobaciones de UI se hacen en el navegador: el proveedor `Replay (dev)` hace turnos completos sin coste ni cambios reales en archivos.
+- Para no esperar al typecheck completo, `vp run check:changed` cubre los paquetes afectados por tus cambios.
+- Windows PowerShell 5.1 descarta los argumentos vacíos (`''`) y rompe las comillas dobles internas al llamar a programas nativos; usa `--%` o evita esas comillas.
+- No digas que algo funciona sin haberlo ejecutado. Para cambios de interfaz, comprueba la app real.
+
+## Scripts del fork
+
+| Script                                | Qué hace                                                                                        |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `docs/personal/custom-env.ps1`        | Activa Vite+, Node y pnpm del `package.json` y Cargo en la terminal actual (dot-source).        |
+| `docs/personal/setup-local-git.ps1`   | Recrea remotos, bloqueo de push, identidad y credenciales de `GuillermoMGV`. Idempotente.       |
+| `docs/personal/sync-upstream.ps1`     | Actualiza `main` desde el oficial y la integra en `custom`. Se detiene ante cualquier problema. |
+| `docs/personal/build-windows.ps1`     | Compila el instalador Windows y lo verifica como el release oficial. No instala.                |
+| `docs/personal/build-and-install.ps1` | `build-windows.ps1` + cierra la app, copia los datos e instala. Versión automática.             |
 
 ## Entorno y arranque
 
@@ -199,7 +250,20 @@ Identidad y actualizaciones: se conservan `com.t3tools.t3code` y el nombre ofici
 
 ## Instalar tu versión
 
-Cierra T3 Code si está abierto. Haz una copia de los datos por si la versión nueva migra la base de datos, y ejecuta el instalador recién generado:
+Lo normal es compilar e instalar de una vez:
+
+```powershell
+./docs/personal/build-and-install.ps1
+```
+
+Sin parámetros calcula la versión `<versión de apps/desktop/package.json>-preview.<AAAAMMDD>.<N>`, con el siguiente `N` libre según `release/` y la versión instalada. También admite `-BuildVersion <v>` y `-SkipBackup`. El script:
+
+1. Compila y verifica con `build-windows.ps1` (se detiene si algo falla, sin tocar la instalación).
+2. Cierra T3 Code instalado si está abierto: primero intenta cerrar la ventana y, si sigue abierto a los 15 s, lo fuerza. Si tienes un turno de un agente en curso, espera a que termine antes de lanzarlo.
+3. Copia `~/.t3/userdata` a `~/.t3/userdata-backup-<AAAAMMDD-HHMMSS>`. Las copias no se borran solas (unos 60 MB cada una); elimina las antiguas a mano.
+4. Ejecuta el instalador y comprueba que la versión instalada es la esperada. La app se abre sola al terminar.
+
+Alternativa manual, por ejemplo con un instalador ya compilado. Cierra T3 Code, copia los datos y ejecuta el instalador:
 
 ```powershell
 $version = '0.1.9-preview.AAAAMMDD.N'
@@ -230,4 +294,5 @@ Si la app nueva falla con tus datos, cierra la app, renombra `~/.t3/userdata` y 
 - Desarrollo con estado aislado en `.t3`: interfaz emparejada en el navegador, proyecto y rama Git detectados, turno gratuito `Replay (dev)` completado con streaming y título automático. Replay simula herramientas: el árbol de trabajo quedó limpio.
 - Windows x64 (base `e8e7fb7`): `build-windows.ps1` generó `T3-Code-0.1.9-preview.20261117.2-x64.exe` (~200 MB). Payload validado (67 archivos, 26 nativos) y verificación oficial de Windows superada. arm64 no se ha probado.
 - Instalación: copia de `~/.t3/userdata` en `userdata-backup-20261117`, instalador ejecutado (código 0), acceso directo `T3 Code (Beta)` creado en el escritorio, app abierta con su servidor interno respondiendo. No había otra instalación de T3 Code en el equipo. Nada publicado ni distribuido.
+- `build-and-install.ps1` sin parámetros: eligió `0.1.9-preview.20261117.3`, compiló y verificó (67 archivos), cerró la app abierta, copió los datos a `userdata-backup-20261117-005223`, instaló y comprobó la versión; la app se reabrió y no quedaron cambios en Git ni carpetas temporales.
 - Proveedores de IA reales (Codex, Claude, Cursor, etc.) no configurados: se autentican después desde la aplicación y no forman parte de la instalación de T3 Code.
