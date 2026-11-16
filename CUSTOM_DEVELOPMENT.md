@@ -3,6 +3,33 @@
 Fork: <https://github.com/GuillermoMGV/t3code>. Base oficial: <https://github.com/pingdotgg/t3code>.
 Checkout: `C:\Users\Guille\Documents\Other Projects\t3code`.
 
+## Ciclo rápido: cambiar algo y usarlo
+
+Todo desde PowerShell en la raíz del repo. Cada paso está detallado en su sección.
+
+```powershell
+# 0. (Opcional) Traer novedades oficiales a custom
+./docs/personal/sync-upstream.ps1
+
+# 1. Cambiar el código en custom
+git switch custom
+
+# 2. Probar en desarrollo (datos aislados en .t3). Ctrl+C para salir.
+. ./docs/personal/custom-env.ps1
+vp run dev --home-dir .t3 --no-seed
+
+# 3. Comprobar, confirmar y subir
+vp run check:changed
+git add <archivos-revisados>
+git commit -m 'feat: describe el cambio'
+git push origin custom
+
+# 4. Compilar el instalador (árbol limpio, dev cerrado, versión nueva cada vez)
+./docs/personal/build-windows.ps1 -BuildVersion 0.1.9-preview.AAAAMMDD.N
+
+# 5. Instalar: ver «Instalar tu versión»
+```
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
@@ -170,6 +197,20 @@ La única diferencia con un release oficial es la falta de firma y de la caché 
 
 Identidad y actualizaciones: se conservan `com.t3tools.t3code` y el nombre oficial, así que instalar este build **sustituye o convive con la instalación oficial** y comparte `~/.t3/userdata`. No lo instales encima de la oficial sin decidirlo antes. El código reconoce las versiones preview y omite la configuración de publicación/actualización correspondiente. Una versión distribuible propia necesita decidir conjuntamente identidad (appId), protocolo, rutas de datos, nombre, iconos, firma y feed de actualizaciones: si usa el feed oficial, una actualización oficial sustituiría tus personalizaciones. `T3CODE_DESKTOP_UPDATE_REPOSITORY` configura el destino de actualizaciones cuando se decida habilitar uno propio; no se ha modificado.
 
+## Instalar tu versión
+
+Cierra T3 Code si está abierto. Haz una copia de los datos por si la versión nueva migra la base de datos, y ejecuta el instalador recién generado:
+
+```powershell
+$version = '0.1.9-preview.AAAAMMDD.N'
+Copy-Item "$env:USERPROFILE\.t3\userdata" "$env:USERPROFILE\.t3\userdata-backup-$(Get-Date -Format yyyyMMdd-HHmm)" -Recurse
+Start-Process ".\release\T3-Code-$version-x64.exe" -Wait
+```
+
+El instalador es de un clic y por usuario (no pide administrador). Instala en `%LOCALAPPDATA%\Programs\t3code`, crea o actualiza el acceso directo **T3 Code (Beta)** en el escritorio y en el menú Inicio, y abre la app al terminar. Las versiones preview se llaman "Beta". Una versión nueva se instala encima de la anterior; conversaciones y ajustes se conservan porque viven en `~/.t3/userdata`, no en la carpeta de la app. Para desinstalar: Configuración de Windows > Aplicaciones > T3 Code (Beta); los datos de `~/.t3` no se borran.
+
+Si la app nueva falla con tus datos, cierra la app, renombra `~/.t3/userdata` y restaura la copia con el nombre `userdata`. Borra las copias antiguas cuando ya no las necesites.
+
 ## Problemas conocidos y limitaciones
 
 - `vp run dev` muestra la URL de emparejamiento solo en una terminal interactiva; con la salida redirigida usa el comando `pair` de la sección de arranque.
@@ -187,5 +228,6 @@ Identidad y actualizaciones: se conservan `com.t3tools.t3code` y el nombre ofici
 - Entorno: Vite+ 1.4.0, Node 26.13.1 y pnpm 12.14.0 desde el manifiesto; Rust 1.100.0 con target MSVC; Visual Studio Build Tools 2022; Python 3.11.
 - `vp i --frozen-lockfile` completado. `vp run check:changed --concurrency 1` y `vp run typecheck` (41 paquetes, 0 errores, repetido sobre `b79d277`) pasaron. No se ha ejecutado la suite completa de tests.
 - Desarrollo con estado aislado en `.t3`: interfaz emparejada en el navegador, proyecto y rama Git detectados, turno gratuito `Replay (dev)` completado con streaming y título automático. Replay simula herramientas: el árbol de trabajo quedó limpio.
-- Windows x64 (base `e8e7fb7`): `build-windows.ps1` generó `T3-Code-0.1.9-preview.20261117.2-x64.exe` (~200 MB). Payload validado (67 archivos, 26 nativos) y verificación oficial de Windows superada. El instalador no se ha instalado, publicado ni distribuido. arm64 no se ha probado.
+- Windows x64 (base `e8e7fb7`): `build-windows.ps1` generó `T3-Code-0.1.9-preview.20261117.2-x64.exe` (~200 MB). Payload validado (67 archivos, 26 nativos) y verificación oficial de Windows superada. arm64 no se ha probado.
+- Instalación: copia de `~/.t3/userdata` en `userdata-backup-20261117`, instalador ejecutado (código 0), acceso directo `T3 Code (Beta)` creado en el escritorio, app abierta con su servidor interno respondiendo. No había otra instalación de T3 Code en el equipo. Nada publicado ni distribuido.
 - Proveedores de IA reales (Codex, Claude, Cursor, etc.) no configurados: se autentican después desde la aplicación y no forman parte de la instalación de T3 Code.
