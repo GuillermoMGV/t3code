@@ -138,6 +138,8 @@ export const IssueTrackerMutation = Schema.Union([
     /** Detected keys to stop showing for this thread. */
     dismissKeys: Schema.Array(IssueKey).check(Schema.isMaxLength(20)),
   }),
+  /** Drops the cached issues, so the next thread list read asks the trackers again. */
+  Schema.Struct({ type: Schema.Literal("refreshIssues") }),
 ]);
 export type IssueTrackerMutation = typeof IssueTrackerMutation.Type;
 

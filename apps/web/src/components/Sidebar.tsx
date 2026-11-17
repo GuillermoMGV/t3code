@@ -254,6 +254,7 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import { SidebarIssueControls, useIssueFilteredThreads } from "./sidebar/SidebarIssueControls";
 import { TooltipProvider } from "./ui/tooltip";
 import {
   composerDraftHasUserContent,
@@ -1297,6 +1298,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   );
 
+  const issueFilteredThreads = useIssueFilteredThreads(listedThreads, connectedEnvironmentIds);
   const {
     workingShelfEnabled,
     pinnedThreads,
@@ -1339,7 +1341,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
-    threads: listedThreads,
+    threads: issueFilteredThreads,
     delegatedUnderParent,
     routeRowThreadKey,
     folderGroups: boringSidebarEnabled
@@ -2971,6 +2973,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
+              issueControls={<SidebarIssueControls environmentIds={connectedEnvironmentIds} />}
               projectScope={
                 <Combobox
                   items={projectScopeItems}

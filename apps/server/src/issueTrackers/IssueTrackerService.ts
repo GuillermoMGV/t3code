@@ -456,6 +456,9 @@ const make = Effect.gen(function* () {
           .remove(input.tracker === "linear" ? LINEAR_KEY_SECRET : JIRA_SECRET)
           .pipe(Effect.mapError(storageError(input.tracker, "Could not remove the credentials.")));
         return {};
+      case "refreshIssues":
+        issueCache.clear();
+        return {};
       case "link":
       case "unlink":
         yield* writeLock.withPermits(1)(
