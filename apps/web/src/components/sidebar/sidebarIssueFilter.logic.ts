@@ -55,6 +55,9 @@ export function matchesIssueFilter(
   return stateMatches && assigneeMatches;
 }
 
-export function toggleFilterValue(values: ReadonlyArray<string>, value: string): string[] {
+export function toggleFilterValue<Value extends string>(
+  values: ReadonlyArray<Value>,
+  value: Value,
+): Value[] {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 }

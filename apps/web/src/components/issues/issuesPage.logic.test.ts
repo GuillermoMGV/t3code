@@ -2,6 +2,10 @@ import { findIssueReferences, type TrackerIssue } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  EMPTY_ISSUE_LIST_FILTER,
+  filterIssues,
+  issueAssigneeGroup,
+  issueStateOptions,
   issueThreadPrompt,
   resolveIssuesTracker,
   threadIssueKey,
@@ -92,5 +96,53 @@ describe("resolveIssuesTracker", () => {
       ),
     ).toBe("jira");
     expect(resolveIssuesTracker([{ tracker: "linear", connected: false }], undefined)).toBe(null);
+  });
+});
+
+const listed = (key: string, state: string | null, assignee: string | null) => ({
+  key,
+  state: state === null ? null : { name: state, color: "#000", category: "started" },
+  assignee: assignee === null ? null : { name: assignee, avatarUrl: null },
+});
+
+describe("filterIssues", () => {
+  const issues = [
+    listed("A-1", "In Progress", "Guillermo Miranda"),
+    listed("A-2", "Todo", "Ada Lovelace"),
+    listed("A-3", "Todo", null),
+    listed("A-4", null, "guillermo miranda "),
+  ];
+  const keys = (filter: Parameters<typeof filterIssues>[1], me: string | null) =>
+    filterIssues(issues, filter, me).map((issue) => issue.key);
+
+  it("groups assignees as me, others and unassigned", () => {
+    expect(issues.map((issue) => issueAssigneeGroup(issue, "Guillermo Miranda"))).toEqual([
+      "me",
+      "others",
+      "unassigned",
+      "me",
+    ]);
+    // Without a known account, nobody is "me".
+    expect(issueAssigneeGroup(issues[0]!, null)).toBe("others");
+  });
+
+  it("adds up values of one kind and narrows across kinds", () => {
+    const me = "Guillermo Miranda";
+    expect(keys(EMPTY_ISSUE_LIST_FILTER, me)).toEqual(["A-1", "A-2", "A-3", "A-4"]);
+    expect(keys({ states: [], assignees: ["me", "unassigned"] }, me)).toEqual([
+      "A-1",
+      "A-3",
+      "A-4",
+    ]);
+    expect(keys({ states: ["Todo"], assignees: [] }, me)).toEqual(["A-2", "A-3"]);
+    expect(keys({ states: ["Todo"], assignees: ["others"] }, me)).toEqual(["A-2"]);
+  });
+
+  it("offers the listed states and keeps chosen ones a new search dropped", () => {
+    expect(issueStateOptions(issues, { states: ["Done"], assignees: [] })).toEqual([
+      "In Progress",
+      "Todo",
+      "Done",
+    ]);
   });
 });

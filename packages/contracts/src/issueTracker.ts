@@ -37,6 +37,12 @@ export const TrackerIssueAssignee = Schema.Struct({
 });
 export type TrackerIssueAssignee = typeof TrackerIssueAssignee.Type;
 
+export const TrackerIssueProject = Schema.Struct({
+  name: Schema.String,
+  url: Schema.NullOr(Schema.String),
+});
+export type TrackerIssueProject = typeof TrackerIssueProject.Type;
+
 export const TrackerIssue = Schema.Struct({
   tracker: IssueTrackerKind,
   key: IssueKey,
@@ -46,6 +52,8 @@ export const TrackerIssue = Schema.Struct({
   assignee: Schema.NullOr(TrackerIssueAssignee),
   priorityLabel: Schema.NullOr(Schema.String),
   updatedAt: Schema.String,
+  /** The Linear or Jira project. Optional: issues cached or stored before it existed lack it. */
+  project: Schema.optional(Schema.NullOr(TrackerIssueProject)),
 });
 export type TrackerIssue = typeof TrackerIssue.Type;
 

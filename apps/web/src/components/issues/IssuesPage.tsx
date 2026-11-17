@@ -13,6 +13,8 @@ import {
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   ChevronDownIcon,
+  FolderIcon,
+  ListFilterIcon,
   MessageSquareIcon,
   PlusIcon,
   SearchIcon,
@@ -49,7 +51,17 @@ import {
 } from "../ui/combobox";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "../ui/menu";
+import { toggleFilterValue } from "../sidebar/sidebarIssueFilter.logic";
 import { SidebarInset } from "../ui/sidebar";
 import { Spinner } from "../ui/spinner";
 import { toastManager } from "../ui/toast";
@@ -58,6 +70,11 @@ import { WorkspaceBreadcrumb, WorkspaceBreadcrumbItem } from "../WorkspaceBreadc
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import {
+  EMPTY_ISSUE_LIST_FILTER,
+  filterIssues,
+  ISSUE_ASSIGNEE_GROUPS,
+  issueStateOptions,
+  type IssueListFilter,
   issueThreadPrompt,
   resolveIssuesTracker,
   threadsByIssue,
@@ -140,7 +157,12 @@ function IssueTrackerTabs({ environmentId }: { environmentId: EnvironmentId }) {
         </ToggleGroup>
       ) : null}
       {/* A new tracker starts a new search. */}
-      <IssueList key={tracker} environmentId={environmentId} tracker={tracker} />
+      <IssueList
+        key={tracker}
+        environmentId={environmentId}
+        tracker={tracker}
+        me={connected.find((connection) => connection.tracker === tracker)?.account ?? null}
+      />
     </>
   );
 }
@@ -174,33 +196,48 @@ function useThreadsByIssue() {
 function IssueList({
   environmentId,
   tracker,
+  me,
 }: {
   environmentId: EnvironmentId;
   tracker: IssueTrackerKind;
+  /** The connected account's name, which is how the tracker names the user as an assignee. */
+  me: string | null;
 }) {
   const label = ISSUE_TRACKER_LABELS[tracker];
   const [draft, setDraft] = useState("");
-  const { query, issues, searching, error } = useIssueSearch(environmentId, tracker, draft);
+  const [filter, setFilter] = useState(EMPTY_ISSUE_LIST_FILTER);
+  const { query, issues: found, searching, error } = useIssueSearch(environmentId, tracker, draft);
+  const issues = filterIssues(found, filter, me);
   const threadsByIssueKey = useThreadsByIssue();
   const projectChoices = useProjectChoices();
   const startThread = useStartIssueThread();
   return (
     <>
-      <InputGroup>
-        <InputGroupAddon>
-          {searching ? <Spinner aria-hidden /> : <SearchIcon aria-hidden />}
-        </InputGroupAddon>
-        <InputGroupInput
-          autoFocus
-          type="search"
-          value={draft}
-          onChange={(event) => setDraft(event.currentTarget.value)}
-          placeholder={`Search ${label} issues, or paste ${PASTE_EXAMPLES[tracker]}`}
-          aria-label={`Search ${label} issues`}
+      <div className="flex items-center gap-2">
+        <InputGroup className="min-w-0 flex-1">
+          <InputGroupAddon>
+            {searching ? <Spinner aria-hidden /> : <SearchIcon aria-hidden />}
+          </InputGroupAddon>
+          <InputGroupInput
+            autoFocus
+            type="search"
+            value={draft}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            placeholder={`Search ${label} issues, or paste ${PASTE_EXAMPLES[tracker]}`}
+            aria-label={`Search ${label} issues`}
+          />
+        </InputGroup>
+        <IssueFiltersMenu
+          filter={filter}
+          onFilter={setFilter}
+          stateOptions={issueStateOptions(found, filter)}
         />
-      </InputGroup>
+      </div>
       <p className="text-muted-foreground text-xs">
         {query === "" ? "Your open issues" : `Results for “${query}”`}
+        {issues.length < found.length
+          ? ` · ${found.length - issues.length} hidden by filters`
+          : null}
       </p>
       {error !== null ? <p className="text-destructive text-sm">{error}</p> : null}
       <ul aria-label={`${label} issues`} className="flex flex-col">
@@ -215,7 +252,9 @@ function IssueList({
         ))}
       </ul>
       {!searching && error === null && issues.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No issues found.</p>
+        <p className="text-muted-foreground text-sm">
+          {found.length === 0 ? "No issues found." : "No issues match the filters."}
+        </p>
       ) : null}
     </>
   );
@@ -321,6 +360,7 @@ function IssueRow({
         <div className="flex min-w-0 items-center gap-3 text-muted-foreground text-xs">
           <IssueStateBadge state={issue.state} className="shrink-0" />
           <IssueAssigneeBadge assignee={issue.assignee} />
+          {issue.project ? <IssueProject project={issue.project} /> : null}
           {issue.priorityLabel ? <span className="shrink-0">{issue.priorityLabel}</span> : null}
           <span className="shrink-0">Updated {formatRelativeTimeLabel(issue.updatedAt)}</span>
         </div>
@@ -437,5 +477,97 @@ function StartThreadPicker({
         </ComboboxList>
       </ComboboxPopup>
     </Combobox>
+  );
+}
+
+function IssueFiltersMenu({
+  filter,
+  onFilter,
+  stateOptions,
+}: {
+  filter: IssueListFilter;
+  onFilter: (filter: IssueListFilter) => void;
+  stateOptions: ReadonlyArray<string>;
+}) {
+  const count = filter.states.length + filter.assignees.length;
+  return (
+    <Menu>
+      <MenuTrigger
+        render={<Button size="sm" variant="outline" className="shrink-0" />}
+        aria-label={count === 0 ? "Filter issues" : `Filter issues (${count} active)`}
+      >
+        <ListFilterIcon aria-hidden />
+        {count === 0 ? "Filters" : `Filters · ${count}`}
+      </MenuTrigger>
+      <MenuPopup align="end" className="max-h-96 w-60 overflow-y-auto">
+        <MenuGroup>
+          <MenuGroupLabel>Assignee</MenuGroupLabel>
+          {ISSUE_ASSIGNEE_GROUPS.map(({ value, label }) => (
+            <MenuCheckboxItem
+              key={value}
+              checked={filter.assignees.includes(value)}
+              onCheckedChange={() =>
+                onFilter({ ...filter, assignees: toggleFilterValue(filter.assignees, value) })
+              }
+            >
+              {label}
+            </MenuCheckboxItem>
+          ))}
+        </MenuGroup>
+        {stateOptions.length > 0 ? (
+          <MenuGroup>
+            <MenuGroupLabel>State</MenuGroupLabel>
+            {stateOptions.map((state) => (
+              <MenuCheckboxItem
+                key={state}
+                checked={filter.states.includes(state)}
+                onCheckedChange={() =>
+                  onFilter({ ...filter, states: toggleFilterValue(filter.states, state) })
+                }
+              >
+                {state}
+              </MenuCheckboxItem>
+            ))}
+          </MenuGroup>
+        ) : null}
+        {count > 0 ? (
+          <>
+            <MenuSeparator />
+            <MenuItem onClick={() => onFilter(EMPTY_ISSUE_LIST_FILTER)}>Clear filters</MenuItem>
+          </>
+        ) : null}
+      </MenuPopup>
+    </Menu>
+  );
+}
+
+function IssueProject({ project }: { project: NonNullable<TrackerIssue["project"]> }) {
+  const openLink = useOpenLink(null);
+  const content = (
+    <>
+      <FolderIcon aria-hidden className="size-3 shrink-0" />
+      <span className="truncate">{project.name}</span>
+    </>
+  );
+  const url = project.url;
+  if (url === null) {
+    return <span className="inline-flex min-w-0 items-center gap-1">{content}</span>;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Open project ${project.name}`}
+      onClick={(event) => {
+        event.preventDefault();
+        openLink(url, { event: { metaKey: event.metaKey, ctrlKey: event.ctrlKey } }).catch(() =>
+          toastManager.add({ type: "error", title: `Could not open ${project.name}` }),
+        );
+      }}
+      className="inline-flex min-w-0 items-center gap-1 underline-offset-2 hover:text-foreground hover:underline"
+    >
+      {content}
+    </a>
   );
 }
