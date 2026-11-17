@@ -327,7 +327,14 @@ Si la app nueva falla con tus datos, cierra la app, renombra `~/.t3/userdata` y 
 - `vp i` puede mostrar `Agent skills awaiting approval`. Es una función de pnpm para skills de agentes incluidas en dependencias; no hace falta aprobarlas para desarrollar ni compilar.
 - La cuenta activa de `gh` en este equipo es la de trabajo. Este repo no depende de ella (helper local), pero `gh` sin `--repo` o sin `GH_TOKEN` actuará con esa cuenta.
 - Git del sistema es 2.36; funciona con este flujo, pero conviene actualizarlo cuando sea posible.
-- Los tests de navegador (`*.browser.test.tsx`, por ejemplo `ThreadDetailsPanel.browser.test.tsx`) necesitan el Chromium de Playwright, que no está instalado en este equipo; `check:changed` los marca como fallidos por eso. Debería instalarse con `pnpm exec playwright install chromium-headless-shell` desde `apps/web` (descarga de unos 100 MB; no probado aún).
+- Los tests de navegador (`*.browser.test.tsx`) necesitan el Chromium de Playwright; sin él, `check:changed` falla con `Executable doesn't exist ... chrome-headless-shell.exe`. Ya está instalado en este equipo. En un equipo nuevo, o si una actualización oficial sube la versión de `playwright` en `apps/web/package.json`, instálalo de nuevo desde `apps/web` (unos 100 MB):
+
+  ```powershell
+  . ../../docs/personal/custom-env.ps1
+  pnpm exec playwright install chromium-headless-shell
+  ```
+
+  Playwright borra al instalar las versiones antiguas que considera sin uso en `%LOCALAPPDATA%\ms-playwright`.
 
 ## Validación de este equipo (17-11-2026)
 

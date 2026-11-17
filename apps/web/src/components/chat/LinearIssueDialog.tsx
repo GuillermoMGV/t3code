@@ -13,7 +13,9 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { useRef, useState } from "react";
 
+import { cn } from "~/lib/utils";
 import { linearEnvironment } from "~/state/linear";
+import { useDebouncedValue } from "~/state/queries";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
@@ -30,6 +32,12 @@ import { Input } from "../ui/input";
 import { Spinner } from "../ui/spinner";
 import { toastManager } from "../ui/toast";
 import { LinearIssueAssigneeBadge, LinearIssueStateBadge } from "./LinearIssueParts";
+import {
+  LINEAR_SEARCH_DEBOUNCE_MS,
+  linearSearchQuery,
+  moveSelectedIssue,
+  resolveSelectedIssue,
+} from "./linearIssueRow.logic";
 
 export type LinearIssueDialogMode = "connect" | "link";
 
@@ -151,11 +159,16 @@ function LinearLinkForm({
   onChanged,
 }: LinearIssueDialogProps) {
   const [draft, setDraft] = useState("");
-  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<LinearIssueIdentifier | null>(null);
+  const query = linearSearchQuery(useDebouncedValue(draft, LINEAR_SEARCH_DEBOUNCE_MS));
+  const typing = linearSearchQuery(draft) !== query;
   const mutation = useLinearMutation(environmentId);
   const search = useEnvironmentQuery(
     linearEnvironment.searchIssues({ environmentId, input: { query } }),
   );
+  const issues = search.data?.issues ?? [];
+  const searching = typing || search.isPending;
+  const selectedIssue = searching ? null : resolveSelectedIssue(issues, selected);
 
   const link = async (identifier: LinearIssueIdentifier) => {
     if (mutation.pending) return;
@@ -165,51 +178,64 @@ function LinearLinkForm({
     onOpenChange(false);
   };
 
-  const submit = () => {
-    const identifier = parseLinearIssueReference(draft);
-    if (identifier !== null) {
-      void link(identifier);
-      return;
-    }
-    setQuery(draft.trim());
+  // A pasted URL or identifier links at once, without waiting for its search.
+  const linkSelection = () => {
+    const identifier = parseLinearIssueReference(draft) ?? selectedIssue;
+    if (identifier !== null) void link(identifier);
   };
 
-  const issues = search.data?.issues ?? [];
   return (
     <>
       <DialogHeader>
         <DialogTitle>Link Linear issue</DialogTitle>
         <DialogDescription>
-          Paste an issue URL or identifier, or search by title. Press Enter to search.
+          Type to search by title, or paste an issue URL or identifier. Pick an issue, then Link.
         </DialogDescription>
       </DialogHeader>
       <DialogPanel>
         <div className="flex flex-col gap-3">
           <Input
             autoFocus
-            placeholder="https://linear.app/…/issue/PRO-123, PRO-123, or words"
+            role="combobox"
+            aria-expanded
+            aria-controls="linear-issue-results"
+            placeholder="Search issues, or paste https://linear.app/…/issue/PRO-123"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setSelected(
+                  moveSelectedIssue(issues, selectedIssue, event.key === "ArrowDown" ? 1 : -1),
+                );
+                return;
+              }
               if (event.key !== "Enter") return;
               event.preventDefault();
-              submit();
+              linkSelection();
             }}
           />
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
             <span>{query === "" ? "Your open issues" : `Results for “${query}”`}</span>
-            {search.isPending ? <Spinner size="xs" aria-label="Searching Linear" /> : null}
+            {searching ? <Spinner size="xs" aria-label="Searching Linear" /> : null}
           </div>
-          <div className="-mx-1 flex max-h-80 flex-col overflow-y-auto">
+          <div
+            id="linear-issue-results"
+            role="listbox"
+            aria-label="Linear issues"
+            className="-mx-1 flex max-h-80 flex-col overflow-y-auto"
+          >
             {issues.map((issue) => (
               <LinearIssueOption
                 key={issue.identifier}
                 issue={issue}
+                selected={issue.identifier === selectedIssue}
                 disabled={mutation.pending}
-                onSelect={() => void link(issue.identifier)}
+                onSelect={() => setSelected(issue.identifier)}
+                onConfirm={() => void link(issue.identifier)}
               />
             ))}
-            {!search.isPending && search.error === null && issues.length === 0 ? (
+            {!searching && search.error === null && issues.length === 0 ? (
               <p className="px-1 py-2 text-muted-foreground text-xs">No issues found.</p>
             ) : null}
           </div>
@@ -222,8 +248,16 @@ function LinearLinkForm({
         <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button type="button" size="sm" disabled={mutation.pending} onClick={submit}>
-          {parseLinearIssueReference(draft) !== null ? "Link" : "Search"}
+        <Button
+          type="button"
+          size="sm"
+          disabled={
+            mutation.pending ||
+            (parseLinearIssueReference(draft) === null && selectedIssue === null)
+          }
+          onClick={linkSelection}
+        >
+          {mutation.pending ? "Linking..." : selectedIssue ? `Link ${selectedIssue}` : "Link"}
         </Button>
       </DialogFooter>
     </>
@@ -232,19 +266,31 @@ function LinearLinkForm({
 
 function LinearIssueOption({
   issue,
+  selected,
   disabled,
   onSelect,
+  onConfirm,
 }: {
   issue: LinearIssue;
+  selected: boolean;
   disabled: boolean;
   onSelect: () => void;
+  onConfirm: () => void;
 }) {
   return (
     <button
       type="button"
+      role="option"
+      aria-selected={selected}
       disabled={disabled}
       onClick={onSelect}
-      className="flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none disabled:opacity-60"
+      onDoubleClick={onConfirm}
+      // Keeps the row picked with the arrow keys in view.
+      ref={selected ? (node) => node?.scrollIntoView({ block: "nearest" }) : undefined}
+      className={cn(
+        "flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5 text-left hover:bg-accent/60 focus-visible:outline-none disabled:opacity-60",
+        selected && "bg-accent hover:bg-accent",
+      )}
     >
       <span className="flex min-w-0 items-baseline gap-2 text-sm">
         <span className="shrink-0 text-muted-foreground tabular-nums text-xs">

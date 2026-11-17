@@ -59,6 +59,36 @@ export function resolveLinearIssueRowView(input: {
     : { kind: "issue", issue: data.issue, source: data.link.source };
 }
 
+/** Waits for a pause in typing before searching Linear. */
+export const LINEAR_SEARCH_DEBOUNCE_MS = 500;
+
+/** The text to search for; one character is too broad, so it lists open issues instead. */
+export function linearSearchQuery(draft: string): string {
+  const trimmed = draft.trim();
+  return trimmed.length < 2 ? "" : trimmed;
+}
+
+/** The chosen issue while it is still listed, otherwise the first result. */
+export function resolveSelectedIssue(
+  issues: ReadonlyArray<Pick<LinearIssue, "identifier">>,
+  selected: LinearIssueIdentifier | null,
+): LinearIssueIdentifier | null {
+  if (selected !== null && issues.some((issue) => issue.identifier === selected)) return selected;
+  return issues[0]?.identifier ?? null;
+}
+
+/** Moves the selection by `delta` rows, stopping at the first and last result. */
+export function moveSelectedIssue(
+  issues: ReadonlyArray<Pick<LinearIssue, "identifier">>,
+  selected: LinearIssueIdentifier | null,
+  delta: number,
+): LinearIssueIdentifier | null {
+  if (issues.length === 0) return null;
+  const current = issues.findIndex((issue) => issue.identifier === selected);
+  const next = Math.min(Math.max((current === -1 ? 0 : current) + delta, 0), issues.length - 1);
+  return issues[next]!.identifier;
+}
+
 export function assigneeInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const initials =

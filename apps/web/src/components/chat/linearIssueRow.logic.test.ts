@@ -4,7 +4,10 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   assigneeInitials,
   collectThreadLinearIdentifiers,
+  linearSearchQuery,
+  moveSelectedIssue,
   resolveLinearIssueRowView,
+  resolveSelectedIssue,
 } from "./linearIssueRow.logic";
 
 const id = (value: string) => value as LinearIssueIdentifier;
@@ -67,6 +70,46 @@ describe("resolveLinearIssueRowView", () => {
     ],
   ] as const)("shows %s", (_name, input, expected) => {
     expect(resolveLinearIssueRowView(input)).toEqual(expected);
+  });
+});
+
+describe("linearSearchQuery", () => {
+  it.each([
+    ["", ""],
+    ["  a ", ""],
+    ["  login sso ", "login sso"],
+  ])("searches %j as %j", (draft, expected) => {
+    expect(linearSearchQuery(draft)).toBe(expected);
+  });
+});
+
+describe("issue selection", () => {
+  const issues = [
+    { identifier: id("PRO-1") },
+    { identifier: id("PRO-2") },
+    { identifier: id("PRO-3") },
+  ];
+
+  it.each([
+    ["the first result when nothing is chosen", null, "PRO-1"],
+    ["the chosen issue while it is listed", id("PRO-2"), "PRO-2"],
+    ["the first result once the chosen issue is gone", id("PRO-9"), "PRO-1"],
+  ] as const)("selects %s", (_name, selected, expected) => {
+    expect(resolveSelectedIssue(issues, selected)).toBe(expected);
+  });
+
+  it("selects nothing without results", () => {
+    expect(resolveSelectedIssue([], id("PRO-1"))).toBeNull();
+    expect(moveSelectedIssue([], id("PRO-1"), 1)).toBeNull();
+  });
+
+  it.each([
+    ["down", id("PRO-1"), 1, "PRO-2"],
+    ["up", id("PRO-2"), -1, "PRO-1"],
+    ["down at the last result", id("PRO-3"), 1, "PRO-3"],
+    ["up at the first result", id("PRO-1"), -1, "PRO-1"],
+  ] as const)("moves %s", (_name, selected, delta, expected) => {
+    expect(moveSelectedIssue(issues, selected, delta)).toBe(expected);
   });
 });
 
