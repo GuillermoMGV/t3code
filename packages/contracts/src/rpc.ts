@@ -358,6 +358,15 @@ import {
 } from "./providerUsageLimits.ts";
 import { UsagePricing, UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
 import {
+  LinearMutation,
+  LinearMutationResult,
+  LinearRequestError,
+  LinearSearchIssuesInput,
+  LinearSearchIssuesResult,
+  LinearThreadIssueInput,
+  LinearThreadIssueResult,
+} from "./linear.ts";
+import {
   StorageCleanupReport,
   DatabaseReclaimError,
   DatabaseStorageStatus,
@@ -547,6 +556,9 @@ export const WS_METHODS = {
   serverCheckOtlpEndpoint: "server.checkOtlpEndpoint",
   serverListTextGeneratorModels: "server.listTextGeneratorModels",
   serverPrepareTriage: "server.prepareTriage",
+  linearGetThreadIssue: "linear.getThreadIssue",
+  linearSearchIssues: "linear.searchIssues",
+  linearMutate: "linear.mutate",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
@@ -1020,6 +1032,24 @@ const WsServerPrepareTriageRpc = Rpc.make(WS_METHODS.serverPrepareTriage, {
   payload: ServerPrepareTriageInput,
   success: ServerPrepareTriageResult,
   error: Schema.Union([ServerPrepareTriageError, EnvironmentAuthorizationError]),
+});
+
+const WsLinearGetThreadIssueRpc = Rpc.make(WS_METHODS.linearGetThreadIssue, {
+  payload: LinearThreadIssueInput,
+  success: LinearThreadIssueResult,
+  error: Schema.Union([LinearRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsLinearSearchIssuesRpc = Rpc.make(WS_METHODS.linearSearchIssues, {
+  payload: LinearSearchIssuesInput,
+  success: LinearSearchIssuesResult,
+  error: Schema.Union([LinearRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsLinearMutateRpc = Rpc.make(WS_METHODS.linearMutate, {
+  payload: LinearMutation,
+  success: LinearMutationResult,
+  error: Schema.Union([LinearRequestError, EnvironmentAuthorizationError]),
 });
 
 const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
@@ -2169,6 +2199,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerCheckOtlpEndpointRpc,
   WsServerListTextGeneratorModelsRpc,
   WsServerPrepareTriageRpc,
+  WsLinearGetThreadIssueRpc,
+  WsLinearSearchIssuesRpc,
+  WsLinearMutateRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,
