@@ -23,7 +23,14 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { RefreshIcon } from "../ui/refresh-icon";
 import { SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import {
+  filterNotifications,
+  type NotificationTrackerFilter,
+  showsTrackerFilter,
+  unreadBadgeLabel,
+} from "./SidebarIssueNotifications.logic";
 
 // Fork-only notifications bell for Linear and Jira; see CUSTOM_DEVELOPMENT.md.
 
@@ -57,8 +64,12 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
   });
   const openLink = useOpenLink(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [trackerFilter, setTrackerFilter] = useState<NotificationTrackerFilter>("all");
   const data = query.data;
   if (data === null || data.connected.length === 0) return null;
+  const withFilter = showsTrackerFilter(data.connected, data.notifications);
+  const visible = filterNotifications(data.notifications, withFilter ? trackerFilter : "all");
+  const visibleUnreadIds = visible.filter((item) => !item.read).map((item) => item.id);
 
   const run = async (input: IssueTrackerNotificationsMutation) => {
     const result = await mutate({ environmentId, input });
@@ -86,24 +97,24 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
         <Tooltip>
           <TooltipTrigger
             render={
-              <PopoverTrigger
-                render={<SidebarMenuButton aria-label={label} size="icon" className="relative" />}
-              />
+              <PopoverTrigger render={<SidebarMenuButton aria-label={label} size="icon" />} />
             }
           >
             <BellIcon />
-            {unread > 0 ? (
-              <Badge
-                variant="destructive"
-                size="sm"
-                className="pointer-events-none absolute -top-1 -right-1"
-              >
-                {unread > 99 ? "99+" : unread}
-              </Badge>
-            ) : null}
           </TooltipTrigger>
           <TooltipPopup side="top">{label}</TooltipPopup>
         </Tooltip>
+        {/* Outside the button: SidebarMenuButton clips its overflow, which cut the badge. */}
+        {unread > 0 ? (
+          <Badge
+            variant="destructive"
+            size="sm"
+            aria-hidden
+            className="pointer-events-none absolute -top-1 -right-1"
+          >
+            {unreadBadgeLabel(unread)}
+          </Badge>
+        ) : null}
         <PopoverPopup side="top" align="start" className="w-96">
           <div className="flex max-h-120 flex-col">
             <div className="flex items-center gap-1 pb-2">
@@ -111,8 +122,15 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
               <Button
                 variant="ghost"
                 size="xs"
-                disabled={unread === 0}
-                onClick={() => void run({ type: "markAllRead" })}
+                disabled={visibleUnreadIds.length === 0}
+                // With a tracker chosen, only what is shown is marked.
+                onClick={() =>
+                  void run(
+                    withFilter && trackerFilter !== "all"
+                      ? { type: "markRead", ids: visibleUnreadIds }
+                      : { type: "markAllRead" },
+                  )
+                }
               >
                 <CheckCheckIcon />
                 Mark all as read
@@ -143,13 +161,30 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
                 {ISSUE_TRACKER_LABELS[error.tracker]}: {error.message}
               </p>
             ))}
-            {data.notifications.length === 0 ? (
+            {withFilter ? (
+              <ToggleGroup
+                aria-label="Show notifications from"
+                className="mb-2 self-start"
+                value={[trackerFilter]}
+                onValueChange={(next) => {
+                  const value = next[0];
+                  if (value === "all" || value === "linear" || value === "jira") {
+                    setTrackerFilter(value);
+                  }
+                }}
+              >
+                <Toggle value="all">All</Toggle>
+                <Toggle value="linear">{ISSUE_TRACKER_LABELS.linear}</Toggle>
+                <Toggle value="jira">{ISSUE_TRACKER_LABELS.jira}</Toggle>
+              </ToggleGroup>
+            ) : null}
+            {visible.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 {data.checkedAt === null ? "Checking…" : "No notifications in the last days."}
               </p>
             ) : (
               <ul className="-mx-2 min-h-0 flex-1 overflow-y-auto">
-                {data.notifications.map((notification) => (
+                {visible.map((notification) => (
                   <NotificationRow
                     key={notification.id}
                     notification={notification}
