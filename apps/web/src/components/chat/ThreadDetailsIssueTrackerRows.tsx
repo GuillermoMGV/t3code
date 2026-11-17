@@ -58,6 +58,10 @@ export function ThreadDetailsIssueTrackerRows({
   const query = useEnvironmentQuery(
     issueTrackerEnvironment.threadIssues({ environmentId, input: { threadId, detected } }),
   );
+  // The thread list's badges read the same links; refresh them with the panel.
+  const summaries = useEnvironmentQuery(
+    issueTrackerEnvironment.threadSummaries({ environmentId, input: {} }),
+  );
   const view = resolveIssueTrackerPanelView({ data: query.data, error: query.error });
   const navigate = useNavigate();
   const openSettings = () => void navigate({ to: SETTINGS_PATH });
@@ -101,7 +105,10 @@ export function ThreadDetailsIssueTrackerRows({
           environmentId={environmentId}
           threadId={threadId}
           dismissKeys={detected.filter((ref) => ref.tracker === row.tracker).map((ref) => ref.key)}
-          onChanged={() => query.refresh()}
+          onChanged={() => {
+            query.refresh();
+            summaries.refresh();
+          }}
           onOpenSettings={openSettings}
         />
       ))}

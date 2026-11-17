@@ -119,6 +119,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.issueTrackersGetThreadIssues]: AuthOrchestrationReadScope,
   [WS_METHODS.issueTrackersSearch]: AuthOrchestrationReadScope,
   [WS_METHODS.issueTrackersGetConnections]: AuthOrchestrationReadScope,
+  [WS_METHODS.issueTrackersGetThreadSummaries]: AuthOrchestrationReadScope,
   // Connecting replaces stored Linear or Jira credentials; linking edits a thread's details.
   [WS_METHODS.issueTrackersMutate]: AuthOrchestrationOperateScope,
   [WS_METHODS.scheduledTasksSubscribe]: AuthOrchestrationReadScope,

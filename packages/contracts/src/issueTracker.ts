@@ -75,6 +75,18 @@ export const IssueTrackerThreadResult = Schema.Struct({
 });
 export type IssueTrackerThreadResult = typeof IssueTrackerThreadResult.Type;
 
+export const IssueTrackerSummariesInput = Schema.Struct({});
+export const IssueTrackerThreadSummary = Schema.Struct({
+  threadId: ThreadId,
+  /** Linked issues the saved credentials can read, Linear first. */
+  issues: Schema.Array(TrackerIssue),
+});
+export type IssueTrackerThreadSummary = typeof IssueTrackerThreadSummary.Type;
+export const IssueTrackerSummariesResult = Schema.Struct({
+  threads: Schema.Array(IssueTrackerThreadSummary),
+});
+export type IssueTrackerSummariesResult = typeof IssueTrackerSummariesResult.Type;
+
 export const IssueTrackerSearchInput = Schema.Struct({
   tracker: IssueTrackerKind,
   /** An issue URL, a key, or words from the title. Empty lists your open issues. */

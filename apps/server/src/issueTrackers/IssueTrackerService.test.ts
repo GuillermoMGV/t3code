@@ -3,7 +3,12 @@ import type { IssueKey } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
-import { applyThreadLinkMutation, resolveThreadLink } from "./IssueTrackerService.ts";
+import {
+  applyThreadLinkMutation,
+  rememberDetectedLink,
+  resolveThreadLink,
+  summaryKey,
+} from "./IssueTrackerService.ts";
 import { jqlString, makeJiraApi, normalizeJiraSiteUrl } from "./jiraApi.ts";
 import { makeLinearApi } from "./linearApi.ts";
 
@@ -39,6 +44,49 @@ describe("resolveThreadLink", () => {
     ],
   ] as const)("resolves %s", (_name, entry, detected, expected) => {
     expect(resolveThreadLink(entry, detected)).toEqual(expected);
+  });
+});
+
+describe("remembered detections", () => {
+  it("falls back to the remembered detection before the messages load", () => {
+    expect(resolveThreadLink({ detected: key("PRO-4") }, [])).toEqual({
+      key: "PRO-4",
+      source: "detected",
+    });
+  });
+
+  it("remembers a new detection and ignores manual links or repeats", () => {
+    expect(rememberDetectedLink(undefined, { key: key("PRO-4"), source: "detected" })).toEqual({
+      detected: "PRO-4",
+    });
+    expect(
+      rememberDetectedLink({ detected: key("PRO-4") }, { key: key("PRO-4"), source: "detected" }),
+    ).toBeUndefined();
+    expect(
+      rememberDetectedLink(undefined, { key: key("PRO-4"), source: "manual" }),
+    ).toBeUndefined();
+  });
+
+  it.each([
+    ["the manual link", { key: key("PRO-1"), detected: key("PRO-2") }, "PRO-1"],
+    ["the remembered detection", { detected: key("PRO-2") }, "PRO-2"],
+    [
+      "nothing for a dismissed detection",
+      { detected: key("PRO-2"), dismissed: [key("PRO-2")] },
+      null,
+    ],
+    ["nothing without links", undefined, null],
+  ] as const)("shows %s in the thread list", (_name, entry, expected) => {
+    expect(summaryKey(entry)).toBe(expected);
+  });
+
+  it("forgets the detection when the thread is unlinked", () => {
+    expect(
+      applyThreadLinkMutation(
+        { detected: key("PRO-2") },
+        { type: "unlink", threadId, tracker: "linear", dismissKeys: [key("PRO-2")] },
+      ),
+    ).toEqual({ dismissed: ["PRO-2"] });
   });
 });
 

@@ -2710,6 +2710,7 @@ export const layerWsRpc = (
         [WS_METHODS.issueTrackersGetThreadIssues]: (input) => issueTrackers.getThreadIssues(input),
         [WS_METHODS.issueTrackersSearch]: (input) => issueTrackers.search(input),
         [WS_METHODS.issueTrackersGetConnections]: (_input) => issueTrackers.getConnections,
+        [WS_METHODS.issueTrackersGetThreadSummaries]: (_input) => issueTrackers.getThreadSummaries,
         [WS_METHODS.issueTrackersMutate]: (input) => issueTrackers.mutate(input),
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
         [WS_METHODS.serverReportClientActivity]: (input, metadata) =>

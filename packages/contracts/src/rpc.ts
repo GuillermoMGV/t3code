@@ -365,6 +365,8 @@ import {
   IssueTrackerMutationResult,
   IssueTrackerSearchInput,
   IssueTrackerSearchResult,
+  IssueTrackerSummariesInput,
+  IssueTrackerSummariesResult,
   IssueTrackerThreadInput,
   IssueTrackerThreadResult,
 } from "./issueTracker.ts";
@@ -561,6 +563,7 @@ export const WS_METHODS = {
   issueTrackersGetThreadIssues: "issueTrackers.getThreadIssues",
   issueTrackersSearch: "issueTrackers.search",
   issueTrackersGetConnections: "issueTrackers.getConnections",
+  issueTrackersGetThreadSummaries: "issueTrackers.getThreadSummaries",
   issueTrackersMutate: "issueTrackers.mutate",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
@@ -1052,6 +1055,12 @@ const WsIssueTrackersSearchRpc = Rpc.make(WS_METHODS.issueTrackersSearch, {
 const WsIssueTrackersGetConnectionsRpc = Rpc.make(WS_METHODS.issueTrackersGetConnections, {
   payload: IssueTrackerConnectionsInput,
   success: IssueTrackerConnectionsResult,
+  error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
+});
+
+const WsIssueTrackersGetThreadSummariesRpc = Rpc.make(WS_METHODS.issueTrackersGetThreadSummaries, {
+  payload: IssueTrackerSummariesInput,
+  success: IssueTrackerSummariesResult,
   error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
 });
 
@@ -2211,6 +2220,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsIssueTrackersGetThreadIssuesRpc,
   WsIssueTrackersSearchRpc,
   WsIssueTrackersGetConnectionsRpc,
+  WsIssueTrackersGetThreadSummariesRpc,
   WsIssueTrackersMutateRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,

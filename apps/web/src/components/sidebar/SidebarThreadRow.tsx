@@ -2,6 +2,7 @@ import { useAtomMount } from "@effect/atom-react";
 import { asLaunchingThread } from "@t3tools/client-runtime/state/thread-inbox";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadTerminalStatusButton } from "../ThreadStatusIndicators";
+import { SidebarThreadIssueBadges, useThreadIssueSummary } from "./SidebarThreadIssueBadges";
 import { discardComposerDraft } from "../../lib/discardComposerDraft";
 import { contextMenuSourceOf } from "../../contextMenuSource";
 import { requestCustomSnooze } from "../CustomSnoozeDialog";
@@ -675,6 +676,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   } = props;
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const threadKey = scopedThreadKey(threadRef);
+  const issueSummary = useThreadIssueSummary(threadRef);
   const canOperateThread = useEnvironmentScope(thread.environmentId, AuthOrchestrationOperateScope);
   const { leaseLiveStatus, rowRef: leaseRowRef } = useSidebarRowSubscriptionLease(props.isActive);
   const { revealRef } = props;
@@ -1169,6 +1171,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const metaLineEmpty =
     !checkoutThread.branch &&
     !showsScratchMachine &&
+    issueSummary === null &&
     prBadge === null &&
     diff === null &&
     runningTerminalIds.length === 0;
@@ -1193,6 +1196,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       ) : (
         <span className="flex-1" />
       )}
+      {issueSummary ? <SidebarThreadIssueBadges issue={issueSummary} /> : null}
       {terminalStatusIcon}
       {prBadge}
       {diff ? (

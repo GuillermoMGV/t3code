@@ -11,9 +11,12 @@ import {
   type IssueTrackerSearchResult,
   type IssueTrackerThreadInput,
   type IssueTrackerThreadResult,
+  type IssueTrackerSummariesResult,
   type IssueTrackerThreadRow,
+  type TrackerIssue,
   parseIssueReference,
 } from "@t3tools/contracts";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -32,12 +35,15 @@ const TRACKERS = ["linear", "jira"] as const satisfies ReadonlyArray<IssueTracke
 const LINEAR_KEY_SECRET = "linear-api-key";
 const JIRA_SECRET = "jira-credentials";
 const LINKS_FILE = "issue-tracker-links.json";
+const ISSUE_CACHE_MS = 60_000;
 /** Written by the first, Linear-only version of this feature. */
 const LEGACY_LINEAR_LINKS_FILE = "linear-links.json";
 
 const ThreadLinkEntry = Schema.Struct({
   key: Schema.optional(IssueKey),
   dismissed: Schema.optional(Schema.Array(IssueKey)),
+  /** The issue last detected in the thread's messages, so the thread list can show it. */
+  detected: Schema.optional(IssueKey),
 });
 type ThreadLinkEntry = typeof ThreadLinkEntry.Type;
 
@@ -80,8 +86,26 @@ export function resolveThreadLink(
 ): { key: IssueKey; source: IssueTrackerLinkSource } | null {
   if (entry?.key !== undefined) return { key: entry.key, source: "manual" };
   const dismissed = entry?.dismissed ?? [];
-  const key = detected.find((candidate) => !dismissed.includes(candidate));
+  // The remembered detection covers a client that has not loaded the messages yet.
+  const candidates = entry?.detected === undefined ? detected : [...detected, entry.detected];
+  const key = candidates.find((candidate) => !dismissed.includes(candidate));
   return key === undefined ? null : { key, source: "detected" };
+}
+
+/** The issue the thread list shows for a tracker: the manual link, else the remembered detection. */
+export function summaryKey(entry: ThreadLinkEntry | undefined): IssueKey | null {
+  if (entry?.key !== undefined) return entry.key;
+  const detected = entry?.detected;
+  return detected !== undefined && !(entry?.dismissed ?? []).includes(detected) ? detected : null;
+}
+
+/** The entry remembering a newly detected issue, or undefined when nothing changes. */
+export function rememberDetectedLink(
+  entry: ThreadLinkEntry | undefined,
+  link: { key: IssueKey; source: IssueTrackerLinkSource } | null,
+): ThreadLinkEntry | undefined {
+  if (link?.source !== "detected" || entry?.detected === link.key) return undefined;
+  return { ...entry, detected: link.key };
 }
 
 /** The entry after a mutation, or undefined when nothing is left to remember. */
@@ -113,6 +137,7 @@ export class IssueTrackerService extends Context.Service<
       input: IssueTrackerSearchInput,
     ) => Effect.Effect<IssueTrackerSearchResult, IssueTrackerError>;
     readonly getConnections: Effect.Effect<IssueTrackerConnectionsResult, IssueTrackerError>;
+    readonly getThreadSummaries: Effect.Effect<IssueTrackerSummariesResult, IssueTrackerError>;
     readonly mutate: (
       input: IssueTrackerMutation,
     ) => Effect.Effect<IssueTrackerMutationResult, IssueTrackerError>;
@@ -215,6 +240,24 @@ const make = Effect.gen(function* () {
           ),
         );
 
+  // The thread list asks for every linked thread at once; this keeps it to one read per issue a minute.
+  const issueCache = new Map<
+    string,
+    { readonly issue: TrackerIssue | null; readonly at: number }
+  >();
+  const fetchAndCache = (tracker: IssueTrackerKind, key: IssueKey) =>
+    fetchIssue(tracker, key).pipe(
+      Effect.tap((issue) =>
+        Clock.currentTimeMillis.pipe(
+          Effect.map((at) =>
+            Option.isSome(issue)
+              ? issueCache.set(`${tracker}:${key}`, { issue: issue.value, at })
+              : undefined,
+          ),
+        ),
+      ),
+    );
+
   const isConnected = (tracker: IssueTrackerKind) =>
     tracker === "linear"
       ? readLinearKey.pipe(Effect.map(Option.isSome))
@@ -237,7 +280,7 @@ const make = Effect.gen(function* () {
           if (!connected || link === null) {
             return { tracker, connected, link, issue: null, error: null };
           }
-          const issue = yield* fetchIssue(tracker, link.key);
+          const issue = yield* fetchAndCache(tracker, link.key);
           return { tracker, connected, link, issue: Option.getOrNull(issue), error: null };
         }).pipe(
           // One tracker failing must not hide the other's row.
@@ -254,8 +297,76 @@ const make = Effect.gen(function* () {
       },
       { concurrency: "unbounded" },
     );
+    const detectedNow = rows.flatMap((row) =>
+      rememberDetectedLink(threadLinks[row.tracker], row.link) === undefined || row.link === null
+        ? []
+        : [{ tracker: row.tracker, key: row.link.key }],
+    );
+    if (detectedNow.length > 0) {
+      yield* writeLock
+        .withPermits(1)(
+          Effect.gen(function* () {
+            const latest = yield* readLinks;
+            const current = latest.threads[input.threadId] ?? {};
+            const next: ThreadLinks = Object.assign(
+              { ...current },
+              ...detectedNow.map(({ tracker, key }) => ({
+                [tracker]: { ...current[tracker], detected: key },
+              })),
+            );
+            yield* writeLinks({ threads: { ...latest.threads, [input.threadId]: next } });
+          }),
+        )
+        // Remembering the detection only helps the thread list; the panel answer stands without it.
+        .pipe(Effect.ignore);
+    }
     return { rows };
   });
+
+  const getThreadSummaries = Effect.gen(function* () {
+    const links = yield* readLinks;
+    const [linearConnected, jiraConnected] = yield* Effect.all([
+      isConnected("linear"),
+      isConnected("jira"),
+    ]);
+    const connected = { linear: linearConnected, jira: jiraConnected };
+    const wanted = Object.entries(links.threads).flatMap(([threadId, threadLinks]) =>
+      TRACKERS.flatMap((tracker) => {
+        const key = summaryKey(threadLinks[tracker]);
+        return key !== null && connected[tracker] ? [{ threadId, tracker, key }] : [];
+      }),
+    );
+    const now = yield* Clock.currentTimeMillis;
+    const uniqueIssues = [...new Map(wanted.map((item) => [`${item.tracker}:${item.key}`, item]))];
+    const fetched = yield* Effect.forEach(
+      uniqueIssues,
+      ([id, { tracker, key }]) => {
+        const cached = issueCache.get(id);
+        if (cached !== undefined && now - cached.at < ISSUE_CACHE_MS) {
+          return Effect.succeed([id, cached.issue] as const);
+        }
+        return fetchAndCache(tracker, key).pipe(
+          Effect.map((issue) => [id, Option.getOrNull(issue)] as const),
+          // A tracker that fails leaves its badges out; the list must still load.
+          Effect.orElseSucceed(() => [id, null] as const),
+        );
+      },
+      { concurrency: 4 },
+    );
+    const issueById = new Map(fetched);
+    const byThread = new Map<string, TrackerIssue[]>();
+    for (const { threadId, tracker, key } of wanted) {
+      const issue = issueById.get(`${tracker}:${key}`) ?? null;
+      if (issue === null) continue;
+      byThread.set(threadId, [...(byThread.get(threadId) ?? []), issue]);
+    }
+    return {
+      threads: [...byThread].map(([threadId, issues]) => ({
+        threadId: threadId as IssueTrackerThreadInput["threadId"],
+        issues,
+      })),
+    };
+  }).pipe(Effect.withSpan("IssueTrackerService.getThreadSummaries"));
 
   const search = Effect.fn("IssueTrackerService.search")(function* (
     input: IssueTrackerSearchInput,
@@ -367,7 +478,13 @@ const make = Effect.gen(function* () {
     }
   });
 
-  return IssueTrackerService.of({ getThreadIssues, search, getConnections, mutate });
+  return IssueTrackerService.of({
+    getThreadIssues,
+    search,
+    getConnections,
+    getThreadSummaries,
+    mutate,
+  });
 });
 
 const notConnected = (tracker: IssueTrackerKind) =>

@@ -25,6 +25,14 @@ export const issueTrackerEnvironment = {
     tag: WS_METHODS.issueTrackersGetConnections,
     staleTimeMs: 30_000,
   }),
+  /** Every linked thread's issues, for the thread list's badges. */
+  threadSummaries: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
+    label: "issue-trackers:thread-summaries",
+    tag: WS_METHODS.issueTrackersGetThreadSummaries,
+    staleTimeMs: 30_000,
+    // The server caches each issue for a minute, so this costs one read per issue at most.
+    refreshIntervalMs: 60_000,
+  }),
   mutate: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "issue-trackers:mutate",
     tag: WS_METHODS.issueTrackersMutate,
