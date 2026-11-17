@@ -123,6 +123,9 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.issueTrackersGetIssues]: AuthOrchestrationReadScope,
   // Connecting replaces stored Linear or Jira credentials; linking edits a thread's details.
   [WS_METHODS.issueTrackersMutate]: AuthOrchestrationOperateScope,
+  [WS_METHODS.issueTrackersGetNotifications]: AuthOrchestrationReadScope,
+  // Marks items read in Linear itself, not only on this server.
+  [WS_METHODS.issueTrackersMutateNotifications]: AuthOrchestrationOperateScope,
   [WS_METHODS.salesforceGetState]: AuthOrchestrationReadScope,
   // Changes the org agents run `sf` against, and signs in or out of orgs.
   [WS_METHODS.salesforceMutate]: AuthOrchestrationOperateScope,

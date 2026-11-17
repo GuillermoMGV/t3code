@@ -205,7 +205,8 @@ export const makeLinearApi = Effect.gen(function* () {
     return toTrackerIssues((yield* expectData(AssignedData, result)).viewer.assignedIssues.nodes);
   });
 
-  return { viewerName, issue, search, assignedOpenIssues };
+  // graphql: used by the notifications bell (IssueTrackerNotifications.ts).
+  return { viewerName, issue, search, assignedOpenIssues, graphql };
 });
 
 export type LinearApi = Effect.Success<typeof makeLinearApi>;

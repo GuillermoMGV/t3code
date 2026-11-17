@@ -65,6 +65,7 @@ export * from "./previewAutomation.ts";
 export * from "./previewCapture.ts";
 export * from "./usage.ts";
 export * from "./issueTracker.ts";
+export * from "./issueTrackerNotifications.ts";
 export * from "./salesforce.ts";
 export * from "./scheduledTask.ts";
 export * from "./worktreeMcp.ts";

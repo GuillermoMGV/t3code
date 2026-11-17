@@ -373,6 +373,11 @@ import {
   IssueTrackerThreadResult,
 } from "./issueTracker.ts";
 import {
+  IssueTrackerNotificationsInput,
+  IssueTrackerNotificationsMutation,
+  IssueTrackerNotificationsResult,
+} from "./issueTrackerNotifications.ts";
+import {
   SalesforceError,
   SalesforceMutation,
   SalesforceMutationResult,
@@ -575,6 +580,8 @@ export const WS_METHODS = {
   issueTrackersGetThreadSummaries: "issueTrackers.getThreadSummaries",
   issueTrackersGetIssues: "issueTrackers.getIssues",
   issueTrackersMutate: "issueTrackers.mutate",
+  issueTrackersGetNotifications: "issueTrackers.getNotifications",
+  issueTrackersMutateNotifications: "issueTrackers.mutateNotifications",
   salesforceGetState: "salesforce.getState",
   salesforceMutate: "salesforce.mutate",
   serverSignalProcess: "server.signalProcess",
@@ -1087,6 +1094,21 @@ const WsIssueTrackersMutateRpc = Rpc.make(WS_METHODS.issueTrackersMutate, {
   success: IssueTrackerMutationResult,
   error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
 });
+
+const WsIssueTrackersGetNotificationsRpc = Rpc.make(WS_METHODS.issueTrackersGetNotifications, {
+  payload: IssueTrackerNotificationsInput,
+  success: IssueTrackerNotificationsResult,
+  error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
+});
+
+const WsIssueTrackersMutateNotificationsRpc = Rpc.make(
+  WS_METHODS.issueTrackersMutateNotifications,
+  {
+    payload: IssueTrackerNotificationsMutation,
+    success: IssueTrackerNotificationsResult,
+    error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
+  },
+);
 
 const WsSalesforceGetStateRpc = Rpc.make(WS_METHODS.salesforceGetState, {
   payload: SalesforceStateInput,
@@ -2253,6 +2275,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsIssueTrackersGetThreadSummariesRpc,
   WsIssueTrackersGetIssuesRpc,
   WsIssueTrackersMutateRpc,
+  WsIssueTrackersGetNotificationsRpc,
+  WsIssueTrackersMutateNotificationsRpc,
   WsSalesforceGetStateRpc,
   WsSalesforceMutateRpc,
   WsServerGetUsageSummaryRpc,
