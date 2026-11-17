@@ -25,6 +25,7 @@ import { useContext, useState, type MouseEvent as ReactMouseEvent } from "react"
 import { useOpenLink } from "~/browser/useOpenLink";
 import { isElectron } from "~/env";
 import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
+import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useScratchProject } from "~/hooks/useScratchProject";
 import { buildSidebarProjectPickerEntries } from "~/sidebarProjectGrouping";
 import { useThreadShells } from "~/state/entities";
@@ -38,6 +39,7 @@ import { IssueAssigneeBadge, IssueStateBadge, IssueTrackerIcon } from "../chat/I
 import { useIssueSearch } from "../chat/useIssueSearch";
 import { useSortedProjectGroups } from "../CommandPaletteLookups";
 import { ProjectFavicon } from "../ProjectFavicon";
+import type { EnvironmentPullRequestEntry } from "../pullRequest/pullRequestList.logic";
 import { Button } from "../ui/button";
 import {
   Combobox,
@@ -73,13 +75,17 @@ import {
   EMPTY_ISSUE_LIST_FILTER,
   filterIssues,
   ISSUE_ASSIGNEE_GROUPS,
+  IssueListFilter,
+  issueListFilterCount,
+  issueListFilterStorageKey,
+  issueProjectOptions,
   issueStateOptions,
-  type IssueListFilter,
   issueThreadPrompt,
   resolveIssuesTracker,
   threadsByIssue,
   threadsForIssue,
 } from "./issuesPage.logic";
+import { IssuePullRequestsLine, useIssuePullRequests } from "./IssuePullRequests";
 
 // Fork-only Issues page (start a thread from a Linear or Jira issue); see CUSTOM_DEVELOPMENT.md.
 
@@ -205,8 +211,19 @@ function IssueList({
 }) {
   const label = ISSUE_TRACKER_LABELS[tracker];
   const [draft, setDraft] = useState("");
-  const [filter, setFilter] = useState(EMPTY_ISSUE_LIST_FILTER);
-  const { query, issues: found, searching, error } = useIssueSearch(environmentId, tracker, draft);
+  // Remembered per tracker in this browser, like the Pull requests page's filters.
+  const [filter, setFilter] = useLocalStorage(
+    issueListFilterStorageKey(tracker),
+    EMPTY_ISSUE_LIST_FILTER,
+    IssueListFilter,
+  );
+  const {
+    query,
+    issues: found,
+    searching,
+    error,
+  } = useIssueSearch(environmentId, tracker, draft, "recent");
+  const pullRequestsByKey = useIssuePullRequests();
   const issues = filterIssues(found, filter, me);
   const threadsByIssueKey = useThreadsByIssue();
   const projectChoices = useProjectChoices();
@@ -231,10 +248,11 @@ function IssueList({
           filter={filter}
           onFilter={setFilter}
           stateOptions={issueStateOptions(found, filter)}
+          projectOptions={issueProjectOptions(found, filter)}
         />
       </div>
       <p className="text-muted-foreground text-xs">
-        {query === "" ? "Your open issues" : `Results for “${query}”`}
+        {query === "" ? "Recently updated issues" : `Results for “${query}”`}
         {issues.length < found.length
           ? ` · ${found.length - issues.length} hidden by filters`
           : null}
@@ -246,6 +264,7 @@ function IssueList({
             key={issue.key}
             issue={issue}
             threads={threadsForIssue(threadsByIssueKey, issue)}
+            pullRequests={pullRequestsByKey.get(issue.key) ?? []}
             projectChoices={projectChoices}
             onStart={(projectRef) => void startThread(issue, projectRef)}
           />
@@ -326,11 +345,13 @@ function useProjectChoices(): ReadonlyArray<ProjectChoice> {
 function IssueRow({
   issue,
   threads,
+  pullRequests,
   projectChoices,
   onStart,
 }: {
   issue: TrackerIssue;
   threads: ReadonlyArray<EnvironmentThreadShell>;
+  pullRequests: ReadonlyArray<EnvironmentPullRequestEntry>;
   projectChoices: ReadonlyArray<ProjectChoice>;
   onStart: (projectRef: ScopedProjectRef) => void;
 }) {
@@ -364,6 +385,7 @@ function IssueRow({
           {issue.priorityLabel ? <span className="shrink-0">{issue.priorityLabel}</span> : null}
           <span className="shrink-0">Updated {formatRelativeTimeLabel(issue.updatedAt)}</span>
         </div>
+        {pullRequests.length > 0 ? <IssuePullRequestsLine entries={pullRequests} /> : null}
       </div>
       {threads.length === 0 ? (
         <StartThreadPicker issueKey={issue.key} choices={projectChoices} onPick={onStart} />
@@ -484,12 +506,14 @@ function IssueFiltersMenu({
   filter,
   onFilter,
   stateOptions,
+  projectOptions,
 }: {
   filter: IssueListFilter;
   onFilter: (filter: IssueListFilter) => void;
   stateOptions: ReadonlyArray<string>;
+  projectOptions: ReadonlyArray<string>;
 }) {
-  const count = filter.states.length + filter.assignees.length;
+  const count = issueListFilterCount(filter);
   return (
     <Menu>
       <MenuTrigger
@@ -526,6 +550,22 @@ function IssueFiltersMenu({
                 }
               >
                 {state}
+              </MenuCheckboxItem>
+            ))}
+          </MenuGroup>
+        ) : null}
+        {projectOptions.length > 0 ? (
+          <MenuGroup>
+            <MenuGroupLabel>Project</MenuGroupLabel>
+            {projectOptions.map((project) => (
+              <MenuCheckboxItem
+                key={project}
+                checked={filter.projects.includes(project)}
+                onCheckedChange={() =>
+                  onFilter({ ...filter, projects: toggleFilterValue(filter.projects, project) })
+                }
+              >
+                {project}
               </MenuCheckboxItem>
             ))}
           </MenuGroup>

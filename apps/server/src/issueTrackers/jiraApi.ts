@@ -202,11 +202,12 @@ export const makeJiraApi = Effect.gen(function* () {
   const searchJql = Effect.fn("JiraApi.searchJql")(function* (
     credentials: JiraCredentials,
     jql: string,
+    maxResults = 15,
   ) {
     const response = yield* request(credentials, "/rest/api/3/search/jql", {
       jql,
       fields: ISSUE_FIELDS,
-      maxResults: 15,
+      maxResults,
     });
     // Jira answers a JQL it cannot run, such as one naming a missing project, with 400.
     if (response.status === 400) return [];
@@ -218,6 +219,10 @@ export const makeJiraApi = Effect.gen(function* () {
   const search = (credentials: JiraCredentials, term: string) =>
     searchJql(credentials, `text ~ ${jqlString(term)} ORDER BY updated DESC`);
 
+  // The search endpoint rejects unbounded JQL, so "recent" means updated in the last 90 days.
+  const recentIssues = (credentials: JiraCredentials) =>
+    searchJql(credentials, "updated >= -90d ORDER BY updated DESC", 30);
+
   const assignedOpenIssues = (credentials: JiraCredentials) =>
     searchJql(
       credentials,
@@ -225,7 +230,7 @@ export const makeJiraApi = Effect.gen(function* () {
     );
 
   // request, readJson: used by the notifications bell (IssueTrackerNotifications.ts).
-  return { myself, issue, search, assignedOpenIssues, request, readJson };
+  return { myself, issue, search, assignedOpenIssues, recentIssues, request, readJson };
 });
 
 export type JiraApi = Effect.Success<typeof makeJiraApi>;

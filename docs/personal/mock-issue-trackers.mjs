@@ -235,6 +235,9 @@ NodeHttp.createServer(async (req, res) => {
       ? sendJson(res, 200, { data: { issue: found } })
       : sendJson(res, 200, { data: null, errors: [{ message: "Entity not found" }] });
   }
+  if (query.includes("issues(first")) {
+    return sendJson(res, 200, { data: { issues: { nodes: linearIssues } } });
+  }
   if (query.includes("searchIssues")) {
     const term = String(variables.term).toLowerCase();
     const nodes = linearIssues.filter((issue) => issue.title.toLowerCase().includes(term));

@@ -8,20 +8,25 @@ import { ISSUE_SEARCH_DEBOUNCE_MS, issueSearchQuery } from "./issueTrackerRows.l
 // Fork-only Linear and Jira integration; see CUSTOM_DEVELOPMENT.md.
 
 /**
- * Searches one tracker as the user types. An empty draft lists the user's open issues; a pasted
+ * Searches one tracker as the user types. An empty draft lists issues by `scope`; a pasted
  * issue URL or key finds that issue, because the server parses it before searching by title.
  */
 export function useIssueSearch(
   environmentId: EnvironmentId | null,
   tracker: IssueTrackerKind,
   draft: string,
+  /** What an empty draft lists; left out, the server lists the user's open issues. */
+  scope?: "mine" | "recent",
 ) {
   const query = issueSearchQuery(useDebouncedValue(draft, ISSUE_SEARCH_DEBOUNCE_MS));
   const typing = issueSearchQuery(draft) !== query;
   const search = useEnvironmentQuery(
     environmentId === null
       ? null
-      : issueTrackerEnvironment.search({ environmentId, input: { tracker, query } }),
+      : issueTrackerEnvironment.search({
+          environmentId,
+          input: { tracker, query, ...(scope === undefined ? {} : { scope }) },
+        }),
   );
   return {
     query,

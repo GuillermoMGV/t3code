@@ -106,8 +106,10 @@ export type IssueTrackerIssuesResult = typeof IssueTrackerIssuesResult.Type;
 
 export const IssueTrackerSearchInput = Schema.Struct({
   tracker: IssueTrackerKind,
-  /** An issue URL, a key, or words from the title. Empty lists your open issues. */
+  /** An issue URL, a key, or words from the title. Empty lists issues by `scope`. */
   query: Schema.String.check(Schema.isMaxLength(500)),
+  /** What an empty query lists: your open issues (default), or recently updated ones. */
+  scope: Schema.optional(Schema.Literals(["mine", "recent"])),
 });
 export type IssueTrackerSearchInput = typeof IssueTrackerSearchInput.Type;
 

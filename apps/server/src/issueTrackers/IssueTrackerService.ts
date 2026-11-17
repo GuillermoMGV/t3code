@@ -422,10 +422,17 @@ const make = Effect.gen(function* () {
   ) {
     const query = input.query.trim();
     const key = query.length === 0 ? null : parseIssueReference(query, input.tracker);
+    const recent = input.scope === "recent";
     if (input.tracker === "linear") {
       const apiKey = yield* readLinearKey;
       if (Option.isNone(apiKey)) return yield* notConnected("linear");
-      if (query.length === 0) return { issues: yield* linear.assignedOpenIssues(apiKey.value) };
+      if (query.length === 0) {
+        return {
+          issues: yield* recent
+            ? linear.recentIssues(apiKey.value)
+            : linear.assignedOpenIssues(apiKey.value),
+        };
+      }
       if (key !== null) {
         const issue = yield* linear.issue(apiKey.value, key);
         return { issues: issue === null ? [] : [issue] };
@@ -434,7 +441,13 @@ const make = Effect.gen(function* () {
     }
     const credentials = yield* readJiraCredentials;
     if (Option.isNone(credentials)) return yield* notConnected("jira");
-    if (query.length === 0) return { issues: yield* jira.assignedOpenIssues(credentials.value) };
+    if (query.length === 0) {
+      return {
+        issues: yield* recent
+          ? jira.recentIssues(credentials.value)
+          : jira.assignedOpenIssues(credentials.value),
+      };
+    }
     if (key !== null) {
       const issue = yield* jira.issue(credentials.value, key);
       return { issues: issue === null ? [] : [issue] };

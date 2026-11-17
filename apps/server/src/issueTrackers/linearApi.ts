@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
 const LINEAR_API_URL = "https://api.linear.app/graphql";
+const RECENT_ISSUES_LIMIT = 30;
 
 // IssueSearchResult is not an Issue, so the selection is spelled out instead of a fragment.
 const ISSUE_FIELDS = `identifier title url priorityLabel updatedAt
@@ -61,6 +62,9 @@ const ViewerData = Schema.Struct({ viewer: Schema.Struct({ name: Schema.String }
 const IssueData = Schema.Struct({ issue: Schema.NullOr(LinearIssueNode) });
 const SearchData = Schema.Struct({
   searchIssues: Schema.Struct({ nodes: Schema.Array(LinearIssueNode) }),
+});
+const RecentData = Schema.Struct({
+  issues: Schema.Struct({ nodes: Schema.Array(LinearIssueNode) }),
 });
 const AssignedData = Schema.Struct({
   viewer: Schema.Struct({
@@ -212,8 +216,17 @@ export const makeLinearApi = Effect.gen(function* () {
     return toTrackerIssues((yield* expectData(AssignedData, result)).viewer.assignedIssues.nodes);
   });
 
+  const recentIssues = Effect.fn("LinearApi.recentIssues")(function* (apiKey: string) {
+    const result = yield* graphql(
+      apiKey,
+      `query Recent { issues(first: ${RECENT_ISSUES_LIMIT}, orderBy: updatedAt) { nodes { ${ISSUE_FIELDS} } } }`,
+      {},
+    );
+    return toTrackerIssues((yield* expectData(RecentData, result)).issues.nodes);
+  });
+
   // graphql: used by the notifications bell (IssueTrackerNotifications.ts).
-  return { viewerName, issue, search, assignedOpenIssues, graphql };
+  return { viewerName, issue, search, assignedOpenIssues, recentIssues, graphql };
 });
 
 export type LinearApi = Effect.Success<typeof makeLinearApi>;

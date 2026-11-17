@@ -280,6 +280,12 @@ describe("makeJiraApi", () => {
       expect(JSON.parse(requests[0]!.body).jql).toBe(
         'text ~ "cert \\"rotation\\"" ORDER BY updated DESC',
       );
+      // Recent issues need a bounded JQL: the search endpoint rejects unbounded ones.
+      yield* api.recentIssues(JIRA_CREDENTIALS);
+      expect(JSON.parse(requests[1]!.body)).toMatchObject({
+        jql: "updated >= -90d ORDER BY updated DESC",
+        maxResults: 30,
+      });
       const error = yield* api.myself(JIRA_CREDENTIALS).pipe(Effect.flip);
       expect(error.reason).toBe("unauthorized");
     }),
