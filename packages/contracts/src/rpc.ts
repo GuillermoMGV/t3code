@@ -371,6 +371,13 @@ import {
   IssueTrackerThreadResult,
 } from "./issueTracker.ts";
 import {
+  SalesforceError,
+  SalesforceMutation,
+  SalesforceMutationResult,
+  SalesforceState,
+  SalesforceStateInput,
+} from "./salesforce.ts";
+import {
   StorageCleanupReport,
   DatabaseReclaimError,
   DatabaseStorageStatus,
@@ -565,6 +572,8 @@ export const WS_METHODS = {
   issueTrackersGetConnections: "issueTrackers.getConnections",
   issueTrackersGetThreadSummaries: "issueTrackers.getThreadSummaries",
   issueTrackersMutate: "issueTrackers.mutate",
+  salesforceGetState: "salesforce.getState",
+  salesforceMutate: "salesforce.mutate",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
@@ -1068,6 +1077,18 @@ const WsIssueTrackersMutateRpc = Rpc.make(WS_METHODS.issueTrackersMutate, {
   payload: IssueTrackerMutation,
   success: IssueTrackerMutationResult,
   error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
+});
+
+const WsSalesforceGetStateRpc = Rpc.make(WS_METHODS.salesforceGetState, {
+  payload: SalesforceStateInput,
+  success: SalesforceState,
+  error: Schema.Union([SalesforceError, EnvironmentAuthorizationError]),
+});
+
+const WsSalesforceMutateRpc = Rpc.make(WS_METHODS.salesforceMutate, {
+  payload: SalesforceMutation,
+  success: SalesforceMutationResult,
+  error: Schema.Union([SalesforceError, EnvironmentAuthorizationError]),
 });
 
 const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
@@ -2222,6 +2243,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsIssueTrackersGetConnectionsRpc,
   WsIssueTrackersGetThreadSummariesRpc,
   WsIssueTrackersMutateRpc,
+  WsSalesforceGetStateRpc,
+  WsSalesforceMutateRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,

@@ -37,6 +37,7 @@ import { useClientSettings } from "../../hooks/useSettings";
 import { useProject, useServerConfigs } from "../../state/entities";
 import { ThreadDetailsThreadPrRows } from "./ThreadDetailsPrRows";
 import { ThreadDetailsIssueTrackerRows } from "./ThreadDetailsIssueTrackerRows";
+import { ThreadDetailsSalesforceRow } from "./ThreadDetailsSalesforceRow";
 import { cn } from "../../lib/utils";
 import { SlidersHorizontalIcon } from "lucide-react";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
@@ -279,6 +280,14 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                     />
                   </div>
                 </ThreadDetailsSection>
+              ) : null}
+
+              {visible.salesforce && props.gitCwd !== null ? (
+                <ThreadDetailsSalesforceRow
+                  environmentId={props.environmentId}
+                  cwd={props.gitCwd}
+                  separated={density === "full"}
+                />
               ) : null}
 
               {density === "full" && !props.draftId && visible.servers ? (

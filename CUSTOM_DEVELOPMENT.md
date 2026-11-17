@@ -133,6 +133,36 @@ vp run dev --home-dir .t3 --no-seed
 
 Tests: `vp test run packages/contracts/src/issueTracker.test.ts apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueTrackerRows.logic.test.ts`. Las consultas de Linear se comprobaron contra su esquema GraphQL oficial; las de Jira, contra la documentación de autenticación y el changelog de Atlassian (la forma de la respuesta se decodifica de forma tolerante). Ambas se han ejecutado solo contra los mocks.
 
+### Gestor de orgs de Salesforce en el panel del hilo
+
+Qué hace: en hilos cuya carpeta es un proyecto Salesforce DX (tiene `sfdx-project.json`), el panel del hilo muestra la **org por defecto** del workspace (la que usan los agentes cuando ejecutan `sf` sin `-o`), con su tipo (**PROD** en rojo, Dev Hub, Sandbox, Scratch) y un punto de estado (verde conectada, rojo con error, gris sin comprobar). En carpetas que no son DX no aparece nada.
+
+- **Cambiar de org:** clic en la fila → buscador con todas las orgs autenticadas → elegir una ejecuta `sf config set target-org` en la carpeta del hilo (escribe `.sf/config.json`). Elegir una org de producción (o Dev Hub) pide confirmación explícita.
+- **Añadir org:** «Add org…» → alias (se valida que no exista), URL de login (Production/Developer, Sandbox o URL propia) y «Set as default» → `sf org login web`. Muestra «Waiting for login in the browser…» con **Cancel login**, que mata el proceso y libera el puerto 1717.
+- **Manage orgs…:** lista con alias, usuario, URL, estado y último uso; acciones por org: fijar por defecto, abrir en el navegador (`sf org open`, el CLI abre el navegador y la URL con sesión nunca llega a T3 Code), re-autenticar (si no está conectada; reutiliza alias y URL), copiar usuario y cerrar sesión (con confirmación).
+- **Sincronización:** el servidor vigila (solo lectura) `<proyecto>/.sf/`, la carpeta del proyecto, `~/.sf/` y `~/.sfdx/`. Un cambio hecho desde VS Code o la terminal se ve en unos segundos (medido: menos de 7 s).
+- **Carga:** primero la lista rápida (`--skip-connection-status`, ~15 s en este equipo), después los estados en segundo plano (`sf org list`, 20–45 s con 23 orgs). El resultado queda en memoria por carpeta; la web lo lee cada 3 s sin lanzar `sf`.
+- **Seguridad:** `sf org list --json` incluye `accessToken`; el parser (`parseOrgList`) solo deja pasar una lista blanca de campos, con un test que lo comprueba. El runner de procesos solo registra el nombre del comando, no la salida. No se leen los archivos de `~/.sfdx/` con tokens.
+- Sin `sf` instalado, la fila muestra «Salesforce CLI not found» con instrucciones. La fila se oculta con clic derecho en el panel → «Salesforce org».
+
+| Parte     | Archivos nuevos                                                                                                                                                                                             |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contratos | `packages/contracts/src/salesforce.ts`                                                                                                                                                                      |
+| Servidor  | `apps/server/src/salesforce/sfCli.ts` (ejecuta `sf --json`, parser sin secretos) (+ test), `SalesforceService.ts` (caché por carpeta, vigilancia, escrituras en serie, login cancelable)                    |
+| Web       | `apps/web/src/state/salesforce.ts`, `components/chat/ThreadDetailsSalesforceRow.tsx`, `SalesforceOrgsDialog.tsx`, `SalesforceLoginDialog.tsx`, `SalesforceOrgParts.tsx`, `salesforceOrgs.logic.ts` (+ test) |
+
+| Toca (archivos oficiales)                             | Qué añade                                                                        |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `packages/contracts/src/rpc.ts`                       | import, `salesforce.getState` y `salesforce.mutate` (métodos, `Rpc.make`, grupo) |
+| `packages/contracts/src/index.ts`                     | `export * from "./salesforce.ts"`                                                |
+| `apps/server/src/auth/RpcAuthorization.ts`            | permisos (leer: orchestration read; modificar: operate)                          |
+| `apps/server/src/observability/RpcInstrumentation.ts` | categoría de los 2 métodos                                                       |
+| `apps/server/src/server.ts`, `ws.ts`, `ws.test.ts`    | capa del servicio, handlers y mock                                               |
+| `apps/web/src/components/chat/threadDetailsItems.ts`  | elemento `salesforce` del menú «Choose what to show»                             |
+| `apps/web/src/components/chat/ThreadDetailsPanel.tsx` | import y la fila (que pinta su propia sección)                                   |
+
+Limitaciones: no hay comandos en la paleta de comandos (es un archivo oficial de 3.000 líneas muy cambiante; el selector de la fila cubre lo mismo). No está implementado el login por device code (`sf org login device`). Cerrar sesión y abrir org no se han probado contra orgs reales, por seguridad. Probado en el proyecto real `PROPERTI`: org por defecto correcta, cambio DEV ↔ QA2 (restaurado a QA2), cambio externo reflejado, confirmación de PROD (cancelada), estados reales de las 23 orgs, diálogo de re-autenticación y login iniciado y cancelado (proceso terminado, puerto 1717 libre, sin org añadida). Ningún token en registros ni trazas.
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
@@ -334,6 +364,7 @@ Si la app nueva falla con tus datos, cierra la app, renombra `~/.t3/userdata` y 
 - `vp i` puede mostrar `Agent skills awaiting approval`. Es una función de pnpm para skills de agentes incluidas en dependencias; no hace falta aprobarlas para desarrollar ni compilar.
 - La cuenta activa de `gh` en este equipo es la de trabajo. Este repo no depende de ella (helper local), pero `gh` sin `--repo` o sin `GH_TOKEN` actuará con esa cuenta.
 - Git del sistema es 2.36; funciona con este flujo, pero conviene actualizarlo cuando sea posible.
+- En **modo dev** el servidor se reinicia (o se cae) cada pocos minutos en este equipo, sin errores en las trazas; empezó antes de la integración de Salesforce y no ocurre en la app instalada (comprobado con su proceso de servidor vivo más de 10 min). Si pasa, la web muestra un 502: espera a que vuelva o reinicia `vp run dev`. Las operaciones largas de Salesforce (estados, login) se cortan si coincide un reinicio.
 - Los tests de navegador (`*.browser.test.tsx`) necesitan el Chromium de Playwright; sin él, `check:changed` falla con `Executable doesn't exist ... chrome-headless-shell.exe`. Ya está instalado en este equipo. En un equipo nuevo, o si una actualización oficial sube la versión de `playwright` en `apps/web/package.json`, instálalo de nuevo desde `apps/web` (unos 100 MB):
 
   ```powershell

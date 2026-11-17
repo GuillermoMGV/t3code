@@ -98,6 +98,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.issueTrackersGetConnections]: "server",
   [WS_METHODS.issueTrackersGetThreadSummaries]: "server",
   [WS_METHODS.issueTrackersMutate]: "server",
+  [WS_METHODS.salesforceGetState]: "server",
+  [WS_METHODS.salesforceMutate]: "server",
   [WS_METHODS.serverGetUsageSummary]: "server",
   [WS_METHODS.serverRefreshUsageRates]: "server",
   [WS_METHODS.serverSignalProcess]: "server",

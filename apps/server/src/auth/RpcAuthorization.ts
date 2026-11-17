@@ -122,6 +122,9 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.issueTrackersGetThreadSummaries]: AuthOrchestrationReadScope,
   // Connecting replaces stored Linear or Jira credentials; linking edits a thread's details.
   [WS_METHODS.issueTrackersMutate]: AuthOrchestrationOperateScope,
+  [WS_METHODS.salesforceGetState]: AuthOrchestrationReadScope,
+  // Changes the org agents run `sf` against, and signs in or out of orgs.
+  [WS_METHODS.salesforceMutate]: AuthOrchestrationOperateScope,
   [WS_METHODS.scheduledTasksSubscribe]: AuthOrchestrationReadScope,
   [WS_METHODS.secretsAnswerRequest]: AuthOrchestrationOperateScope,
   // Delivery logs hold request bodies, so they need the same scope as the URL.
