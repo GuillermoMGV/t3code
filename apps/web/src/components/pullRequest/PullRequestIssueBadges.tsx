@@ -89,12 +89,17 @@ export function PullRequestIssuesProvider({
   return <PullRequestIssuesContext value={index}>{children}</PullRequestIssuesContext>;
 }
 
+/** The issue a listed pull request names, once the provider above has fetched it. */
+export function usePullRequestIssue(entry: IssueEntry): TrackerIssue | undefined {
+  const index = useContext(PullRequestIssuesContext);
+  const key = pullRequestIssueKey(entry);
+  return key === null ? undefined : index.get(issueIndexKey(entry.environmentId, key));
+}
+
 /** The linked issue's key, state and assignee; a click opens the issue instead of the row. */
 export function PullRequestIssueBadges({ entry }: { entry: IssueEntry }) {
-  const index = useContext(PullRequestIssuesContext);
   const openLink = useOpenLink(null);
-  const key = pullRequestIssueKey(entry);
-  const issue = key === null ? undefined : index.get(issueIndexKey(entry.environmentId, key));
+  const issue = usePullRequestIssue(entry);
   if (issue === undefined) return null;
   const open = (event: ReactMouseEvent | ReactKeyboardEvent) => {
     event.stopPropagation();

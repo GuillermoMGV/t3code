@@ -126,6 +126,9 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.issueTrackersGetNotifications]: AuthOrchestrationReadScope,
   // Marks items read in Linear itself, not only on this server.
   [WS_METHODS.issueTrackersMutateNotifications]: AuthOrchestrationOperateScope,
+  [WS_METHODS.slackGetState]: AuthOrchestrationReadScope,
+  // Replaces the stored Slack token and sends direct messages as its owner.
+  [WS_METHODS.slackMutate]: AuthOrchestrationOperateScope,
   [WS_METHODS.salesforceGetState]: AuthOrchestrationReadScope,
   // Changes the org agents run `sf` against, and signs in or out of orgs.
   [WS_METHODS.salesforceMutate]: AuthOrchestrationOperateScope,

@@ -1398,6 +1398,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["jira atlassian issues tickets api token integration connect"],
   },
   {
+    id: "issue-trackers-slack",
+    title: "Slack",
+    to: "/settings/issue-trackers",
+    searchTerms: ["slack reviewer remind reminder pull request message token integration"],
+  },
+  {
     id: "archive",
     title: "Archived threads",
     to: "/settings/archived",

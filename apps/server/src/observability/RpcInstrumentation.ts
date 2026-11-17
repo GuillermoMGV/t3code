@@ -101,6 +101,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.issueTrackersMutate]: "server",
   [WS_METHODS.issueTrackersGetNotifications]: "server",
   [WS_METHODS.issueTrackersMutateNotifications]: "server",
+  [WS_METHODS.slackGetState]: "server",
+  [WS_METHODS.slackMutate]: "server",
   [WS_METHODS.salesforceGetState]: "server",
   [WS_METHODS.salesforceMutate]: "server",
   [WS_METHODS.serverGetUsageSummary]: "server",

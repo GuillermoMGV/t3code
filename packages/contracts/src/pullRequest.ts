@@ -380,6 +380,8 @@ export const PullRequestListEntry = Schema.Struct({
   updatedAt: IsoDateTime,
   observedAt: Schema.optional(Schema.Finite),
   viewerReviewRequested: Schema.Boolean,
+  /** Fork-only: users asked to review who have not reviewed yet; see CUSTOM_DEVELOPMENT.md. */
+  reviewRequestLogins: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
   labels: Schema.Array(PullRequestLabel),
   reviewDecision: Schema.optional(PullRequestReviewDecision),
   checksState: Schema.optional(PullRequestChecksState),
