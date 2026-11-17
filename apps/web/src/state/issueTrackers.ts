@@ -1,4 +1,5 @@
 import { type EnvironmentId, type TrackerIssue, WS_METHODS } from "@t3tools/contracts";
+import { Effect } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import {
   createEnvironmentRpcCommand,
@@ -8,6 +9,15 @@ import {
 import { threadIssueKey } from "../components/issues/issuesPage.logic";
 import { connectionAtomRuntime } from "../connection/runtime";
 
+/** Every linked thread's issues, for the thread list's badges. */
+const threadSummaries = createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
+  label: "issue-trackers:thread-summaries",
+  tag: WS_METHODS.issueTrackersGetThreadSummaries,
+  staleTimeMs: 30_000,
+  // The server caches each issue for a minute, so this costs one read per issue at most.
+  refreshIntervalMs: 60_000,
+});
+
 // Fork-only Linear and Jira integration; see CUSTOM_DEVELOPMENT.md.
 export const issueTrackerEnvironment = {
   threadIssues: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
@@ -16,6 +26,22 @@ export const issueTrackerEnvironment = {
     staleTimeMs: 30_000,
     // Keeps state and assignee current while the panel is open.
     refreshIntervalMs: 60_000,
+    // The server remembers issues detected in messages while answering; the thread list
+    // learns about them only from a summaries refetch.
+    onAnswer: ({ environmentId, input }, value, registry) =>
+      Effect.sync(() => {
+        const shown = value.rows.flatMap((row) =>
+          row.link?.source === "detected" && row.issue !== null ? [row.issue.key] : [],
+        );
+        if (shown.length === 0) return;
+        const summaries = threadSummaries({ environmentId, input: {} });
+        const known =
+          AsyncResult.getOrElse(registry.get(summaries), () => null)
+            ?.threads.find((summary) => summary.threadId === input.threadId)
+            ?.issues.map((issue) => issue.key) ?? [];
+        if (shown.every((key) => known.includes(key))) return;
+        registry.refresh(summaries);
+      }),
   }),
   search: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
     label: "issue-trackers:search",
@@ -27,14 +53,7 @@ export const issueTrackerEnvironment = {
     tag: WS_METHODS.issueTrackersGetConnections,
     staleTimeMs: 30_000,
   }),
-  /** Every linked thread's issues, for the thread list's badges. */
-  threadSummaries: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
-    label: "issue-trackers:thread-summaries",
-    tag: WS_METHODS.issueTrackersGetThreadSummaries,
-    staleTimeMs: 30_000,
-    // The server caches each issue for a minute, so this costs one read per issue at most.
-    refreshIntervalMs: 60_000,
-  }),
+  threadSummaries,
   /** Issues for keys found in pull request titles and branches. */
   issues: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
     label: "issue-trackers:issues",
