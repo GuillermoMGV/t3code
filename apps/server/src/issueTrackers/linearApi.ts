@@ -9,7 +9,8 @@ const LINEAR_API_URL = "https://api.linear.app/graphql";
 // IssueSearchResult is not an Issue, so the selection is spelled out instead of a fragment.
 const ISSUE_FIELDS = `identifier title url priorityLabel updatedAt
   state { name color type }
-  assignee { name avatarUrl }`;
+  assignee { name avatarUrl }
+  project { name url }`;
 
 const LinearIssueNode = Schema.Struct({
   identifier: Schema.String,
@@ -28,6 +29,11 @@ const LinearIssueNode = Schema.Struct({
         name: Schema.String,
         avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
       }),
+    ),
+  ),
+  project: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({ name: Schema.String, url: Schema.optional(Schema.NullOr(Schema.String)) }),
     ),
   ),
 });
@@ -91,6 +97,7 @@ function toTrackerIssue(node: LinearIssueNode): TrackerIssue | null {
       : null,
     priorityLabel: node.priorityLabel ?? null,
     updatedAt: node.updatedAt,
+    project: node.project ? { name: node.project.name, url: node.project.url ?? null } : null,
   };
 }
 

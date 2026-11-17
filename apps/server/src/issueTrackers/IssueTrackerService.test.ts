@@ -142,6 +142,7 @@ const LINEAR_NODE = {
   updatedAt: "2026-11-17T10:00:00.000Z",
   state: { name: "In Progress", color: "#f2c94c", type: "started" },
   assignee: { name: "Ada Lovelace", avatarUrl: null },
+  project: { name: "Login revamp", url: "https://linear.app/acme/project/login-revamp" },
 };
 
 describe("makeLinearApi", () => {
@@ -161,6 +162,7 @@ describe("makeLinearApi", () => {
         assignee: { name: "Ada Lovelace", avatarUrl: null },
         priorityLabel: "High",
         updatedAt: LINEAR_NODE.updatedAt,
+        project: LINEAR_NODE.project,
       });
       expect(requests[0]?.authorization).toBe("lin_api_key");
     }),
@@ -233,6 +235,7 @@ describe("makeJiraApi", () => {
             },
             assignee: { displayName: "Ada Lovelace", avatarUrls: { "24x24": "https://avatar/24" } },
             priority: { name: "High" },
+            project: { key: "OPS", name: "Operations" },
           },
         },
       }));
@@ -246,6 +249,7 @@ describe("makeJiraApi", () => {
         assignee: { name: "Ada Lovelace", avatarUrl: "https://avatar/24" },
         priorityLabel: "High",
         updatedAt: "2026-11-17T10:00:00.000+0000",
+        project: { name: "Operations", url: "https://acme.atlassian.net/browse/OPS" },
       });
       expect(requests[0]?.authorization).toBe(`Basic ${btoa("ada@example.com:token")}`);
       expect(requests[0]?.url.pathname).toBe("/rest/api/3/issue/OPS-7");

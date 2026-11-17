@@ -15,6 +15,7 @@ const linearIssues = [
     updatedAt: "2026-11-17T09:00:00.000Z",
     state: { name: "In Progress", color: "#f2c94c", type: "started" },
     assignee: { name: "Guillermo Miranda", avatarUrl: null },
+    project: { name: "Login revamp", url: "https://linear.app/acme/project/login-revamp" },
   },
   {
     identifier: "PRO-1240",
@@ -24,6 +25,7 @@ const linearIssues = [
     updatedAt: "2026-11-16T09:00:00.000Z",
     state: { name: "Todo", color: "#e2e2e2", type: "unstarted" },
     assignee: null,
+    project: null,
   },
   {
     identifier: "ENG-77",
@@ -33,6 +35,7 @@ const linearIssues = [
     updatedAt: "2026-11-15T09:00:00.000Z",
     state: { name: "In Review", color: "#0f783c", type: "started" },
     assignee: { name: "Ada Lovelace", avatarUrl: null },
+    project: { name: "Performance", url: "https://linear.app/acme/project/performance" },
   },
 ];
 
@@ -48,6 +51,7 @@ const jiraIssues = [
       },
       assignee: { displayName: "Guillermo Miranda", avatarUrls: {} },
       priority: { name: "High" },
+      project: { key: "OPS", name: "Operations" },
     },
   },
   {
@@ -58,6 +62,7 @@ const jiraIssues = [
       status: { name: "To Do", statusCategory: { key: "new", colorName: "blue-gray" } },
       assignee: null,
       priority: { name: "Medium" },
+      project: { key: "OPS", name: "Operations" },
     },
   },
   {
@@ -68,6 +73,7 @@ const jiraIssues = [
       status: { name: "Done", statusCategory: { key: "done", colorName: "green" } },
       assignee: { displayName: "Ada Lovelace", avatarUrls: {} },
       priority: { name: "Low" },
+      project: { key: "SUP", name: "Support" },
     },
   },
 ];
@@ -216,7 +222,7 @@ NodeHttp.createServer(async (req, res) => {
     });
   }
   if (query.includes("viewer")) {
-    return sendJson(res, 200, { data: { viewer: { name: "Guillermo (mock)" } } });
+    return sendJson(res, 200, { data: { viewer: { name: "Guillermo Miranda" } } });
   }
   if (query.includes("issue(id")) {
     // MOCK_LINEAR_ANY_KEY=1 answers every `PRO-` key, to test pull request badges on real lists.
@@ -257,7 +263,7 @@ NodeHttp.createServer(async (req, res) => {
   }
   if (req.headers.authorization !== JIRA_AUTH) return sendJson(res, 401, {});
   if (url.pathname === "/rest/api/3/myself") {
-    return sendJson(res, 200, { accountId: ME, displayName: "Guillermo (mock Jira)" });
+    return sendJson(res, 200, { accountId: ME, displayName: "Guillermo Miranda" });
   }
   const issueMatch = /^\/rest\/api\/3\/issue\/([^/]+)$/.exec(url.pathname);
   if (issueMatch) {

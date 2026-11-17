@@ -11,7 +11,7 @@ export interface JiraCredentials {
   readonly apiToken: string;
 }
 
-const ISSUE_FIELDS = ["summary", "status", "assignee", "priority", "updated"];
+const ISSUE_FIELDS = ["summary", "status", "assignee", "priority", "updated", "project"];
 
 // Every field is optional: Jira omits fields the caller cannot see, and a missing one should
 // leave a gap in the row rather than fail the whole read.
@@ -45,6 +45,9 @@ const JiraIssue = Schema.Struct({
         ),
       ),
       priority: Schema.optional(Schema.NullOr(Schema.Struct({ name: Schema.String }))),
+      project: Schema.optional(
+        Schema.NullOr(Schema.Struct({ key: Schema.String, name: Schema.String })),
+      ),
     }),
   ),
 });
@@ -126,6 +129,12 @@ function toTrackerIssue(siteUrl: string, issue: JiraIssue): TrackerIssue | null 
           },
     priorityLabel: fields?.priority?.name ?? null,
     updatedAt: fields?.updated ?? "",
+    project: fields?.project
+      ? {
+          name: fields.project.name,
+          url: `${siteUrl}/browse/${encodeURIComponent(fields.project.key)}`,
+        }
+      : null,
   };
 }
 
