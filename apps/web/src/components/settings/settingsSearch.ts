@@ -762,6 +762,19 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/chat",
     searchTerms: ["enter return command ctrl multiline prompt new line composer"],
   },
+  // Fork-only reply cards; see CUSTOM_DEVELOPMENT.md.
+  {
+    id: "reply-cards-issues",
+    title: "Issue cards",
+    to: "/settings/chat",
+    searchTerms: ["reply cards linear jira issue ticket preview below message"],
+  },
+  {
+    id: "reply-cards-pull-requests",
+    title: "Pull request cards",
+    to: "/settings/chat",
+    searchTerms: ["reply cards pull request pr github ci checks preview below message"],
+  },
   {
     id: "follow-up-behavior",
     title: "Follow-up behavior",

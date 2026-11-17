@@ -122,6 +122,7 @@ import { environmentIdsKey } from "~/state/environmentAtomList";
 import { environmentSessionStatesAtom } from "~/state/session";
 import { useCheckProviderUpdates } from "../ProviderUpdatesAction";
 import { canUpdateServer } from "../ServerUpdateAction";
+import { ReplyCardsSettingsSection } from "./ReplyCardsSettings";
 import { downloadLocalUpdate } from "../sidebar/SidebarUpdatePill";
 import { useUpdateEverythingRun } from "../sidebar/updateEverythingRun";
 import { awaitsTrackSwitch, channelSwitchLabel } from "../sidebar/updateEverything.logic";
@@ -1307,6 +1308,8 @@ export function ChatSettingsPanel() {
           }
         />
       </SettingsSection>
+
+      <ReplyCardsSettingsSection />
 
       <SettingsSection id="activity" title="Activity">
         <ToolCallVisibilityRow />
