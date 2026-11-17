@@ -251,6 +251,7 @@ import * as TriageService from "./triage/TriageService.ts";
 import * as IssueTrackerService from "./issueTrackers/IssueTrackerService.ts";
 import * as IssueTrackerNotifications from "./issueTrackers/IssueTrackerNotifications.ts";
 import * as SlackService from "./slack/SlackService.ts";
+import * as SalesforceDataService from "./salesforce/SalesforceDataService.ts";
 import * as SalesforceService from "./salesforce/SalesforceService.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewGuideService.ts";
@@ -1587,6 +1588,7 @@ export const layerWsRpc = (
       const trackerNotifications = yield* IssueTrackerNotifications.IssueTrackerNotifications;
       const slack = yield* SlackService.SlackService;
       const salesforce = yield* SalesforceService.SalesforceService;
+      const salesforceData = yield* SalesforceDataService.SalesforceDataService;
       const hostResources = yield* HostResources.HostResources;
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
       const resourceTelemetry = yield* ResourceTelemetry.ResourceTelemetry;
@@ -2726,6 +2728,7 @@ export const layerWsRpc = (
         [WS_METHODS.slackMutate]: (input) => slack.mutate(input),
         [WS_METHODS.salesforceGetState]: (input) => salesforce.getState(input),
         [WS_METHODS.salesforceMutate]: (input) => salesforce.mutate(input),
+        [WS_METHODS.salesforceData]: (input) => salesforceData.run(input),
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
         [WS_METHODS.serverReportClientActivity]: (input, metadata) =>
           Ref.update(rpcClientIds, (clientIds) => {

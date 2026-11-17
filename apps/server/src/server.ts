@@ -200,6 +200,7 @@ import * as TriageService from "./triage/TriageService.ts";
 import * as IssueTrackerService from "./issueTrackers/IssueTrackerService.ts";
 import * as IssueTrackerNotifications from "./issueTrackers/IssueTrackerNotifications.ts";
 import * as SlackService from "./slack/SlackService.ts";
+import * as SalesforceDataService from "./salesforce/SalesforceDataService.ts";
 import * as SalesforceService from "./salesforce/SalesforceService.ts";
 import * as DesktopTelemetryReceiver from "./resourceTelemetry/DesktopTelemetryReceiver.ts";
 import * as NativeTelemetryClient from "./resourceTelemetry/NativeTelemetryClient.ts";
@@ -808,6 +809,7 @@ const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
   Layer.provideMerge(IssueTrackerNotifications.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(SlackService.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(SalesforceService.layer),
+  Layer.provideMerge(SalesforceDataService.layer),
   // Layers memoize by reference, so this is the same policy the settings layer reads.
   Layer.provideMerge(AnalyticsService.layer.pipe(Layer.provide(ManagedPolicy.layer))),
   Layer.provideMerge(ExternalLauncher.layer),

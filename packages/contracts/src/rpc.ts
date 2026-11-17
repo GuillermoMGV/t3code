@@ -385,6 +385,8 @@ import {
   SlackStateInput,
 } from "./slack.ts";
 import {
+  SalesforceDataRequest,
+  SalesforceDataResult,
   SalesforceError,
   SalesforceMutation,
   SalesforceMutationResult,
@@ -593,6 +595,7 @@ export const WS_METHODS = {
   slackMutate: "slack.mutate",
   salesforceGetState: "salesforce.getState",
   salesforceMutate: "salesforce.mutate",
+  salesforceData: "salesforce.data",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
@@ -1140,6 +1143,12 @@ const WsSalesforceGetStateRpc = Rpc.make(WS_METHODS.salesforceGetState, {
 const WsSalesforceMutateRpc = Rpc.make(WS_METHODS.salesforceMutate, {
   payload: SalesforceMutation,
   success: SalesforceMutationResult,
+  error: Schema.Union([SalesforceError, EnvironmentAuthorizationError]),
+});
+
+const WsSalesforceDataRpc = Rpc.make(WS_METHODS.salesforceData, {
+  payload: SalesforceDataRequest,
+  success: SalesforceDataResult,
   error: Schema.Union([SalesforceError, EnvironmentAuthorizationError]),
 });
 
@@ -2302,6 +2311,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSlackMutateRpc,
   WsSalesforceGetStateRpc,
   WsSalesforceMutateRpc,
+  WsSalesforceDataRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,

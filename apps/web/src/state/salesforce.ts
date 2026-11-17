@@ -27,4 +27,9 @@ export const salesforceEnvironment = {
     label: "salesforce:mutate",
     tag: WS_METHODS.salesforceMutate,
   }),
+  /** Salesforce Export panel: queries, query plans, describes and deletes against an org. */
+  data: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "salesforce:data",
+    tag: WS_METHODS.salesforceData,
+  }),
 };

@@ -151,6 +151,7 @@ import * as TriageService from "./triage/TriageService.ts";
 import * as IssueTrackerService from "./issueTrackers/IssueTrackerService.ts";
 import * as IssueTrackerNotifications from "./issueTrackers/IssueTrackerNotifications.ts";
 import * as SlackService from "./slack/SlackService.ts";
+import * as SalesforceDataService from "./salesforce/SalesforceDataService.ts";
 import * as SalesforceService from "./salesforce/SalesforceService.ts";
 import * as TextGenerators from "./textGeneration/TextGenerators.ts";
 import * as WorkspacePaths from "./workspace/WorkspacePaths.ts";
@@ -823,6 +824,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(IssueTrackerNotifications.IssueTrackerNotifications)({}),
   Layer.mock(SlackService.SlackService)({}),
   Layer.mock(SalesforceService.SalesforceService)({}),
+  Layer.mock(SalesforceDataService.SalesforceDataService)({}),
   Layer.mock(TextGenerators.TextGenerators)({}),
   Layer.mock(ProjectFaviconResolver.ProjectFaviconResolver)({}),
   Layer.mock(ProjectEnrichment.ProjectEnrichmentService)({}),
