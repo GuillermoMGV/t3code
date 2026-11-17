@@ -105,7 +105,7 @@ function IssueTrackerLinkForm({
     setLinkError(error instanceof Error ? error.message : `${label} did not answer. Try again.`);
   };
 
-  // A pasted URL or key links at once, without waiting for its search.
+  // Enter links the highlighted issue; a pasted URL or key links without waiting for its search.
   const linkSelection = () => {
     const key = pastedKey ?? selectedIssue;
     if (key !== null) void link(key);
@@ -116,7 +116,7 @@ function IssueTrackerLinkForm({
       <DialogHeader>
         <DialogTitle>Link {label} issue</DialogTitle>
         <DialogDescription>
-          Type to search by title, or paste an issue URL or key. Pick an issue, then Link.
+          Type to search by title, or paste an issue URL or key. Click an issue to link it.
         </DialogDescription>
       </DialogHeader>
       <DialogPanel>
@@ -143,8 +143,12 @@ function IssueTrackerLinkForm({
             }}
           />
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
-            <span>{query === "" ? "Your open issues" : `Results for “${query}”`}</span>
-            {searching ? <Spinner size="xs" aria-label={`Searching ${label}`} /> : null}
+            <span>
+              {pending ? "Linking…" : query === "" ? "Your open issues" : `Results for “${query}”`}
+            </span>
+            {searching || pending ? (
+              <Spinner size="xs" aria-label={pending ? "Linking" : `Searching ${label}`} />
+            ) : null}
           </div>
           <div
             id="issue-tracker-results"
@@ -158,8 +162,7 @@ function IssueTrackerLinkForm({
                 issue={issue}
                 selected={issue.key === selectedIssue}
                 disabled={pending}
-                onSelect={() => setSelected(issue.key)}
-                onConfirm={() => void link(issue.key)}
+                onLink={() => void link(issue.key)}
               />
             ))}
             {!searching && search.error === null && issues.length === 0 ? (
@@ -175,14 +178,6 @@ function IssueTrackerLinkForm({
         <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending || (pastedKey === null && selectedIssue === null)}
-          onClick={linkSelection}
-        >
-          {pending ? "Linking..." : `Link ${pastedKey ?? selectedIssue ?? ""}`.trim()}
-        </Button>
       </DialogFooter>
     </>
   );
@@ -192,14 +187,12 @@ function IssueOption({
   issue,
   selected,
   disabled,
-  onSelect,
-  onConfirm,
+  onLink,
 }: {
   issue: TrackerIssue;
   selected: boolean;
   disabled: boolean;
-  onSelect: () => void;
-  onConfirm: () => void;
+  onLink: () => void;
 }) {
   return (
     <button
@@ -207,8 +200,8 @@ function IssueOption({
       role="option"
       aria-selected={selected}
       disabled={disabled}
-      onClick={onSelect}
-      onDoubleClick={onConfirm}
+      // One click links; the arrow keys and Enter do the same from the search field.
+      onClick={onLink}
       // Keeps the row picked with the arrow keys in view.
       ref={selected ? (node) => node?.scrollIntoView({ block: "nearest" }) : undefined}
       className={cn(
