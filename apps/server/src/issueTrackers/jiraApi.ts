@@ -215,7 +215,8 @@ export const makeJiraApi = Effect.gen(function* () {
       "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC",
     );
 
-  return { myself, issue, search, assignedOpenIssues };
+  // request, readJson: used by the notifications bell (IssueTrackerNotifications.ts).
+  return { myself, issue, search, assignedOpenIssues, request, readJson };
 });
 
 export type JiraApi = Effect.Success<typeof makeJiraApi>;

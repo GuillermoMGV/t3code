@@ -138,6 +138,39 @@ vp run dev --home-dir .t3 --no-seed
 
 Tests: `vp test run packages/contracts/src/issueTracker.test.ts apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueTrackerRows.logic.test.ts`. Las consultas de Linear se comprobaron contra su esquema GraphQL oficial; las de Jira, contra la documentación de autenticación y el changelog de Atlassian (la forma de la respuesta se decodifica de forma tolerante). Ambas se han ejecutado solo contra los mocks.
 
+### Campana de notificaciones de Linear y Jira
+
+Qué hace: con Linear o Jira conectado, aparece una **campana** en el pie de la barra lateral (junto a Ajustes, Pull requests y Uso). Un globo rojo con el número indica las notificaciones sin leer; no se anima. Al pulsarla se abre una lista, de la más nueva a la más antigua. Cada notificación indica el gestor (icono y nombre), quién lo hizo, el tipo (te asignaron, te quitaron, comentó, te mencionó, cambió el estado, ...), la clave y el título del ticket y, si es un comentario, su texto.
+
+- **Leer y desmarcar:** pulsar una notificación abre el ticket y la marca como leída. El círculo de la derecha la marca como leída o no leída. «Mark all as read» marca todas. Las leídas siguen en la lista, atenuadas, así que no se pierde nada.
+- **Comprobación:** el servidor consulta los gestores **cada 5 minutos**, una sola vez para todos los clientes conectados, y guarda la lista en memoria. Los clientes leen esa copia cada minuto sin llegar a los gestores. El botón de refrescar del popover comprueba al momento. Un gestor conectado después del arranque se comprueba la primera vez que un cliente pide la lista. Si un gestor falla, su error sale en el popover y en el log una sola vez por mensaje distinto; las notificaciones del otro gestor se siguen viendo.
+- **Linear:** usa la API oficial de notificaciones (`notifications`, las 50 últimas, sin archivadas ni pospuestas, solo las de tickets). El estado leído **se sincroniza con Linear**: marcar aquí la marca allí (`notificationUpdate`) y lo que leas en Linear aparece leído aquí en la siguiente comprobación.
+- **Jira:** Atlassian **no tiene una API pública para la campana de Jira Cloud**, así que T3 Code deduce los avisos. Cada comprobación busca, con el token clásico, `(assignee WAS currentUser() OR reporter = currentUser() OR watcher = currentUser()) AND updated >= -3d` (hasta 50 tickets) con el historial de cambios y los comentarios. De ahí saca: asignado o desasignado a ti, cambio de estado, comentario nuevo y mención (un nodo `mention` con tu `accountId`). Tus propias acciones se descartan. El estado leído de Jira es **solo local**.
+- **Límites de Jira:** solo se ven los últimos 3 días. No se detectan menciones en tickets que no te asignaron, no creaste ni sigues (Jira no permite buscarlas). No aparecen otros tipos de aviso de la campana real (reacciones, aprobaciones, avisos de Confluence...). Un ticket con muchísimos cambios puede llegar con el historial recortado. La primera comprobación da por leído todo lo que tenga más de 24 h, para no llenar el globo.
+- **Datos guardados:** `userdata/issue-tracker-notifications.json` contiene solo la hora de la última comprobación y, para Jira, el sitio y los ids leídos (se podan al salir de la ventana de 3 días). Las notificaciones no se guardan: tras reiniciar se vuelven a pedir. Las credenciales son las de «Tickets de Linear y Jira» y no se registran nunca.
+- **Superficies:** web y escritorio. Móvil no tiene campana (no tiene la barra lateral de escritorio). Con varios servidores, la campana usa el servidor principal o, sin él, el primero conectado.
+
+| Parte     | Archivos nuevos                                                                                                                                             |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contratos | `packages/contracts/src/issueTrackerNotifications.ts`                                                                                                       |
+| Servidor  | `apps/server/src/issueTrackers/IssueTrackerNotifications.ts` (servicio y sondeo), `notificationEvents.ts` (Linear y derivación de eventos de Jira) (+ test) |
+| Web       | `apps/web/src/state/issueTrackerNotifications.ts`, `components/sidebar/SidebarIssueNotifications.tsx`                                                       |
+
+| Toca (archivos oficiales)                             | Qué añade                                                                               |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `packages/contracts/src/rpc.ts`                       | import, 2 métodos (`issueTrackers.getNotifications`, `.mutateNotifications`) y registro |
+| `packages/contracts/src/index.ts`                     | `export * from "./issueTrackerNotifications.ts"`                                        |
+| `apps/server/src/auth/RpcAuthorization.ts`            | permisos (leer: orchestration read; marcar: operate)                                    |
+| `apps/server/src/observability/RpcInstrumentation.ts` | categoría de los 2 métodos                                                              |
+| `apps/server/src/server.ts`                           | import y capa `IssueTrackerNotifications.layer`                                         |
+| `apps/server/src/ws.ts`                               | import, `yield*` del servicio y los 2 handlers                                          |
+| `apps/server/src/ws.test.ts`                          | import y `Layer.mock(IssueTrackerNotifications)`                                        |
+| `apps/server/src/issueTrackers/linearApi.ts`          | devuelve también `graphql`                                                              |
+| `apps/server/src/issueTrackers/jiraApi.ts`            | devuelve también `request` y `readJson`                                                 |
+| `apps/web/src/components/sidebar/SidebarChrome.tsx`   | import y `<SidebarIssueNotificationsItem />` tras el botón de Uso                       |
+
+Probar sin credenciales: los mocks de «Tickets de Linear y Jira» ya sirven notificaciones (Linear: 4, una leída; Jira: asignación, cambio de estado, mención y un comentario antiguo; tu propio comentario no aparece). `curl http://127.0.0.1:4567/mock/notify` añade un comentario nuevo en Linear y `curl http://127.0.0.1:4568/mock/notify` uno en Jira; se ven tras pulsar refrescar o en la siguiente comprobación. Si otro checkout ya usa los puertos 4567/4568, `MOCK_LINEAR_PORT` y `MOCK_JIRA_PORT` los cambian (ajusta `T3CODE_LINEAR_API_URL` y el sitio de Jira). Tests: `vp test run apps/server/src/issueTrackers/notificationEvents.test.ts`. La consulta y las mutaciones de Linear se comprobaron contra su esquema GraphQL; la búsqueda de Jira, contra su API REST v3. Ambas se han ejecutado solo contra los mocks.
+
 ### Gestor de orgs de Salesforce en el panel del hilo
 
 Qué hace: en hilos cuya carpeta es un proyecto Salesforce DX (tiene `sfdx-project.json`), el panel del hilo muestra la **org por defecto** del workspace (la que usan los agentes cuando ejecutan `sf` sin `-o`), con su tipo (**PROD** en rojo, Dev Hub, Sandbox, Scratch) y un punto de estado (verde conectada, rojo con error, gris sin comprobar). En carpetas que no son DX no aparece nada.
