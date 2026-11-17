@@ -65,13 +65,17 @@ function issuesByThreadAtom(environmentIds: ReadonlyArray<EnvironmentId>) {
   return atom;
 }
 
+/** The servers the listed threads live on, which are the ones that hold their issue links. */
+function environmentIdsOf(threads: ReadonlyArray<EnvironmentThreadShell>): EnvironmentId[] {
+  return [...new Set(threads.map((thread) => thread.environmentId))].toSorted();
+}
+
 /** The threads that pass the issue filter; the same array while no filter is set. */
 export function useIssueFilteredThreads(
   threads: ReadonlyArray<EnvironmentThreadShell>,
-  environmentIds: ReadonlyArray<EnvironmentId>,
 ): ReadonlyArray<EnvironmentThreadShell> {
   const filter = useAtomValue(issueFilterAtom);
-  const issues = useAtomValue(issuesByThreadAtom(environmentIds));
+  const issues = useAtomValue(issuesByThreadAtom(environmentIdsOf(threads)));
   if (issueFilterCount(filter) === 0) return threads;
   return threads.filter((thread) =>
     matchesIssueFilter(issues.get(threadIssueKey(thread.environmentId, thread.id)) ?? null, filter),
@@ -80,10 +84,11 @@ export function useIssueFilteredThreads(
 
 /** Filter and refresh buttons for the thread list; hidden while no thread has a linked issue. */
 export function SidebarIssueControls({
-  environmentIds,
+  threads,
 }: {
-  environmentIds: ReadonlyArray<EnvironmentId>;
+  threads: ReadonlyArray<EnvironmentThreadShell>;
 }) {
+  const environmentIds = environmentIdsOf(threads);
   const [filter, setFilter] = useAtom(issueFilterAtom);
   const issues = useAtomValue(issuesByThreadAtom(environmentIds));
   const registry = useContext(RegistryContext);

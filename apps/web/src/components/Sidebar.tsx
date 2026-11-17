@@ -1298,7 +1298,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   );
 
-  const issueFilteredThreads = useIssueFilteredThreads(listedThreads, connectedEnvironmentIds);
+  const issueFilteredThreads = useIssueFilteredThreads(listedThreads);
   const {
     workingShelfEnabled,
     pinnedThreads,
@@ -2973,7 +2973,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
-              issueControls={<SidebarIssueControls environmentIds={connectedEnvironmentIds} />}
+              issueControls={<SidebarIssueControls threads={listedThreads} />}
               projectScope={
                 <Combobox
                   items={projectScopeItems}
