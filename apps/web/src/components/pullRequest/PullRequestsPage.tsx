@@ -67,6 +67,7 @@ import { PullRequestCompactFilterMenu } from "./PullRequestCompactFilterMenu";
 import { INVOLVEMENT_TABS, SORT_OPTIONS, STATE_TABS } from "./pullRequestListOptions";
 import { PullRequestsColumn } from "./PullRequestsColumn";
 import { PullRequestListGroups } from "./PullRequestListGroups";
+import { filterByTargetBranch, pullRequestTargetBranches } from "./pullRequestTargetBranch.logic";
 import { pullRequestPanelReference } from "./usePullRequestDetail";
 import { usePullRequestIntentPrefetch } from "./usePullRequestIntentPrefetch";
 import {
@@ -274,6 +275,7 @@ export function PullRequestsPage() {
           ...(next.checks ? { checks: next.checks } : {}),
           ...(next.author ? { author: next.author } : {}),
           ...(next.labels && next.labels.length > 0 ? { labels: next.labels } : {}),
+          ...(next.base ? { base: next.base } : {}),
         };
       },
       replace: true,
@@ -988,7 +990,7 @@ export function PullRequestsPage() {
   } = usePullRequestDisplayGroups({
     answered,
     host: search.host,
-    groups,
+    groups: filterByTargetBranch(groups, search.base),
     statsByRow,
     overrides,
     state: search.state,
@@ -1389,6 +1391,9 @@ export function PullRequestsPage() {
       }}
       authorOptions={facets.authors}
       labelOptions={facets.labels}
+      targetBranch={search.base}
+      targetBranchOptions={pullRequestTargetBranches(groups, search.base)}
+      onTargetBranch={(base) => updateSearch({ base })}
       optionScope={filterOptionScope}
       host={search.host}
       hostOptions={hostMenuOptions}

@@ -15,6 +15,7 @@ import {
   CircleXIcon,
   EyeOffIcon,
   FolderGit2Icon,
+  GitBranchIcon,
   LayersIcon,
   ListFilterIcon,
   SearchIcon,
@@ -138,6 +139,8 @@ const ALL_PROJECTS_VALUE = "all";
 const ALL_HOSTS_VALUE = "";
 const ALL_SERVERS_VALUE = "";
 const UNFILTERED_VALUE = "all";
+/** Not a valid git branch name, so it cannot collide with a real one. */
+const ANY_TARGET_BRANCH = "..any";
 /** Project ids are unique only within an environment. */
 export const pullRequestProjectKey = (project: {
   readonly id: ProjectId;
@@ -478,6 +481,9 @@ export function PullRequestFiltersMenu({
   onFilters,
   authorOptions = [],
   labelOptions = [],
+  targetBranch,
+  targetBranchOptions = [],
+  onTargetBranch,
   optionScope,
   host,
   hostOptions,
@@ -502,6 +508,10 @@ export function PullRequestFiltersMenu({
   onFilters: (filters: PullRequestListFilters) => void;
   authorOptions?: ReadonlyArray<PullRequestAuthorFacet>;
   labelOptions?: ReadonlyArray<PullRequestLabelFacet>;
+  /** Fork-only target branch filter; see CUSTOM_DEVELOPMENT.md. */
+  targetBranch?: string | undefined;
+  targetBranchOptions?: ReadonlyArray<string>;
+  onTargetBranch?: (branch: string | undefined) => void;
   optionScope: ReadonlyArray<PullRequestFilterOptionScope>;
   host: string | undefined;
   hostOptions: ReadonlyArray<PullRequestFilterOption<string>>;
@@ -526,6 +536,7 @@ export function PullRequestFiltersMenu({
     filters.review,
     filters.checks,
     filters.author,
+    targetBranch,
     ...selectedLabels,
   ].filter(Boolean).length;
   const updateFilters = (next: Partial<PullRequestListFilters>) =>
@@ -619,6 +630,21 @@ export function PullRequestFiltersMenu({
           options={CHECKS_OPTIONS}
           onChange={(checks) => updateFilter("checks", checks)}
         />
+        {onTargetBranch ? (
+          <PullRequestFilterRadioSubmenu
+            label="Target branch"
+            value={targetBranch ?? ANY_TARGET_BRANCH}
+            options={[
+              { value: ANY_TARGET_BRANCH, label: "Any", Icon: LayersIcon },
+              ...targetBranchOptions.map((branch) => ({
+                value: branch,
+                label: branch,
+                Icon: GitBranchIcon,
+              })),
+            ]}
+            onChange={(next) => onTargetBranch(next === ANY_TARGET_BRANCH ? undefined : next)}
+          />
+        ) : null}
         {hostOptions.length > 2 ? (
           <>
             <MenuSeparator />

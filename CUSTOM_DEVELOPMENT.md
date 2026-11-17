@@ -166,6 +166,24 @@ Qué hace: en hilos cuya carpeta es un proyecto Salesforce DX (tiene `sfdx-proje
 
 Limitaciones: no hay comandos en la paleta de comandos (es un archivo oficial de 3.000 líneas muy cambiante; el selector de la fila cubre lo mismo). No está implementado el login por device code (`sf org login device`). Cerrar sesión y abrir org no se han probado contra orgs reales, por seguridad. Probado en el proyecto real `PROPERTI`: org por defecto correcta, cambio DEV ↔ QA2 (restaurado a QA2), cambio externo reflejado, confirmación de PROD (cancelada), estados reales de las 23 orgs, diálogo de re-autenticación y login iniciado y cancelado (proceso terminado, puerto 1717 libre, sin org añadida). Ningún token en registros ni trazas.
 
+### Rama origen y destino en la lista de pull requests
+
+Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → rama destino`. En «Filters» hay un submenú **Target branch** con las ramas destino de las PR cargadas; al elegir una solo quedan las PR que van a esa rama (cuenta en el número de filtros y queda en la URL como `?base=develop`).
+
+El filtro se aplica en el cliente sobre las PR ya cargadas, sin tocar la consulta al host ni su caché (que son oficiales y cambian a menudo). Si una rama tiene PR más allá de la primera página, aparecen con «Load more». No se guarda entre sesiones (los demás filtros sí) y no existe el calificador `base:` en el buscador.
+
+| Parte | Archivos nuevos                                                                 |
+| ----- | ------------------------------------------------------------------------------- |
+| Web   | `apps/web/src/components/pullRequest/pullRequestTargetBranch.logic.ts` (+ test) |
+
+| Toca (archivos oficiales)                                        | Qué añade                                                                    |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `apps/web/src/components/pullRequest/PullRequestRow.tsx`         | import y `PullRequestRowBranches` (ya existía) en la línea de metadatos      |
+| `apps/web/src/components/pullRequest/PullRequestListFilters.tsx` | icono, constante `ANY_TARGET_BRANCH`, 3 props opcionales, contador y submenú |
+| `apps/web/src/components/pullRequest/PullRequestsPage.tsx`       | import, `base` en `updateSearch`, filtrado de grupos y props del menú        |
+| `apps/web/src/components/pullRequest/usePullRequestListView.ts`  | campo `base` en `PullRequestsSearch`                                         |
+| `apps/web/src/routes/_chat.pull-requests.tsx`                    | lectura del parámetro `base` de la URL                                       |
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:

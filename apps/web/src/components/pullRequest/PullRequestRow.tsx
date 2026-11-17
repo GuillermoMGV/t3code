@@ -21,6 +21,7 @@ import {
   PULL_REQUEST_ROW_CLASS,
   PULL_REQUEST_ROW_NUMBER_CLASS,
   PullRequestRowAuthor,
+  PullRequestRowBranches,
   PullRequestRowGlyph,
   PullRequestRowLines,
 } from "./PullRequestListRow";
@@ -239,6 +240,9 @@ function PullRequestRowImpl({
                 labelClassName="sr-only @xs/pr-row-meta:not-sr-only @xs/pr-row-meta:truncate"
               />
               {showProjectTitle ? <span className="truncate">{entry.repository}</span> : null}
+              <span className="flex min-w-0 max-w-80">
+                <PullRequestRowBranches head={entry.headBranch} base={entry.baseBranch} />
+              </span>
               {environmentLabel ? (
                 <span className="min-w-0 max-w-32 truncate">{environmentLabel}</span>
               ) : null}

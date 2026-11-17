@@ -53,6 +53,8 @@ export interface PullRequestsSearch extends PullRequestListPreferences {
   readonly selectedProjectId?: ProjectId;
   readonly selectedHost?: string;
   readonly selectedEnvironmentId?: EnvironmentId;
+  /** Fork-only: show only pull requests that merge into this branch. */
+  readonly base?: string;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;

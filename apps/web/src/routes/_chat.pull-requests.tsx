@@ -74,6 +74,9 @@ export const Route = createFileRoute("/_chat/pull-requests")({
         ? raw.author.trim().slice(0, 200)
         : undefined,
     labels: pullRequestSearchLabels(raw.labels),
+    ...(typeof raw.base === "string" && raw.base.trim()
+      ? { base: raw.base.trim().slice(0, 200) }
+      : {}),
   }),
   component: PullRequestsPage,
 });
