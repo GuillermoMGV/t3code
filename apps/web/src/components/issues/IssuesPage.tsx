@@ -12,10 +12,10 @@ import {
 } from "@t3tools/contracts";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
+  ArrowRightIcon,
   ChevronDownIcon,
   FolderIcon,
   ListFilterIcon,
-  MessageSquareIcon,
   PlusIcon,
   SearchIcon,
   SettingsIcon,
@@ -282,7 +282,7 @@ function IssueList({
 /**
  * Opens a new-worktree draft whose prompt names the issue; the user reviews and sends it. The
  * issue is linked right away: detection from the prompt only runs while the thread's details
- * panel is open, and the link is what turns this row into "Open thread".
+ * panel is open, and the link is what turns this row into "Go to thread".
  */
 function useStartIssueThread() {
   const handleNewThread = useNewThreadHandler();
@@ -408,8 +408,8 @@ function OpenThreadButton({ threads }: { threads: ReadonlyArray<EnvironmentThrea
   if (threads.length === 1) {
     return (
       <Button size="xs" variant="outline" className="shrink-0" onClick={() => open(latest)}>
-        <MessageSquareIcon aria-hidden />
-        Open thread
+        <ArrowRightIcon aria-hidden />
+        Go to thread
       </Button>
     );
   }
@@ -419,8 +419,8 @@ function OpenThreadButton({ threads }: { threads: ReadonlyArray<EnvironmentThrea
         render={<Button size="xs" variant="outline" className="shrink-0" />}
         aria-label={`Open one of ${threads.length} threads`}
       >
-        <MessageSquareIcon aria-hidden />
-        Open thread
+        <ArrowRightIcon aria-hidden />
+        Go to thread
         <ChevronDownIcon aria-hidden />
       </MenuTrigger>
       <MenuPopup align="end" className="max-w-80">

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   EMPTY_ISSUE_LIST_FILTER,
+  issueKeysIn,
   filterIssues,
   issueAssigneeGroup,
   issueProjectOptions,
@@ -20,9 +21,16 @@ const ref = (tracker: TrackerIssue["tracker"], key: string) => ({
   key: key as TrackerIssue["key"],
 });
 
-const thread = (id: string, updatedAt: string, archivedAt: string | null = null) => ({
+const thread = (
+  id: string,
+  updatedAt: string,
+  archivedAt: string | null = null,
+  named: { title?: string; branch?: string | null } = {},
+) => ({
   environmentId: "env",
   id,
+  title: named.title ?? "New thread",
+  branch: named.branch ?? null,
   updatedAt,
   archivedAt,
 });
@@ -49,6 +57,38 @@ describe("threadsByIssue", () => {
     expect(threadsForIssue(byIssue, ref("jira", "OPS-2")).map((t) => t.id)).toEqual(["new"]);
     // The same key in the other tracker is a different issue.
     expect(threadsForIssue(byIssue, ref("jira", "PRO-1"))).toEqual([]);
+  });
+
+  it("also finds threads whose branch or title names the key, in any case", () => {
+    const byIssue = threadsByIssue(
+      new Map([[threadIssueKey("env", "linked"), [ref("linear", "PRO-12")]]]),
+      [
+        thread("linked", "2026-11-01T00:00:00.000Z", null, { branch: "feat/pro-12-login" }),
+        thread("branch", "2026-11-05T00:00:00.000Z", null, { branch: "feat/PRO-12-login" }),
+        thread("title", "2026-11-09T00:00:00.000Z", null, { title: "Fix pro-12: SSO" }),
+        // A longer key is another issue.
+        thread("other", "2026-11-10T00:00:00.000Z", null, { branch: "feat/PRO-123-export" }),
+        thread("archived", "2026-11-11T00:00:00.000Z", "2026-11-12T00:00:00.000Z", {
+          title: "PRO-12 again",
+        }),
+      ],
+    );
+    expect(threadsForIssue(byIssue, ref("linear", "PRO-12")).map((t) => t.id)).toEqual([
+      "title",
+      "branch",
+      "linked",
+    ]);
+    // A key in a name cannot tell trackers apart, so it counts for either.
+    expect(threadsForIssue(byIssue, ref("jira", "PRO-123")).map((t) => t.id)).toEqual(["other"]);
+  });
+
+  it("reads standalone keys only", () => {
+    // `abcPRO-4` is its own key, not PRO-4; `PRO-5a` is no key at all.
+    expect(issueKeysIn("feat/pro-12-login PRO-3: x abcPRO-4 PRO-5a")).toEqual([
+      "PRO-12",
+      "PRO-3",
+      "ABCPRO-4",
+    ]);
   });
 
   it("keeps threads on different servers apart", () => {

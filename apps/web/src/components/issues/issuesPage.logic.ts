@@ -11,39 +11,67 @@ const issueId = (issue: Pick<TrackerIssue, "tracker" | "key">) => `${issue.track
 interface IssueThreadCandidate {
   readonly environmentId: string;
   readonly id: string;
+  readonly title: string;
+  readonly branch: string | null;
   readonly updatedAt: string;
   readonly archivedAt: string | null;
 }
 
+// A key standing alone, any case: `feat/pro-12-login`, `PRO-12: …`, but not `PRO-123` for PRO-12.
+const KEY_IN_TEXT = /(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9_]{0,19}-[1-9]\d{0,6})(?![A-Za-z0-9])/g;
+
+/** Every issue-key-shaped token in the text, upper-cased. */
+export function issueKeysIn(text: string): ReadonlyArray<string> {
+  return [...text.matchAll(KEY_IN_TEXT)].map((match) => match[1]!.toUpperCase());
+}
+
+// Stored links know their tracker; a key in a branch or title could belong to either.
+const mentionId = (key: string) => `key:${key.toUpperCase()}`;
+
 /**
- * The threads linked to each issue, most recently updated first. Links can outlive their thread
- * (a deleted thread, or a draft that was never sent), so only threads the client knows count;
- * archived ones are left out.
+ * The threads that belong to each issue: those linked to it (a manual link, or a detection the
+ * server remembered) and those whose branch or title names its key. Links can outlive their
+ * thread (a deleted thread, or a draft never sent), so only threads the client knows count, and
+ * archived ones are left out. Reads only thread shells, never messages.
  */
 export function threadsByIssue<Thread extends IssueThreadCandidate>(
   threadIssues: ReadonlyMap<string, ReadonlyArray<Pick<TrackerIssue, "tracker" | "key">>>,
   threads: ReadonlyArray<Thread>,
 ): ReadonlyMap<string, ReadonlyArray<Thread>> {
   const byIssue = new Map<string, Thread[]>();
+  const add = (id: string, thread: Thread) => {
+    const list = byIssue.get(id) ?? [];
+    if (!list.includes(thread)) byIssue.set(id, [...list, thread]);
+  };
   for (const thread of threads) {
     if (thread.archivedAt !== null) continue;
     for (const issue of threadIssues.get(threadIssueKey(thread.environmentId, thread.id)) ?? []) {
-      const id = issueId(issue);
-      byIssue.set(id, [...(byIssue.get(id) ?? []), thread]);
+      add(issueId(issue), thread);
     }
-  }
-  for (const list of byIssue.values()) {
-    list.sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+    for (const key of issueKeysIn(`${thread.branch ?? ""} ${thread.title}`)) {
+      add(mentionId(key), thread);
+    }
   }
   return byIssue;
 }
 
-export function threadsForIssue<Thread>(
+/** The issue's threads, most recently updated first. */
+export function threadsForIssue<Thread extends Pick<IssueThreadCandidate, "updatedAt">>(
   byIssue: ReadonlyMap<string, ReadonlyArray<Thread>>,
   issue: Pick<TrackerIssue, "tracker" | "key">,
 ): ReadonlyArray<Thread> {
-  return byIssue.get(issueId(issue)) ?? [];
+  const linked = byIssue.get(issueId(issue)) ?? [];
+  const named = byIssue.get(mentionId(issue.key)) ?? [];
+  if (named.length === 0) return sortByRecency(linked);
+  return sortByRecency([...new Set([...linked, ...named])]);
 }
+
+const sortByRecency = <Thread extends Pick<IssueThreadCandidate, "updatedAt">>(
+  threads: ReadonlyArray<Thread>,
+) =>
+  threads.length < 2
+    ? threads
+    : [...threads].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 
 /** The draft's first message. The URL lets the thread detect and link the issue. */
 export function issueThreadPrompt(issue: Pick<TrackerIssue, "key" | "title" | "url">): string {
