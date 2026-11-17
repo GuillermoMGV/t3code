@@ -1,6 +1,7 @@
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  CalendarClockIcon,
   ChartNoAxesColumnIcon,
   SettingsIcon,
   TicketIcon,
@@ -291,6 +292,15 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             onClick={() => {
               closeMobileSidebar();
               void navigate({ to: "/issues" });
+            }}
+          />
+          {/* Fork-only shortcut to scheduled tasks; see CUSTOM_DEVELOPMENT.md. */}
+          <SidebarUtilityItem
+            icon={<CalendarClockIcon />}
+            label="Scheduled tasks"
+            onClick={() => {
+              closeMobileSidebar();
+              void navigate({ to: "/settings/scheduled-tasks" });
             }}
           />
           <SidebarUtilityItem

@@ -247,6 +247,14 @@ Probar: con los mocks de `mock-issue-trackers.mjs` (ver la sección de Linear y 
 
 Limitaciones (fase 1): el prompt solo lleva clave, título y URL (ni descripción ni comentarios); no hay entrada en la paleta de comandos ni se recuerda el proyecto por equipo; no existe en la app móvil.
 
+### Acceso directo a tareas programadas
+
+Qué hace: el icono del calendario con reloj en la parte inferior de la barra lateral (entre «Issues» y «Usage») abre Ajustes → **Scheduled tasks** (`/settings/scheduled-tasks`) en un clic. Se muestra siempre, igual que la entrada de Ajustes; los permisos de crear tareas los sigue decidiendo esa página. En la paleta de comandos ya aparece «Scheduled tasks» (sale de la búsqueda de ajustes), así que no hay entrada nueva ni atajo de teclado.
+
+| Toca (archivos oficiales)                           | Qué añade                                              |
+| --------------------------------------------------- | ------------------------------------------------------ |
+| `apps/web/src/components/sidebar/SidebarChrome.tsx` | icono `CalendarClockIcon` y el botón «Scheduled tasks» |
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
