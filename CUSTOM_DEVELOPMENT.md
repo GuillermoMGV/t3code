@@ -198,6 +198,32 @@ El filtro se aplica en el cliente sobre las PR ya cargadas, sin tocar la consult
 | `apps/web/src/components/pullRequest/usePullRequestListView.ts`  | campo `base` en `PullRequestsSearch`                                                                                      |
 | `apps/web/src/routes/_chat.pull-requests.tsx`                    | lectura del parámetro `base` de la URL                                                                                    |
 
+### Página de tickets: empezar un hilo desde un ticket
+
+Qué hace: el icono del ticket en la parte inferior de la barra lateral (junto a «Pull requests») abre la página **Issues** (`/issues`), fuera de cualquier conversación. Sin ningún gestor conectado, la página lo explica y lleva a Ajustes → Issue trackers.
+
+- **Pestañas Linear y Jira:** solo las de los gestores conectados (con uno solo, no hay pestañas). La pestaña queda en la URL (`?tracker=jira`).
+- **Lista:** sin texto muestra tus tickets abiertos; el buscador busca mientras escribes, con la misma espera y la misma búsqueda que el diálogo de vincular (`useIssueSearch.ts`). Una URL o clave pegada encuentra ese ticket. Cada fila muestra clave, título, estado con su color, asignado, prioridad y hace cuánto se actualizó. Clic en la clave abre el ticket en el gestor.
+- **Open thread:** si ya hay hilos vinculados al ticket, la fila los abre (con varios, un menú ordenado del más reciente al más antiguo; los archivados no cuentan). Sale de los vínculos que la barra lateral ya carga (`getThreadSummaries`), sin peticiones por fila.
+- **Start thread:** pide el proyecto (con buscador) y abre un borrador en un **worktree nuevo** con el prompt `Work on PRO-123: <título>` y la URL del ticket. **No se envía**: lo revisas y lo envías tú. El ticket se vincula al hilo en ese momento (vínculo manual), porque la detección automática por la URL del prompt solo se ejecuta con el panel del hilo abierto; así la fila pasa a «Open thread» en cuanto envías el borrador. Un borrador que nunca se envía deja un vínculo huérfano que no se muestra.
+- **Nombre de la rama:** lo decide el ajuste de nombres de rama de worktree (Ajustes → Worktrees, instrucciones propias). Para que empiece por la clave, añade allí una instrucción como «start the branch name with the issue key, for example pro-123-short-title».
+
+| Parte | Archivos nuevos                                                                                                                                 |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web   | `apps/web/src/routes/_chat.issues.tsx`, `components/issues/IssuesPage.tsx`, `issuesPage.logic.ts` (+ test), `components/chat/useIssueSearch.ts` |
+
+También cambia archivos del fork: `IssueTrackerLinkDialog.tsx` usa `useIssueSearch`, y el atom de tickets por hilo pasó de `SidebarIssueControls.tsx` a `state/issueTrackers.ts` (`threadIssuesAtom`) para que la página y el filtro de la barra lateral lean lo mismo.
+
+| Toca (archivos oficiales)                            | Qué añade                                         |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| `apps/web/src/components/sidebar/SidebarChrome.tsx`  | icono `TicketIcon` y el botón «Issues»            |
+| `apps/web/src/components/sidebar/mainAppLocation.ts` | `/issues` cuenta como página de utilidad («Back») |
+| `apps/web/src/routeTree.gen.ts`                      | generado por el plugin de TanStack Router         |
+
+Probar: con los mocks de `mock-issue-trackers.mjs` (ver la sección de Linear y Jira), abre Issues, pulsa «Start thread» en un ticket, elige proyecto, envía el borrador con `Replay (dev)` y vuelve a Issues: la fila muestra «Open thread». Tests: `vp test run apps/web/src/components/issues/issuesPage.logic.test.ts`.
+
+Limitaciones (fase 1): el prompt solo lleva clave, título y URL (ni descripción ni comentarios); no hay entrada en la paleta de comandos ni se recuerda el proyecto por equipo; no existe en la app móvil.
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:

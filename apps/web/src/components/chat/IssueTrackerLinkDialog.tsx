@@ -15,8 +15,6 @@ import { useState } from "react";
 
 import { cn } from "~/lib/utils";
 import { issueTrackerEnvironment } from "~/state/issueTrackers";
-import { useEnvironmentQuery } from "~/state/query";
-import { useDebouncedValue } from "~/state/queries";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
 import {
@@ -31,12 +29,8 @@ import {
 import { Input } from "../ui/input";
 import { Spinner } from "../ui/spinner";
 import { IssueAssigneeBadge, IssueStateBadge } from "./IssueTrackerParts";
-import {
-  ISSUE_SEARCH_DEBOUNCE_MS,
-  issueSearchQuery,
-  moveSelectedIssue,
-  resolveSelectedIssue,
-} from "./issueTrackerRows.logic";
+import { moveSelectedIssue, resolveSelectedIssue } from "./issueTrackerRows.logic";
+import { useIssueSearch } from "./useIssueSearch";
 
 const PASTE_EXAMPLES: Readonly<Record<IssueTrackerKind, string>> = {
   linear: "https://linear.app/…/issue/PRO-123",
@@ -75,14 +69,9 @@ function IssueTrackerLinkForm({
   const [selected, setSelected] = useState<IssueKey | null>(null);
   const [pending, setPending] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-  const query = issueSearchQuery(useDebouncedValue(draft, ISSUE_SEARCH_DEBOUNCE_MS));
-  const typing = issueSearchQuery(draft) !== query;
   const mutate = useAtomCommand(issueTrackerEnvironment.mutate, { reportFailure: false });
-  const search = useEnvironmentQuery(
-    issueTrackerEnvironment.search({ environmentId, input: { tracker, query } }),
-  );
-  const issues = search.data?.issues ?? [];
-  const searching = typing || search.isPending;
+  const search = useIssueSearch(environmentId, tracker, draft);
+  const { query, issues, searching } = search;
   const selectedIssue = searching ? null : resolveSelectedIssue(issues, selected);
   const pastedKey = parseIssueReference(draft, tracker);
 

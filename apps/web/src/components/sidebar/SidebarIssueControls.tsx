@@ -1,11 +1,12 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import type { EnvironmentId, TrackerIssue } from "@t3tools/contracts";
-import { AsyncResult, Atom } from "effect/reactivity";
+import type { EnvironmentId } from "@t3tools/contracts";
+import { Atom } from "effect/reactivity";
 import { RefreshCwIcon, TicketIcon } from "lucide-react";
 import { useContext, useState } from "react";
 
-import { issueTrackerEnvironment } from "~/state/issueTrackers";
+import { issueTrackerEnvironment, threadIssuesAtom } from "~/state/issueTrackers";
+import { threadIssueKey } from "../issues/issuesPage.logic";
 import { useAtomCommand } from "~/state/use-atom-command";
 import {
   Menu,
@@ -39,32 +40,6 @@ const issueFilterAtom = Atom.make<SidebarIssueFilter>(EMPTY_ISSUE_FILTER).pipe(
   Atom.withLabel("sidebar:issue-filter"),
 );
 
-const threadIssueKey = (environmentId: EnvironmentId, threadId: string) =>
-  `${environmentId}\u0000${threadId}`;
-
-// One derived atom per set of environments; a new atom per render would refetch.
-const issuesByThreadAtoms = new Map<string, Atom.Atom<ReadonlyMap<string, TrackerIssue>>>();
-function issuesByThreadAtom(environmentIds: ReadonlyArray<EnvironmentId>) {
-  const key = environmentIds.join("\u0000");
-  let atom = issuesByThreadAtoms.get(key);
-  if (atom === undefined) {
-    atom = Atom.make((get) => {
-      const issues = new Map<string, TrackerIssue>();
-      for (const environmentId of environmentIds) {
-        const result = get(issueTrackerEnvironment.threadSummaries({ environmentId, input: {} }));
-        for (const summary of AsyncResult.getOrElse(result, () => null)?.threads ?? []) {
-          const issue = summary.issues[0];
-          if (issue !== undefined)
-            issues.set(threadIssueKey(environmentId, summary.threadId), issue);
-        }
-      }
-      return issues;
-    });
-    issuesByThreadAtoms.set(key, atom);
-  }
-  return atom;
-}
-
 /** The servers the listed threads live on, which are the ones that hold their issue links. */
 function environmentIdsOf(threads: ReadonlyArray<EnvironmentThreadShell>): EnvironmentId[] {
   return [...new Set(threads.map((thread) => thread.environmentId))].toSorted();
@@ -75,10 +50,13 @@ export function useIssueFilteredThreads(
   threads: ReadonlyArray<EnvironmentThreadShell>,
 ): ReadonlyArray<EnvironmentThreadShell> {
   const filter = useAtomValue(issueFilterAtom);
-  const issues = useAtomValue(issuesByThreadAtom(environmentIdsOf(threads)));
+  const issues = useAtomValue(threadIssuesAtom(environmentIdsOf(threads)));
   if (issueFilterCount(filter) === 0) return threads;
   return threads.filter((thread) =>
-    matchesIssueFilter(issues.get(threadIssueKey(thread.environmentId, thread.id)) ?? null, filter),
+    matchesIssueFilter(
+      issues.get(threadIssueKey(thread.environmentId, thread.id))?.[0] ?? null,
+      filter,
+    ),
   );
 }
 
@@ -90,14 +68,17 @@ export function SidebarIssueControls({
 }) {
   const environmentIds = environmentIdsOf(threads);
   const [filter, setFilter] = useAtom(issueFilterAtom);
-  const issues = useAtomValue(issuesByThreadAtom(environmentIds));
+  const issues = useAtomValue(threadIssuesAtom(environmentIds));
   const registry = useContext(RegistryContext);
   const mutate = useAtomCommand(issueTrackerEnvironment.mutate, { reportFailure: false });
   const [refreshing, setRefreshing] = useState(false);
   const count = issueFilterCount(filter);
   if (issues.size === 0 && count === 0) return null;
 
-  const options = issueFilterOptions([...issues.values()], filter);
+  const options = issueFilterOptions(
+    [...issues.values()].flatMap((threadIssues) => threadIssues.slice(0, 1)),
+    filter,
+  );
   const filterLabel =
     count === 0
       ? "Filter threads by issue"
