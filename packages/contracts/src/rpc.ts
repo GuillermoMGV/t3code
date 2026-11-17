@@ -358,14 +358,16 @@ import {
 } from "./providerUsageLimits.ts";
 import { UsagePricing, UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
 import {
-  LinearMutation,
-  LinearMutationResult,
-  LinearRequestError,
-  LinearSearchIssuesInput,
-  LinearSearchIssuesResult,
-  LinearThreadIssueInput,
-  LinearThreadIssueResult,
-} from "./linear.ts";
+  IssueTrackerConnectionsInput,
+  IssueTrackerConnectionsResult,
+  IssueTrackerError,
+  IssueTrackerMutation,
+  IssueTrackerMutationResult,
+  IssueTrackerSearchInput,
+  IssueTrackerSearchResult,
+  IssueTrackerThreadInput,
+  IssueTrackerThreadResult,
+} from "./issueTracker.ts";
 import {
   StorageCleanupReport,
   DatabaseReclaimError,
@@ -556,9 +558,10 @@ export const WS_METHODS = {
   serverCheckOtlpEndpoint: "server.checkOtlpEndpoint",
   serverListTextGeneratorModels: "server.listTextGeneratorModels",
   serverPrepareTriage: "server.prepareTriage",
-  linearGetThreadIssue: "linear.getThreadIssue",
-  linearSearchIssues: "linear.searchIssues",
-  linearMutate: "linear.mutate",
+  issueTrackersGetThreadIssues: "issueTrackers.getThreadIssues",
+  issueTrackersSearch: "issueTrackers.search",
+  issueTrackersGetConnections: "issueTrackers.getConnections",
+  issueTrackersMutate: "issueTrackers.mutate",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
@@ -1034,22 +1037,28 @@ const WsServerPrepareTriageRpc = Rpc.make(WS_METHODS.serverPrepareTriage, {
   error: Schema.Union([ServerPrepareTriageError, EnvironmentAuthorizationError]),
 });
 
-const WsLinearGetThreadIssueRpc = Rpc.make(WS_METHODS.linearGetThreadIssue, {
-  payload: LinearThreadIssueInput,
-  success: LinearThreadIssueResult,
-  error: Schema.Union([LinearRequestError, EnvironmentAuthorizationError]),
+const WsIssueTrackersGetThreadIssuesRpc = Rpc.make(WS_METHODS.issueTrackersGetThreadIssues, {
+  payload: IssueTrackerThreadInput,
+  success: IssueTrackerThreadResult,
+  error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
 });
 
-const WsLinearSearchIssuesRpc = Rpc.make(WS_METHODS.linearSearchIssues, {
-  payload: LinearSearchIssuesInput,
-  success: LinearSearchIssuesResult,
-  error: Schema.Union([LinearRequestError, EnvironmentAuthorizationError]),
+const WsIssueTrackersSearchRpc = Rpc.make(WS_METHODS.issueTrackersSearch, {
+  payload: IssueTrackerSearchInput,
+  success: IssueTrackerSearchResult,
+  error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
 });
 
-const WsLinearMutateRpc = Rpc.make(WS_METHODS.linearMutate, {
-  payload: LinearMutation,
-  success: LinearMutationResult,
-  error: Schema.Union([LinearRequestError, EnvironmentAuthorizationError]),
+const WsIssueTrackersGetConnectionsRpc = Rpc.make(WS_METHODS.issueTrackersGetConnections, {
+  payload: IssueTrackerConnectionsInput,
+  success: IssueTrackerConnectionsResult,
+  error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
+});
+
+const WsIssueTrackersMutateRpc = Rpc.make(WS_METHODS.issueTrackersMutate, {
+  payload: IssueTrackerMutation,
+  success: IssueTrackerMutationResult,
+  error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
 });
 
 const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
@@ -2199,9 +2208,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerCheckOtlpEndpointRpc,
   WsServerListTextGeneratorModelsRpc,
   WsServerPrepareTriageRpc,
-  WsLinearGetThreadIssueRpc,
-  WsLinearSearchIssuesRpc,
-  WsLinearMutateRpc,
+  WsIssueTrackersGetThreadIssuesRpc,
+  WsIssueTrackersSearchRpc,
+  WsIssueTrackersGetConnectionsRpc,
+  WsIssueTrackersMutateRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,

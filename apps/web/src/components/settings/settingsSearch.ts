@@ -36,6 +36,7 @@ export type SettingsPath =
   | "/settings/connections"
   | "/settings/access"
   | "/settings/secrets"
+  | "/settings/issue-trackers"
   | "/settings/maintenance"
   | "/settings/labs"
   | "/settings/about"
@@ -111,6 +112,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/connections": msg("Environments"),
   "/settings/access": msg("Sharing & access"),
   "/settings/secrets": msg("Secrets"),
+  "/settings/issue-trackers": msg("Issue trackers"),
   "/settings/maintenance": msg("Maintenance"),
   "/settings/labs": msg("Labs"),
   "/settings/about": msg("About"),
@@ -157,6 +159,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
       "/settings/connections",
       "/settings/access",
       ...(isSecretsFeatureEnabled ? (["/settings/secrets"] as const) : []),
+      "/settings/issue-trackers",
     ],
   },
   {
@@ -1370,6 +1373,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     secretsFeatureOnly: true,
   },
   {
+    id: "issue-trackers-linear",
+    title: "Linear",
+    to: "/settings/issue-trackers",
+    searchTerms: ["linear issues tickets api key integration connect"],
+  },
+  {
+    id: "issue-trackers-jira",
+    title: "Jira",
+    to: "/settings/issue-trackers",
+    searchTerms: ["jira atlassian issues tickets api token integration connect"],
+  },
+  {
     id: "archive",
     title: "Archived threads",
     to: "/settings/archived",
@@ -1400,6 +1415,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/connections": "connections",
   "/settings/access": "connections",
   "/settings/secrets": null,
+  "/settings/issue-trackers": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
   "/settings/labs": null,

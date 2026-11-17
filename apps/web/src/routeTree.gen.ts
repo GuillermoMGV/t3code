@@ -37,6 +37,7 @@ import { Route as ChatSettingsOpenSourceLicensesRouteImport } from './routes/_ch
 import { Route as ChatSettingsMaintenanceRouteImport } from './routes/_chat.settings.maintenance'
 import { Route as ChatSettingsLabsRouteImport } from './routes/_chat.settings.labs'
 import { Route as ChatSettingsKeybindingsRouteImport } from './routes/_chat.settings.keybindings'
+import { Route as ChatSettingsIssueTrackersRouteImport } from './routes/_chat.settings.issue-trackers'
 import { Route as ChatSettingsIntegrationsRouteImport } from './routes/_chat.settings.integrations'
 import { Route as ChatSettingsGeneralRouteImport } from './routes/_chat.settings.general'
 import { Route as ChatSettingsDiffsRouteImport } from './routes/_chat.settings.diffs'
@@ -196,6 +197,12 @@ const ChatSettingsKeybindingsRoute = ChatSettingsKeybindingsRouteImport.update({
   path: '/keybindings',
   getParentRoute: () => ChatSettingsRoute,
 } as any)
+const ChatSettingsIssueTrackersRoute =
+  ChatSettingsIssueTrackersRouteImport.update({
+    id: '/issue-trackers',
+    path: '/issue-trackers',
+    getParentRoute: () => ChatSettingsRoute,
+  } as any)
 const ChatSettingsIntegrationsRoute =
   ChatSettingsIntegrationsRouteImport.update({
     id: '/integrations',
@@ -302,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/settings/diffs': typeof ChatSettingsDiffsRoute
   '/settings/general': typeof ChatSettingsGeneralRoute
   '/settings/integrations': typeof ChatSettingsIntegrationsRoute
+  '/settings/issue-trackers': typeof ChatSettingsIssueTrackersRoute
   '/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/settings/labs': typeof ChatSettingsLabsRoute
   '/settings/maintenance': typeof ChatSettingsMaintenanceRoute
@@ -346,6 +354,7 @@ export interface FileRoutesByTo {
   '/settings/diffs': typeof ChatSettingsDiffsRoute
   '/settings/general': typeof ChatSettingsGeneralRoute
   '/settings/integrations': typeof ChatSettingsIntegrationsRoute
+  '/settings/issue-trackers': typeof ChatSettingsIssueTrackersRoute
   '/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/settings/labs': typeof ChatSettingsLabsRoute
   '/settings/maintenance': typeof ChatSettingsMaintenanceRoute
@@ -392,6 +401,7 @@ export interface FileRoutesById {
   '/_chat/settings/diffs': typeof ChatSettingsDiffsRoute
   '/_chat/settings/general': typeof ChatSettingsGeneralRoute
   '/_chat/settings/integrations': typeof ChatSettingsIntegrationsRoute
+  '/_chat/settings/issue-trackers': typeof ChatSettingsIssueTrackersRoute
   '/_chat/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/_chat/settings/labs': typeof ChatSettingsLabsRoute
   '/_chat/settings/maintenance': typeof ChatSettingsMaintenanceRoute
@@ -438,6 +448,7 @@ export interface FileRouteTypes {
     | '/settings/diffs'
     | '/settings/general'
     | '/settings/integrations'
+    | '/settings/issue-trackers'
     | '/settings/keybindings'
     | '/settings/labs'
     | '/settings/maintenance'
@@ -482,6 +493,7 @@ export interface FileRouteTypes {
     | '/settings/diffs'
     | '/settings/general'
     | '/settings/integrations'
+    | '/settings/issue-trackers'
     | '/settings/keybindings'
     | '/settings/labs'
     | '/settings/maintenance'
@@ -527,6 +539,7 @@ export interface FileRouteTypes {
     | '/_chat/settings/diffs'
     | '/_chat/settings/general'
     | '/_chat/settings/integrations'
+    | '/_chat/settings/issue-trackers'
     | '/_chat/settings/keybindings'
     | '/_chat/settings/labs'
     | '/_chat/settings/maintenance'
@@ -754,6 +767,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSettingsKeybindingsRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
+    '/_chat/settings/issue-trackers': {
+      id: '/_chat/settings/issue-trackers'
+      path: '/issue-trackers'
+      fullPath: '/settings/issue-trackers'
+      preLoaderRoute: typeof ChatSettingsIssueTrackersRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
     '/_chat/settings/integrations': {
       id: '/_chat/settings/integrations'
       path: '/integrations'
@@ -876,6 +896,7 @@ interface ChatSettingsRouteChildren {
   ChatSettingsDiffsRoute: typeof ChatSettingsDiffsRoute
   ChatSettingsGeneralRoute: typeof ChatSettingsGeneralRoute
   ChatSettingsIntegrationsRoute: typeof ChatSettingsIntegrationsRoute
+  ChatSettingsIssueTrackersRoute: typeof ChatSettingsIssueTrackersRoute
   ChatSettingsKeybindingsRoute: typeof ChatSettingsKeybindingsRoute
   ChatSettingsLabsRoute: typeof ChatSettingsLabsRoute
   ChatSettingsMaintenanceRoute: typeof ChatSettingsMaintenanceRoute
@@ -906,6 +927,7 @@ const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
   ChatSettingsDiffsRoute: ChatSettingsDiffsRoute,
   ChatSettingsGeneralRoute: ChatSettingsGeneralRoute,
   ChatSettingsIntegrationsRoute: ChatSettingsIntegrationsRoute,
+  ChatSettingsIssueTrackersRoute: ChatSettingsIssueTrackersRoute,
   ChatSettingsKeybindingsRoute: ChatSettingsKeybindingsRoute,
   ChatSettingsLabsRoute: ChatSettingsLabsRoute,
   ChatSettingsMaintenanceRoute: ChatSettingsMaintenanceRoute,

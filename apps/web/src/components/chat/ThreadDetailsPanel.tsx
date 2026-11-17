@@ -36,7 +36,7 @@ import { resolveThreadDetailsVisibility, THREAD_DETAILS_ITEMS } from "./threadDe
 import { useClientSettings } from "../../hooks/useSettings";
 import { useProject, useServerConfigs } from "../../state/entities";
 import { ThreadDetailsThreadPrRows } from "./ThreadDetailsPrRows";
-import { ThreadDetailsLinearRow } from "./ThreadDetailsLinearRow";
+import { ThreadDetailsIssueTrackerRows } from "./ThreadDetailsIssueTrackerRows";
 import { cn } from "../../lib/utils";
 import { SlidersHorizontalIcon } from "lucide-react";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
@@ -265,15 +265,15 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                 </ThreadDetailsSection>
               ) : null}
 
-              {visible.linear && props.isServerThread && !props.draftId ? (
+              {visible.issueTrackers && props.isServerThread && !props.draftId ? (
                 <ThreadDetailsSection
-                  headingId="thread-details-linear-heading"
-                  title="Linear"
+                  headingId="thread-details-issue-trackers-heading"
+                  title="Issues"
                   showHeading={false}
                   separated={density === "full"}
                 >
                   <div className="flex flex-col">
-                    <ThreadDetailsLinearRow
+                    <ThreadDetailsIssueTrackerRows
                       environmentId={props.environmentId}
                       threadId={props.threadId}
                     />

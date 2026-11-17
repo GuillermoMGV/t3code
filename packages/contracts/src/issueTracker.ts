@@ -1,0 +1,187 @@
+import * as Schema from "effect/Schema";
+
+import { ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+
+// Fork-only Linear and Jira integration. Thread links live outside the orchestration model so
+// upstream merges stay clean; see CUSTOM_DEVELOPMENT.md.
+
+export const IssueTrackerKind = Schema.Literals(["linear", "jira"]);
+export type IssueTrackerKind = typeof IssueTrackerKind.Type;
+
+export const ISSUE_TRACKER_LABELS: Readonly<Record<IssueTrackerKind, string>> = {
+  linear: "Linear",
+  jira: "Jira",
+};
+
+const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9_]*-[1-9]\d*$/;
+
+/** `ABC-123`: a Linear identifier or a Jira issue key. */
+export const IssueKey = TrimmedNonEmptyString.check(Schema.isPattern(ISSUE_KEY_PATTERN));
+export type IssueKey = typeof IssueKey.Type;
+
+export const IssueRef = Schema.Struct({ tracker: IssueTrackerKind, key: IssueKey });
+export type IssueRef = typeof IssueRef.Type;
+
+export const TrackerIssueState = Schema.Struct({
+  name: Schema.String,
+  /** CSS color the tracker uses for the state. */
+  color: Schema.String,
+  /** The tracker's own grouping, such as Linear's `started` or Jira's `indeterminate`. */
+  category: Schema.String,
+});
+export type TrackerIssueState = typeof TrackerIssueState.Type;
+
+export const TrackerIssueAssignee = Schema.Struct({
+  name: Schema.String,
+  avatarUrl: Schema.NullOr(Schema.String),
+});
+export type TrackerIssueAssignee = typeof TrackerIssueAssignee.Type;
+
+export const TrackerIssue = Schema.Struct({
+  tracker: IssueTrackerKind,
+  key: IssueKey,
+  title: Schema.String,
+  url: Schema.String,
+  state: Schema.NullOr(TrackerIssueState),
+  assignee: Schema.NullOr(TrackerIssueAssignee),
+  priorityLabel: Schema.NullOr(Schema.String),
+  updatedAt: Schema.String,
+});
+export type TrackerIssue = typeof TrackerIssue.Type;
+
+export const IssueTrackerThreadInput = Schema.Struct({
+  threadId: ThreadId,
+  /** Issues referenced in the thread's messages, oldest first. */
+  detected: Schema.Array(IssueRef).check(Schema.isMaxLength(20)),
+});
+export type IssueTrackerThreadInput = typeof IssueTrackerThreadInput.Type;
+
+export const IssueTrackerLinkSource = Schema.Literals(["manual", "detected"]);
+export type IssueTrackerLinkSource = typeof IssueTrackerLinkSource.Type;
+
+export const IssueTrackerThreadRow = Schema.Struct({
+  tracker: IssueTrackerKind,
+  connected: Schema.Boolean,
+  link: Schema.NullOr(Schema.Struct({ key: IssueKey, source: IssueTrackerLinkSource })),
+  /** Null when nothing is linked, or the credentials cannot read the linked issue. */
+  issue: Schema.NullOr(TrackerIssue),
+  /** Why the tracker could not be read; the other tracker's row still loads. */
+  error: Schema.NullOr(Schema.String),
+});
+export type IssueTrackerThreadRow = typeof IssueTrackerThreadRow.Type;
+
+export const IssueTrackerThreadResult = Schema.Struct({
+  rows: Schema.Array(IssueTrackerThreadRow),
+});
+export type IssueTrackerThreadResult = typeof IssueTrackerThreadResult.Type;
+
+export const IssueTrackerSearchInput = Schema.Struct({
+  tracker: IssueTrackerKind,
+  /** An issue URL, a key, or words from the title. Empty lists your open issues. */
+  query: Schema.String.check(Schema.isMaxLength(500)),
+});
+export type IssueTrackerSearchInput = typeof IssueTrackerSearchInput.Type;
+
+export const IssueTrackerSearchResult = Schema.Struct({ issues: Schema.Array(TrackerIssue) });
+export type IssueTrackerSearchResult = typeof IssueTrackerSearchResult.Type;
+
+export const IssueTrackerConnection = Schema.Struct({
+  tracker: IssueTrackerKind,
+  connected: Schema.Boolean,
+  /** The account the saved credentials belong to. */
+  account: Schema.NullOr(Schema.String),
+  /** The Jira site; null for Linear. */
+  site: Schema.NullOr(Schema.String),
+  /** Why the saved credentials could not be checked just now. */
+  error: Schema.NullOr(Schema.String),
+});
+export type IssueTrackerConnection = typeof IssueTrackerConnection.Type;
+
+export const IssueTrackerConnectionsInput = Schema.Struct({});
+export const IssueTrackerConnectionsResult = Schema.Struct({
+  trackers: Schema.Array(IssueTrackerConnection),
+});
+export type IssueTrackerConnectionsResult = typeof IssueTrackerConnectionsResult.Type;
+
+export const IssueTrackerMutation = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("connectLinear"), apiKey: TrimmedNonEmptyString }),
+  Schema.Struct({
+    type: Schema.Literal("connectJira"),
+    /** `https://example.atlassian.net`, `example.atlassian.net`, or `example`. */
+    siteUrl: TrimmedNonEmptyString,
+    email: TrimmedNonEmptyString,
+    apiToken: TrimmedNonEmptyString,
+  }),
+  Schema.Struct({ type: Schema.Literal("disconnect"), tracker: IssueTrackerKind }),
+  Schema.Struct({
+    type: Schema.Literal("link"),
+    threadId: ThreadId,
+    tracker: IssueTrackerKind,
+    key: IssueKey,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("unlink"),
+    threadId: ThreadId,
+    tracker: IssueTrackerKind,
+    /** Detected keys to stop showing for this thread. */
+    dismissKeys: Schema.Array(IssueKey).check(Schema.isMaxLength(20)),
+  }),
+]);
+export type IssueTrackerMutation = typeof IssueTrackerMutation.Type;
+
+export const IssueTrackerMutationResult = Schema.Struct({
+  /** The account the new credentials belong to, after connecting. */
+  account: Schema.optional(Schema.String),
+});
+export type IssueTrackerMutationResult = typeof IssueTrackerMutationResult.Type;
+
+export class IssueTrackerError extends Schema.TaggedError<IssueTrackerError>()(
+  "IssueTrackerError",
+  {
+    tracker: IssueTrackerKind,
+    reason: Schema.Literals([
+      "notConnected",
+      "unauthorized",
+      "invalidInput",
+      "network",
+      "invalidResponse",
+      "storage",
+    ]),
+    detail: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    return this.detail;
+  }
+}
+
+const LINEAR_URL = /https?:\/\/linear\.app\/[^/\s]+\/issue\/([a-z][a-z0-9_]*-[1-9]\d*)/gi;
+// Jira Cloud issue pages and board views that open an issue in a side panel.
+const JIRA_URL =
+  /https?:\/\/[a-z0-9-]+\.atlassian\.net\/(?:browse\/([a-z][a-z0-9_]*-[1-9]\d*)|[^\s]*?[?&]selectedIssue=([a-z][a-z0-9_]*-[1-9]\d*))/gi;
+
+const asKey = (value: string): IssueKey | null => {
+  const key = value.trim().toUpperCase();
+  return ISSUE_KEY_PATTERN.test(key) ? (key as IssueKey) : null;
+};
+
+/** Every Linear or Jira issue URL in the text, in order, without repeats. Bare keys are ignored. */
+export function findIssueReferences(text: string): IssueRef[] {
+  const found: Array<IssueRef & { index: number }> = [];
+  const add = (tracker: IssueTrackerKind, raw: string | undefined, index: number) => {
+    const key = raw === undefined ? null : asKey(raw);
+    if (key === null) return;
+    if (found.some((ref) => ref.tracker === tracker && ref.key === key)) return;
+    found.push({ tracker, key, index });
+  };
+  for (const match of text.matchAll(LINEAR_URL)) add("linear", match[1], match.index);
+  for (const match of text.matchAll(JIRA_URL)) add("jira", match[1] ?? match[2], match.index);
+  return [...found].sort((a, b) => a.index - b.index).map(({ tracker, key }) => ({ tracker, key }));
+}
+
+/** The key in a URL of that tracker, or a bare key; null otherwise. */
+export function parseIssueReference(value: string, tracker: IssueTrackerKind): IssueKey | null {
+  const [fromUrl] = findIssueReferences(value.trim()).filter((ref) => ref.tracker === tracker);
+  return fromUrl?.key ?? asKey(value);
+}

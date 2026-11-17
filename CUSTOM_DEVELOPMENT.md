@@ -73,58 +73,63 @@ Trucos que ahorran tiempo:
 
 ## Scripts del fork
 
-| Script                                | Qué hace                                                                                        |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `docs/personal/custom-env.ps1`        | Activa Vite+, Node y pnpm del `package.json` y Cargo en la terminal actual (dot-source).        |
-| `docs/personal/setup-local-git.ps1`   | Recrea remotos, bloqueo de push, identidad y credenciales de `GuillermoMGV`. Idempotente.       |
-| `docs/personal/sync-upstream.ps1`     | Actualiza `main` desde el oficial y la integra en `custom`. Se detiene ante cualquier problema. |
-| `docs/personal/build-windows.ps1`     | Compila el instalador Windows y lo verifica como el release oficial. No instala.                |
-| `docs/personal/build-and-install.ps1` | `build-windows.ps1` + cierra la app, copia los datos e instala. Versión automática.             |
-| `docs/personal/mock-linear.mjs`       | API GraphQL de Linear simulada para probar la integración sin una key real (ver abajo).         |
+| Script                                  | Qué hace                                                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `docs/personal/custom-env.ps1`          | Activa Vite+, Node y pnpm del `package.json` y Cargo en la terminal actual (dot-source).        |
+| `docs/personal/setup-local-git.ps1`     | Recrea remotos, bloqueo de push, identidad y credenciales de `GuillermoMGV`. Idempotente.       |
+| `docs/personal/sync-upstream.ps1`       | Actualiza `main` desde el oficial y la integra en `custom`. Se detiene ante cualquier problema. |
+| `docs/personal/build-windows.ps1`       | Compila el instalador Windows y lo verifica como el release oficial. No instala.                |
+| `docs/personal/build-and-install.ps1`   | `build-windows.ps1` + cierra la app, copia los datos e instala. Versión automática.             |
+| `docs/personal/mock-issue-trackers.mjs` | APIs de Linear y Jira simuladas para probar la integración sin credenciales reales (ver abajo). |
 
 ## Personalizaciones del fork
 
 Funciones propias de este fork. Cada una vive sobre todo en archivos nuevos; la tabla «Toca» lista las líneas añadidas en archivos oficiales, que son los únicos puntos donde una sincronización puede dar conflicto. Al resolverlo, conserva el cambio oficial y vuelve a añadir la línea del fork.
 
-### Ticket de Linear en el panel del hilo
+### Tickets de Linear y Jira en el panel del hilo
 
-Qué hace: el panel de detalles del hilo (icono arriba a la derecha) muestra el ticket de Linear asociado con título, identificador, **estado con su color y asignado**, y se actualiza cada minuto mientras está abierto.
+Qué hace: el panel de detalles del hilo (icono arriba a la derecha) muestra el ticket de Linear y el de Jira asociados al hilo, cada uno con título, clave, **estado con su color y asignado**. Se actualizan cada minuto mientras el panel está abierto. Solo aparece la fila de un gestor si está conectado o si el hilo menciona uno de sus tickets; sin ninguno conectado, la fila «Connect Linear or Jira» lleva a Ajustes.
 
-- **Conectar:** la fila «Connect Linear» pide una personal API key (Linear → Settings → Security & access → Personal API keys). Se valida contra Linear y se guarda en `userdata/secrets/linear-api-key.bin`.
-- **Vincular automáticamente:** si un mensaje tuyo del hilo contiene una URL `https://linear.app/<workspace>/issue/ABC-123/...`, el ticket aparece solo.
-- **Vincular a mano:** «Link Linear issue» abre un diálogo con tus tickets abiertos; acepta una URL, un identificador (`PRO-123`) o palabras para buscar por título (Enter).
-- **Menú ⋯:** abrir en Linear, copiar enlace, cambiar de ticket, refrescar, desvincular (también oculta los tickets detectados en el hilo) y desconectar Linear.
-- La fila se puede ocultar con el clic derecho en el panel → «Linear issue».
-- Los vínculos se guardan en `userdata/linear-links.json` (por hilo: ticket manual y detectados descartados), no en el modelo del hilo: no viajan al exportar o migrar un hilo a otra máquina.
+- **Conectar:** Ajustes → Connections → **Issue trackers**. Linear pide una personal API key (Linear → Settings → Security & access → Personal API keys). Jira pide el sitio (`tu-equipo.atlassian.net`), el email de la cuenta de Atlassian y un API token **sin scopes** (<https://id.atlassian.com/manage-profile/security/api-tokens>). Las credenciales se validan contra el gestor antes de guardarlas en `userdata/secrets/` (`linear-api-key.bin`, `jira-credentials.bin`). La página muestra la cuenta conectada y permite desconectar.
+- **Vincular automáticamente:** si un mensaje tuyo del hilo contiene una URL `https://linear.app/<workspace>/issue/ABC-123/...` o `https://<sitio>.atlassian.net/browse/ABC-123` (también `?selectedIssue=ABC-123` de los tableros), el ticket aparece solo.
+- **Vincular a mano:** «Link Linear issue» / «Link Jira issue» abre un buscador que busca **mientras escribes** (espera 500 ms, `ISSUE_SEARCH_DEBOUNCE_MS` en `issueTrackerRows.logic.ts`). Sin texto muestra tus tickets abiertos. Se elige con clic o con ↑/↓ y se vincula con **Link** o Enter; doble clic vincula directamente. Una URL o clave pegada se vincula sin esperar a la búsqueda.
+- **Menú ⋯:** abrir en el gestor, copiar enlace, cambiar de ticket, refrescar, desvincular (también oculta los tickets detectados en el hilo) e ir a sus ajustes.
+- La sección se oculta con clic derecho en el panel → «Linear and Jira issues».
+- Los vínculos se guardan en `userdata/issue-tracker-links.json` (por hilo y gestor: ticket manual y detectados descartados), no en el modelo del hilo: no viajan al exportar o migrar un hilo. Al primer uso se importa el `linear-links.json` de la primera versión.
+- Limitaciones de Jira: solo Jira Cloud con API token clásico (los tokens con scopes usan `api.atlassian.com/ex/jira/{cloudId}` y no están soportados); Jira Server/Data Center no está probado. La búsqueda usa `POST /rest/api/3/search/jql` con `text ~ "..."`; tus abiertos, `assignee = currentUser() AND statusCategory != Done`.
 
-| Parte     | Archivos nuevos                                                                                                                                                   |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Contratos | `packages/contracts/src/linear.ts` (+ test)                                                                                                                       |
-| Servidor  | `apps/server/src/linear/linearApi.ts` (GraphQL), `LinearService.ts` (key, vínculos, RPC) (+ test)                                                                 |
-| Web       | `apps/web/src/state/linear.ts`, `components/chat/ThreadDetailsLinearRow.tsx`, `LinearIssueDialog.tsx`, `LinearIssueParts.tsx`, `linearIssueRow.logic.ts` (+ test) |
+| Parte     | Archivos nuevos                                                                                                                                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Contratos | `packages/contracts/src/issueTracker.ts` (+ test)                                                                                                                                                                                                                                    |
+| Servidor  | `apps/server/src/issueTrackers/linearApi.ts` (GraphQL), `jiraApi.ts` (REST v3), `IssueTrackerService.ts` (credenciales, vínculos, RPC) (+ test)                                                                                                                                      |
+| Web       | `apps/web/src/state/issueTrackers.ts`, `components/chat/ThreadDetailsIssueTrackerRows.tsx`, `IssueTrackerLinkDialog.tsx`, `IssueTrackerParts.tsx`, `issueTrackerRows.logic.ts` (+ test), `components/settings/IssueTrackersSettings.tsx`, `routes/_chat.settings.issue-trackers.tsx` |
 
-| Toca (archivos oficiales)                             | Qué añade                                                                     |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `packages/contracts/src/rpc.ts`                       | import, 3 métodos en `WS_METHODS`, 3 `Rpc.make` y su registro en `WsRpcGroup` |
-| `packages/contracts/src/index.ts`                     | `export * from "./linear.ts"`                                                 |
-| `apps/server/src/auth/RpcAuthorization.ts`            | permisos de los 3 métodos (leer: orchestration read; modificar: operate)      |
-| `apps/server/src/observability/RpcInstrumentation.ts` | categoría de los 3 métodos                                                    |
-| `apps/server/src/server.ts`                           | import y capa `LinearService.layer`                                           |
-| `apps/server/src/ws.ts`                               | import, `yield* LinearService` y los 3 handlers                               |
-| `apps/server/src/ws.test.ts`                          | import y `Layer.mock(LinearService)`                                          |
-| `apps/web/src/components/chat/threadDetailsItems.ts`  | elemento `linear` del menú «Choose what to show»                              |
-| `apps/web/src/components/chat/ThreadDetailsPanel.tsx` | import y la sección que renderiza la fila                                     |
+| Toca (archivos oficiales)                                 | Qué añade                                                                                            |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `packages/contracts/src/rpc.ts`                           | import, 4 métodos `issueTrackers.*` en `WS_METHODS`, 4 `Rpc.make` y su registro en `WsRpcGroup`      |
+| `packages/contracts/src/index.ts`                         | `export * from "./issueTracker.ts"`                                                                  |
+| `apps/server/src/auth/RpcAuthorization.ts`                | permisos de los 4 métodos (leer: orchestration read; modificar: operate)                             |
+| `apps/server/src/observability/RpcInstrumentation.ts`     | categoría de los 4 métodos                                                                           |
+| `apps/server/src/server.ts`                               | import y capa `IssueTrackerService.layer`                                                            |
+| `apps/server/src/ws.ts`                                   | import, `yield* IssueTrackerService` y los 4 handlers                                                |
+| `apps/server/src/ws.test.ts`                              | import y `Layer.mock(IssueTrackerService)`                                                           |
+| `apps/web/src/components/chat/threadDetailsItems.ts`      | elemento `issueTrackers` del menú «Choose what to show»                                              |
+| `apps/web/src/components/chat/ThreadDetailsPanel.tsx`     | import y la sección que renderiza las filas                                                          |
+| `apps/web/src/components/settings/settingsSearch.ts`      | ruta `/settings/issue-trackers` (tipo, etiqueta, grupo Connections, ámbito) y 2 entradas de búsqueda |
+| `apps/web/src/components/settings/SettingsSidebarNav.tsx` | icono de la página                                                                                   |
+| `apps/web/src/routes/_chat.settings.tsx`                  | la página usa un solo entorno, como Secrets                                                          |
+| `apps/web/src/routeTree.gen.ts`                           | generado por el plugin de TanStack Router al arrancar dev o compilar                                 |
 
-Probar sin key real: la variable `T3CODE_LINEAR_API_URL` redirige el servidor a otra URL de API.
+Probar sin credenciales reales: `docs/personal/mock-issue-trackers.mjs` simula Linear (puerto 4567, key `test-key`) y Jira (puerto 4568, email `dev@example.com`, token `test-token`). La variable `T3CODE_LINEAR_API_URL` redirige Linear; para Jira basta con poner `http://127.0.0.1:4568` como sitio (http solo se acepta en localhost).
 
 ```powershell
-node docs/personal/mock-linear.mjs   # en otra terminal; escucha en 127.0.0.1:4567, key «test-key»
+node docs/personal/mock-issue-trackers.mjs   # en otra terminal
 $env:T3CODE_LINEAR_API_URL = 'http://127.0.0.1:4567/graphql'
 . ./docs/personal/custom-env.ps1
 vp run dev --home-dir .t3 --no-seed
 ```
 
-Tests: `vp test run packages/contracts/src/linear.test.ts apps/server/src/linear/LinearService.test.ts apps/web/src/components/chat/linearIssueRow.logic.test.ts`. Las consultas usan el esquema público de Linear (`searchIssues`, `issue(id)` con identificador, `viewer.assignedIssues`); se comprobaron contra su SDL oficial, pero solo se han ejecutado contra el mock.
+Tests: `vp test run packages/contracts/src/issueTracker.test.ts apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueTrackerRows.logic.test.ts`. Las consultas de Linear se comprobaron contra su esquema GraphQL oficial; las de Jira, contra la documentación de autenticación y el changelog de Atlassian (la forma de la respuesta se decodifica de forma tolerante). Ambas se han ejecutado solo contra los mocks.
 
 ## Entorno y arranque
 

@@ -1,4 +1,4 @@
-import { LinearIssue, LinearRequestError, type LinearIssueIdentifier } from "@t3tools/contracts";
+import { IssueTrackerError, type IssueKey, type TrackerIssue } from "@t3tools/contracts";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -10,6 +10,28 @@ const LINEAR_API_URL = "https://api.linear.app/graphql";
 const ISSUE_FIELDS = `identifier title url priorityLabel updatedAt
   state { name color type }
   assignee { name avatarUrl }`;
+
+const LinearIssueNode = Schema.Struct({
+  identifier: Schema.String,
+  title: Schema.String,
+  url: Schema.String,
+  priorityLabel: Schema.optional(Schema.NullOr(Schema.String)),
+  updatedAt: Schema.String,
+  state: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({ name: Schema.String, color: Schema.String, type: Schema.String }),
+    ),
+  ),
+  assignee: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        name: Schema.String,
+        avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
+      }),
+    ),
+  ),
+});
+type LinearIssueNode = typeof LinearIssueNode.Type;
 
 const GraphqlResponse = Schema.Struct({
   data: Schema.optional(Schema.NullOr(Schema.Unknown)),
@@ -30,22 +52,50 @@ const GraphqlResponse = Schema.Struct({
 const decodeGraphqlResponse = Schema.decodeUnknownEffect(GraphqlResponse);
 
 const ViewerData = Schema.Struct({ viewer: Schema.Struct({ name: Schema.String }) });
-const IssueData = Schema.Struct({ issue: Schema.NullOr(LinearIssue) });
+const IssueData = Schema.Struct({ issue: Schema.NullOr(LinearIssueNode) });
 const SearchData = Schema.Struct({
-  searchIssues: Schema.Struct({ nodes: Schema.Array(LinearIssue) }),
+  searchIssues: Schema.Struct({ nodes: Schema.Array(LinearIssueNode) }),
 });
 const AssignedData = Schema.Struct({
   viewer: Schema.Struct({
-    assignedIssues: Schema.Struct({ nodes: Schema.Array(LinearIssue) }),
+    assignedIssues: Schema.Struct({ nodes: Schema.Array(LinearIssueNode) }),
   }),
 });
 
+const linearError = (reason: IssueTrackerError["reason"], detail: string, cause?: unknown) =>
+  new IssueTrackerError({ tracker: "linear", reason, detail, cause });
+
 const invalidResponse = (cause: unknown) =>
-  new LinearRequestError({
-    reason: "invalidResponse",
-    detail: "Linear returned a response T3 Code could not read.",
-    cause,
-  });
+  linearError("invalidResponse", "Linear returned a response T3 Code could not read.", cause);
+
+const unauthorized = () =>
+  linearError(
+    "unauthorized",
+    "Linear rejected the API key. Connect Linear again in Settings → Issue trackers.",
+  );
+
+/** Null when Linear sends an identifier T3 Code cannot use as a key. */
+function toTrackerIssue(node: LinearIssueNode): TrackerIssue | null {
+  const key = node.identifier.trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]*-[1-9]\d*$/.test(key)) return null;
+  return {
+    tracker: "linear",
+    key: key as IssueKey,
+    title: node.title,
+    url: node.url,
+    state: node.state
+      ? { name: node.state.name, color: node.state.color, category: node.state.type }
+      : null,
+    assignee: node.assignee
+      ? { name: node.assignee.name, avatarUrl: node.assignee.avatarUrl ?? null }
+      : null,
+    priorityLabel: node.priorityLabel ?? null,
+    updatedAt: node.updatedAt,
+  };
+}
+
+const toTrackerIssues = (nodes: ReadonlyArray<LinearIssueNode>) =>
+  nodes.flatMap((node) => toTrackerIssue(node) ?? []);
 
 type GraphqlResult =
   | { readonly _tag: "data"; readonly data: unknown }
@@ -74,21 +124,15 @@ export const makeLinearApi = Effect.gen(function* () {
       )
       .pipe(
         Effect.timeout("15 seconds"),
-        Effect.mapError(
-          (cause) =>
-            new LinearRequestError({
-              reason: "network",
-              detail: "Could not reach Linear. Check the connection and try again.",
-              cause,
-            }),
+        Effect.mapError((cause) =>
+          linearError(
+            "network",
+            "Could not reach Linear. Check the connection and try again.",
+            cause,
+          ),
         ),
       );
-    if (response.status === 401 || response.status === 403) {
-      return yield* new LinearRequestError({
-        reason: "unauthorized",
-        detail: "Linear rejected the API key. Connect Linear again with a valid key.",
-      });
-    }
+    if (response.status === 401 || response.status === 403) return yield* unauthorized();
     const body = yield* response.json.pipe(
       Effect.flatMap(decodeGraphqlResponse),
       Effect.mapError(invalidResponse),
@@ -101,10 +145,7 @@ export const makeLinearApi = Effect.gen(function* () {
         ),
       )
     ) {
-      return yield* new LinearRequestError({
-        reason: "unauthorized",
-        detail: "Linear rejected the API key. Connect Linear again with a valid key.",
-      });
+      return yield* unauthorized();
     }
     if (errors.length > 0) {
       return { _tag: "errors", message: errors[0]!.message } satisfies GraphqlResult;
@@ -126,18 +167,16 @@ export const makeLinearApi = Effect.gen(function* () {
   });
 
   /** Null when the issue does not exist or the key cannot see it. */
-  const issue = Effect.fn("LinearApi.issue")(function* (
-    apiKey: string,
-    identifier: LinearIssueIdentifier,
-  ) {
+  const issue = Effect.fn("LinearApi.issue")(function* (apiKey: string, key: IssueKey) {
     const result = yield* graphql(
       apiKey,
       `query Issue($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} } }`,
-      { id: identifier },
+      { id: key },
     );
     // Linear answers an unknown identifier with an "Entity not found" error.
     if (result._tag === "errors") return null;
-    return (yield* expectData(IssueData, result)).issue;
+    const node = (yield* expectData(IssueData, result)).issue;
+    return node === null ? null : toTrackerIssue(node);
   });
 
   const search = Effect.fn("LinearApi.search")(function* (apiKey: string, term: string) {
@@ -146,7 +185,7 @@ export const makeLinearApi = Effect.gen(function* () {
       `query Search($term: String!) { searchIssues(term: $term, first: 10) { nodes { ${ISSUE_FIELDS} } } }`,
       { term },
     );
-    return (yield* expectData(SearchData, result)).searchIssues.nodes;
+    return toTrackerIssues((yield* expectData(SearchData, result)).searchIssues.nodes);
   });
 
   const assignedOpenIssues = Effect.fn("LinearApi.assignedOpenIssues")(function* (apiKey: string) {
@@ -163,7 +202,7 @@ export const makeLinearApi = Effect.gen(function* () {
       }`,
       {},
     );
-    return (yield* expectData(AssignedData, result)).viewer.assignedIssues.nodes;
+    return toTrackerIssues((yield* expectData(AssignedData, result)).viewer.assignedIssues.nodes);
   });
 
   return { viewerName, issue, search, assignedOpenIssues };
