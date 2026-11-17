@@ -173,6 +173,9 @@ Limitaciones: no hay comandos en la paleta de comandos (es un archivo oficial de
 
 Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → rama destino` y, a su derecha, el **ticket** de Linear o Jira de la PR: clave, estado (con su color) y asignado.
 
+- La rama destino es una insignia con color según el tipo (`targetBranchKind`): ámbar para `master`/`main`, azul para `develop`, gris para el resto. La rama origen va en texto atenuado y recortada por el medio.
+- Clic (o Enter) en las insignias del ticket lo abre en el navegador sin seleccionar la PR. Las insignias del ticket no se recortan; ceden espacio el autor, el repositorio y la rama origen.
+
 - **Cómo se relaciona la PR con el ticket:** por la clave que aparece en el **título** (en mayúsculas, como `fix(PRO-2238): …` o `PRO-3853 …`) o, si no hay, en la **rama origen** (`feat/pro-2239-…` también vale). Es la convención que ya usan los títulos y ramas de Properti. No hace falta vincular nada a mano ni que Linear o Jira estén enlazados con GitHub.
 - El servidor busca todas las claves de la lista en una sola petición (`issueTrackers.getIssues`): primero en Linear y, si no existe, en Jira; solo con los gestores conectados en Ajustes. Los aciertos se guardan un minuto (como en el listado de hilos) y las claves que no son tickets (`UTF-8`, `issue-123` en ramas de otros repos) 30 minutos, para no gastar el límite de peticiones de Linear. El botón de refrescar de la barra lateral vacía las dos cachés.
 - Sin clave reconocible, o sin gestor conectado, la fila queda como antes.

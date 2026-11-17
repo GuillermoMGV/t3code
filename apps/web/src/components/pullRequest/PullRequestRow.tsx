@@ -21,11 +21,10 @@ import {
   PULL_REQUEST_ROW_CLASS,
   PULL_REQUEST_ROW_NUMBER_CLASS,
   PullRequestRowAuthor,
-  PullRequestRowBranches,
   PullRequestRowGlyph,
   PullRequestRowLines,
 } from "./PullRequestListRow";
-import { PullRequestIssueBadges } from "./PullRequestIssueBadges";
+import { PullRequestIssueBadges, PullRequestTargetBranches } from "./PullRequestIssueBadges";
 import { PullRequestLabelChip, PullRequestReviewDecisionGlyph } from "./pullRequestPresentation";
 
 const LABEL_SLOTS = [
@@ -242,7 +241,7 @@ function PullRequestRowImpl({
               />
               {showProjectTitle ? <span className="truncate">{entry.repository}</span> : null}
               <span className="flex min-w-0 max-w-80">
-                <PullRequestRowBranches head={entry.headBranch} base={entry.baseBranch} />
+                <PullRequestTargetBranches head={entry.headBranch} base={entry.baseBranch} />
               </span>
               <PullRequestIssueBadges entry={entry} />
               {environmentLabel ? (

@@ -17,6 +17,14 @@ export function pullRequestTargetBranches(
   return [...branches].toSorted((left, right) => left.localeCompare(right));
 }
 
+/** Where a target branch sits: the released line, the shared integration line, or anything else. */
+export function targetBranchKind(base: string): "production" | "integration" | "other" {
+  const name = base.toLowerCase();
+  if (name === "main" || name === "master" || name === "production") return "production";
+  if (name === "develop" || name === "development" || name === "dev") return "integration";
+  return "other";
+}
+
 /** Keeps only the pull requests that merge into `base`; every group when it is undefined. */
 export function filterByTargetBranch<Group extends BranchGroup>(
   groups: ReadonlyArray<Group>,
