@@ -110,12 +110,12 @@ Qué hace: el panel de detalles del hilo (icono arriba a la derecha) muestra el 
 
 | Toca (archivos oficiales)                                 | Qué añade                                                                                             |
 | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `packages/contracts/src/rpc.ts`                           | import, 5 métodos `issueTrackers.*` en `WS_METHODS`, 5 `Rpc.make` y su registro en `WsRpcGroup`       |
+| `packages/contracts/src/rpc.ts`                           | import, 6 métodos `issueTrackers.*` en `WS_METHODS`, 6 `Rpc.make` y su registro en `WsRpcGroup`       |
 | `packages/contracts/src/index.ts`                         | `export * from "./issueTracker.ts"`                                                                   |
-| `apps/server/src/auth/RpcAuthorization.ts`                | permisos de los 5 métodos (leer: orchestration read; modificar: operate)                              |
-| `apps/server/src/observability/RpcInstrumentation.ts`     | categoría de los 5 métodos                                                                            |
+| `apps/server/src/auth/RpcAuthorization.ts`                | permisos de los 6 métodos (leer: orchestration read; modificar: operate)                              |
+| `apps/server/src/observability/RpcInstrumentation.ts`     | categoría de los 6 métodos                                                                            |
 | `apps/server/src/server.ts`                               | import y capa `IssueTrackerService.layer`                                                             |
-| `apps/server/src/ws.ts`                                   | import, `yield* IssueTrackerService` y los 5 handlers                                                 |
+| `apps/server/src/ws.ts`                                   | import, `yield* IssueTrackerService` y los 6 handlers                                                 |
 | `apps/server/src/ws.test.ts`                              | import y `Layer.mock(IssueTrackerService)`                                                            |
 | `apps/web/src/components/chat/threadDetailsItems.ts`      | elemento `issueTrackers` del menú «Choose what to show»                                               |
 | `apps/web/src/components/chat/ThreadDetailsPanel.tsx`     | import y la sección que renderiza las filas                                                           |
@@ -169,23 +169,31 @@ Qué hace: en hilos cuya carpeta es un proyecto Salesforce DX (tiene `sfdx-proje
 
 Limitaciones: no hay comandos en la paleta de comandos (es un archivo oficial de 3.000 líneas muy cambiante; el selector de la fila cubre lo mismo). No está implementado el login por device code (`sf org login device`). Cerrar sesión y abrir org no se han probado contra orgs reales, por seguridad. Probado en el proyecto real `PROPERTI`: org por defecto correcta, cambio DEV ↔ QA2 (restaurado a QA2), cambio externo reflejado, confirmación de PROD (cancelada), estados reales de las 23 orgs, diálogo de re-autenticación y login iniciado y cancelado (proceso terminado, puerto 1717 libre, sin org añadida). Ningún token en registros ni trazas.
 
-### Rama origen y destino en la lista de pull requests
+### Ramas y ticket en la lista de pull requests
 
-Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → rama destino`. En «Filters» hay un submenú **Target branch** con las ramas destino de las PR cargadas; al elegir una solo quedan las PR que van a esa rama (cuenta en el número de filtros y queda en la URL como `?base=develop`).
+Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → rama destino` y, a su derecha, el **ticket** de Linear o Jira de la PR: clave, estado (con su color) y asignado.
+
+- **Cómo se relaciona la PR con el ticket:** por la clave que aparece en el **título** (en mayúsculas, como `fix(PRO-2238): …` o `PRO-3853 …`) o, si no hay, en la **rama origen** (`feat/pro-2239-…` también vale). Es la convención que ya usan los títulos y ramas de Properti. No hace falta vincular nada a mano ni que Linear o Jira estén enlazados con GitHub.
+- El servidor busca todas las claves de la lista en una sola petición (`issueTrackers.getIssues`): primero en Linear y, si no existe, en Jira; solo con los gestores conectados en Ajustes. Los aciertos se guardan un minuto (como en el listado de hilos) y las claves que no son tickets (`UTF-8`, `issue-123` en ramas de otros repos) 30 minutos, para no gastar el límite de peticiones de Linear. El botón de refrescar de la barra lateral vacía las dos cachés.
+- Sin clave reconocible, o sin gestor conectado, la fila queda como antes.
+- Para probar con PR reales sin credenciales: `$env:MOCK_LINEAR_ANY_KEY = '1'` antes de arrancar `mock-issue-trackers.mjs` hace que el mock de Linear responda a cualquier clave `PRO-`.
+
+**Filtro por rama destino.** En «Filters» hay un submenú **Target branch** con las ramas destino de las PR cargadas; al elegir una solo quedan las PR que van a esa rama (cuenta en el número de filtros y queda en la URL como `?base=develop`).
 
 El filtro se aplica en el cliente sobre las PR ya cargadas, sin tocar la consulta al host ni su caché (que son oficiales y cambian a menudo). Si una rama tiene PR más allá de la primera página, aparecen con «Load more». No se guarda entre sesiones (los demás filtros sí) y no existe el calificador `base:` en el buscador.
 
-| Parte | Archivos nuevos                                                                 |
-| ----- | ------------------------------------------------------------------------------- |
-| Web   | `apps/web/src/components/pullRequest/pullRequestTargetBranch.logic.ts` (+ test) |
+| Parte    | Archivos nuevos                                                                                                                                     |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web      | `apps/web/src/components/pullRequest/pullRequestTargetBranch.logic.ts` (+ test), `pullRequestIssue.logic.ts` (+ test), `PullRequestIssueBadges.tsx` |
+| Servidor | `getIssues` en `IssueTrackerService.ts` y el método `issueTrackers.getIssues` (ver la tabla de Linear y Jira)                                       |
 
-| Toca (archivos oficiales)                                        | Qué añade                                                                    |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `apps/web/src/components/pullRequest/PullRequestRow.tsx`         | import y `PullRequestRowBranches` (ya existía) en la línea de metadatos      |
-| `apps/web/src/components/pullRequest/PullRequestListFilters.tsx` | icono, constante `ANY_TARGET_BRANCH`, 3 props opcionales, contador y submenú |
-| `apps/web/src/components/pullRequest/PullRequestsPage.tsx`       | import, `base` en `updateSearch`, filtrado de grupos y props del menú        |
-| `apps/web/src/components/pullRequest/usePullRequestListView.ts`  | campo `base` en `PullRequestsSearch`                                         |
-| `apps/web/src/routes/_chat.pull-requests.tsx`                    | lectura del parámetro `base` de la URL                                       |
+| Toca (archivos oficiales)                                        | Qué añade                                                                                                                 |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/pullRequest/PullRequestRow.tsx`         | imports, `PullRequestRowBranches` (ya existía) y `PullRequestIssueBadges` en la línea de metadatos                        |
+| `apps/web/src/components/pullRequest/PullRequestListFilters.tsx` | icono, constante `ANY_TARGET_BRANCH`, 3 props opcionales, contador y submenú                                              |
+| `apps/web/src/components/pullRequest/PullRequestsPage.tsx`       | imports, `base` en `updateSearch`, filtrado de grupos, props del menú y `PullRequestIssuesProvider` alrededor de la lista |
+| `apps/web/src/components/pullRequest/usePullRequestListView.ts`  | campo `base` en `PullRequestsSearch`                                                                                      |
+| `apps/web/src/routes/_chat.pull-requests.tsx`                    | lectura del parámetro `base` de la URL                                                                                    |
 
 ## Entorno y arranque
 

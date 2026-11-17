@@ -33,6 +33,13 @@ export const issueTrackerEnvironment = {
     // The server caches each issue for a minute, so this costs one read per issue at most.
     refreshIntervalMs: 60_000,
   }),
+  /** Issues for keys found in pull request titles and branches. */
+  issues: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
+    label: "issue-trackers:issues",
+    tag: WS_METHODS.issueTrackersGetIssues,
+    staleTimeMs: 30_000,
+    refreshIntervalMs: 60_000,
+  }),
   mutate: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "issue-trackers:mutate",
     tag: WS_METHODS.issueTrackersMutate,

@@ -101,7 +101,12 @@ NodeHttp.createServer(async (req, res) => {
     return sendJson(res, 200, { data: { viewer: { name: "Guillermo (mock)" } } });
   }
   if (query.includes("issue(id")) {
-    const found = linearIssues.find((issue) => issue.identifier === variables.id);
+    // MOCK_LINEAR_ANY_KEY=1 answers every `PRO-` key, to test pull request badges on real lists.
+    const found =
+      linearIssues.find((issue) => issue.identifier === variables.id) ??
+      (process.env.MOCK_LINEAR_ANY_KEY === "1" && String(variables.id).startsWith("PRO-")
+        ? { ...linearIssues[Number(variables.id.slice(4)) % 3], identifier: variables.id }
+        : undefined);
     return found
       ? sendJson(res, 200, { data: { issue: found } })
       : sendJson(res, 200, { data: null, errors: [{ message: "Entity not found" }] });

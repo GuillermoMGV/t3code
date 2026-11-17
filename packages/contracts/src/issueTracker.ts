@@ -87,6 +87,15 @@ export const IssueTrackerSummariesResult = Schema.Struct({
 });
 export type IssueTrackerSummariesResult = typeof IssueTrackerSummariesResult.Type;
 
+/** Issue keys found outside threads, such as in pull request titles and branches. */
+export const IssueTrackerIssuesInput = Schema.Struct({
+  keys: Schema.Array(IssueKey).check(Schema.isMaxLength(200)),
+});
+export type IssueTrackerIssuesInput = typeof IssueTrackerIssuesInput.Type;
+/** The keys a connected tracker knows; unknown keys are left out. Linear wins a shared key. */
+export const IssueTrackerIssuesResult = Schema.Struct({ issues: Schema.Array(TrackerIssue) });
+export type IssueTrackerIssuesResult = typeof IssueTrackerIssuesResult.Type;
+
 export const IssueTrackerSearchInput = Schema.Struct({
   tracker: IssueTrackerKind,
   /** An issue URL, a key, or words from the title. Empty lists your open issues. */

@@ -12,6 +12,8 @@ import {
   type IssueTrackerThreadInput,
   type IssueTrackerThreadResult,
   type IssueTrackerSummariesResult,
+  type IssueTrackerIssuesInput,
+  type IssueTrackerIssuesResult,
   type IssueTrackerThreadRow,
   type TrackerIssue,
   parseIssueReference,
@@ -36,6 +38,7 @@ const LINEAR_KEY_SECRET = "linear-api-key";
 const JIRA_SECRET = "jira-credentials";
 const LINKS_FILE = "issue-tracker-links.json";
 const ISSUE_CACHE_MS = 60_000;
+const MISSING_KEY_CACHE_MS = 30 * 60_000;
 /** Written by the first, Linear-only version of this feature. */
 const LEGACY_LINEAR_LINKS_FILE = "linear-links.json";
 
@@ -138,6 +141,9 @@ export class IssueTrackerService extends Context.Service<
     ) => Effect.Effect<IssueTrackerSearchResult, IssueTrackerError>;
     readonly getConnections: Effect.Effect<IssueTrackerConnectionsResult, IssueTrackerError>;
     readonly getThreadSummaries: Effect.Effect<IssueTrackerSummariesResult, IssueTrackerError>;
+    readonly getIssues: (
+      input: IssueTrackerIssuesInput,
+    ) => Effect.Effect<IssueTrackerIssuesResult, IssueTrackerError>;
     readonly mutate: (
       input: IssueTrackerMutation,
     ) => Effect.Effect<IssueTrackerMutationResult, IssueTrackerError>;
@@ -368,6 +374,49 @@ const make = Effect.gen(function* () {
     };
   }).pipe(Effect.withSpan("IssueTrackerService.getThreadSummaries"));
 
+  // Keys come from pull request titles and branches, so many are not issues at all (`UTF-8`).
+  // Misses stay cached longer, so a long list does not spend the trackers' rate limits on them.
+  const keyCache = new Map<string, { readonly issue: TrackerIssue | null; readonly at: number }>();
+  const lookupKey = Effect.fn("IssueTrackerService.lookupKey")(function* (
+    key: IssueKey,
+    connected: Readonly<Record<IssueTrackerKind, boolean>>,
+  ) {
+    for (const tracker of TRACKERS) {
+      if (!connected[tracker]) continue;
+      // A failing tracker must not hide the other's issue; the key just shows no badge.
+      const issue = yield* fetchIssue(tracker, key).pipe(Effect.orElseSucceed(Option.none));
+      if (Option.isSome(issue)) return issue.value;
+    }
+    return null;
+  });
+
+  const getIssues = Effect.fn("IssueTrackerService.getIssues")(function* (
+    input: IssueTrackerIssuesInput,
+  ) {
+    const [linearConnected, jiraConnected] = yield* Effect.all([
+      isConnected("linear"),
+      isConnected("jira"),
+    ]);
+    if (!linearConnected && !jiraConnected) return { issues: [] };
+    const connected = { linear: linearConnected, jira: jiraConnected };
+    const now = yield* Clock.currentTimeMillis;
+    const found = yield* Effect.forEach(
+      [...new Set(input.keys)],
+      (key) => {
+        const cached = keyCache.get(key);
+        const maxAge = cached?.issue === null ? MISSING_KEY_CACHE_MS : ISSUE_CACHE_MS;
+        if (cached !== undefined && now - cached.at < maxAge) {
+          return Effect.succeed(cached.issue);
+        }
+        return lookupKey(key, connected).pipe(
+          Effect.tap((issue) => Effect.sync(() => keyCache.set(key, { issue, at: now }))),
+        );
+      },
+      { concurrency: 4 },
+    );
+    return { issues: found.filter((issue) => issue !== null) };
+  });
+
   const search = Effect.fn("IssueTrackerService.search")(function* (
     input: IssueTrackerSearchInput,
   ) {
@@ -458,6 +507,7 @@ const make = Effect.gen(function* () {
         return {};
       case "refreshIssues":
         issueCache.clear();
+        keyCache.clear();
         return {};
       case "link":
       case "unlink":
@@ -486,6 +536,7 @@ const make = Effect.gen(function* () {
     search,
     getConnections,
     getThreadSummaries,
+    getIssues,
     mutate,
   });
 });

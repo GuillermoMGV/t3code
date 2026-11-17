@@ -68,6 +68,7 @@ import { INVOLVEMENT_TABS, SORT_OPTIONS, STATE_TABS } from "./pullRequestListOpt
 import { PullRequestsColumn } from "./PullRequestsColumn";
 import { PullRequestListGroups } from "./PullRequestListGroups";
 import { filterByTargetBranch, pullRequestTargetBranches } from "./pullRequestTargetBranch.logic";
+import { PullRequestIssuesProvider } from "./PullRequestIssueBadges";
 import { pullRequestPanelReference } from "./usePullRequestDetail";
 import { usePullRequestIntentPrefetch } from "./usePullRequestIntentPrefetch";
 import {
@@ -1278,21 +1279,23 @@ export function PullRequestsPage() {
           onLoadMore={loadMore}
         />
       ) : (
-        <PullRequestListGroups
-          groups={displayGroups}
-          environmentLabels={capableEnvironments.length > 1 ? environmentLabels : null}
-          query={typedParsed.text}
-          selected={selected}
-          showProvider={showProvider}
-          statsRef={registerStatsRow}
-          onSelect={selectEntry}
-          onIntent={prefetchEntry}
-          hostActionsOf={hostActionsOf}
-          onActed={onSpeedAction}
-          closingKeys={closingKeys}
-          sweepingKeys={closeSweepKeys}
-          onCloseSweepStart={startCloseSweep}
-        />
+        <PullRequestIssuesProvider groups={displayGroups}>
+          <PullRequestListGroups
+            groups={displayGroups}
+            environmentLabels={capableEnvironments.length > 1 ? environmentLabels : null}
+            query={typedParsed.text}
+            selected={selected}
+            showProvider={showProvider}
+            statsRef={registerStatsRow}
+            onSelect={selectEntry}
+            onIntent={prefetchEntry}
+            hostActionsOf={hostActionsOf}
+            onActed={onSpeedAction}
+            closingKeys={closingKeys}
+            sweepingKeys={closeSweepKeys}
+            onCloseSweepStart={startCloseSweep}
+          />
+        </PullRequestIssuesProvider>
       )}
 
       {listError && shownCount > 0 ? (

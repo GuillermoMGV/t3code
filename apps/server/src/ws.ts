@@ -2713,6 +2713,7 @@ export const layerWsRpc = (
         [WS_METHODS.issueTrackersSearch]: (input) => issueTrackers.search(input),
         [WS_METHODS.issueTrackersGetConnections]: (_input) => issueTrackers.getConnections,
         [WS_METHODS.issueTrackersGetThreadSummaries]: (_input) => issueTrackers.getThreadSummaries,
+        [WS_METHODS.issueTrackersGetIssues]: (input) => issueTrackers.getIssues(input),
         [WS_METHODS.issueTrackersMutate]: (input) => issueTrackers.mutate(input),
         [WS_METHODS.salesforceGetState]: (input) => salesforce.getState(input),
         [WS_METHODS.salesforceMutate]: (input) => salesforce.mutate(input),

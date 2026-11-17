@@ -97,6 +97,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.issueTrackersSearch]: "server",
   [WS_METHODS.issueTrackersGetConnections]: "server",
   [WS_METHODS.issueTrackersGetThreadSummaries]: "server",
+  [WS_METHODS.issueTrackersGetIssues]: "server",
   [WS_METHODS.issueTrackersMutate]: "server",
   [WS_METHODS.salesforceGetState]: "server",
   [WS_METHODS.salesforceMutate]: "server",

@@ -25,6 +25,7 @@ import {
   PullRequestRowGlyph,
   PullRequestRowLines,
 } from "./PullRequestListRow";
+import { PullRequestIssueBadges } from "./PullRequestIssueBadges";
 import { PullRequestLabelChip, PullRequestReviewDecisionGlyph } from "./pullRequestPresentation";
 
 const LABEL_SLOTS = [
@@ -243,6 +244,7 @@ function PullRequestRowImpl({
               <span className="flex min-w-0 max-w-80">
                 <PullRequestRowBranches head={entry.headBranch} base={entry.baseBranch} />
               </span>
+              <PullRequestIssueBadges entry={entry} />
               {environmentLabel ? (
                 <span className="min-w-0 max-w-32 truncate">{environmentLabel}</span>
               ) : null}
