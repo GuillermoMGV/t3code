@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fork Feature"
+  short_description: "Implement a feature in the personal fork end to end"
+  default_prompt: "Use $fork-feature to implement this change in the fork: plan, build, test, verify, document, commit, push and install."

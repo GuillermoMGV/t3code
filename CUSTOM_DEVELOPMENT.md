@@ -32,12 +32,14 @@ git push origin custom
 
 Lee esta sección antes de compilar, instalar, sincronizar o hacer commits en este repo. Las normas de código del proyecto están en `AGENTS.md`.
 
+Para implementar cualquier funcionalidad o cambio, sigue la skill [`fork-feature`](.agents/skills/fork-feature/SKILL.md): recoge el flujo completo (estudiar, planificar, implementar sin romper futuras sincronizaciones, probar, verificar en la app, documentar, comprobar, subir e instalar) y los errores típicos de lint y Effect ya resueltos. En Windows el enlace `.claude/skills` no funciona como symlink, así que ábrela directamente.
+
 Reglas:
 
 - Trabaja en `custom` (o en una rama creada desde `custom`). Nunca hagas commits en `main`: es una copia exacta de `upstream/main`.
 - Sube solo a `origin` (`GuillermoMGV/t3code`). El push a `upstream` está bloqueado (`DISABLED`); no lo desbloquees ni abras PRs contra `pingdotgg/t3code`.
 - Sin `--force`, `reset --hard` ni reescritura de historia sin permiso explícito del usuario. Integra el oficial con merge, no con rebase.
-- En los conflictos de sincronización, conserva la intención de ambos lados; no elijas ours/theirs en bloque. Los archivos propios del fork son `CUSTOM_DEVELOPMENT.md`, `docs/personal/*`, el bloque inicial de `AGENTS.md` y lo que lista «Personalizaciones del fork».
+- En los conflictos de sincronización, conserva la intención de ambos lados; no elijas ours/theirs en bloque. Los archivos propios del fork son `CUSTOM_DEVELOPMENT.md`, `docs/personal/*`, `.agents/skills/fork-feature/`, el bloque inicial de `AGENTS.md` y lo que lista «Personalizaciones del fork».
 - No pongas en Git `.t3/`, `release/`, `.env`, tokens ni URLs de emparejamiento (llevan credenciales).
 - En desarrollo usa siempre `--home-dir .t3`. Nunca apuntes un servidor de desarrollo a `~/.t3/userdata`: son los datos reales de la app instalada.
 
