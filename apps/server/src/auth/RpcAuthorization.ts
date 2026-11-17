@@ -129,6 +129,8 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.salesforceGetState]: AuthOrchestrationReadScope,
   // Changes the org agents run `sf` against, and signs in or out of orgs.
   [WS_METHODS.salesforceMutate]: AuthOrchestrationOperateScope,
+  // Reads and deletes org records with the CLI's session.
+  [WS_METHODS.salesforceData]: AuthOrchestrationOperateScope,
   [WS_METHODS.scheduledTasksSubscribe]: AuthOrchestrationReadScope,
   [WS_METHODS.secretsAnswerRequest]: AuthOrchestrationOperateScope,
   // Delivery logs hold request bodies, so they need the same scope as the URL.

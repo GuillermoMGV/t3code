@@ -378,6 +378,8 @@ import {
   IssueTrackerNotificationsResult,
 } from "./issueTrackerNotifications.ts";
 import {
+  SalesforceDataRequest,
+  SalesforceDataResult,
   SalesforceError,
   SalesforceMutation,
   SalesforceMutationResult,
@@ -584,6 +586,7 @@ export const WS_METHODS = {
   issueTrackersMutateNotifications: "issueTrackers.mutateNotifications",
   salesforceGetState: "salesforce.getState",
   salesforceMutate: "salesforce.mutate",
+  salesforceData: "salesforce.data",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
@@ -1119,6 +1122,12 @@ const WsSalesforceGetStateRpc = Rpc.make(WS_METHODS.salesforceGetState, {
 const WsSalesforceMutateRpc = Rpc.make(WS_METHODS.salesforceMutate, {
   payload: SalesforceMutation,
   success: SalesforceMutationResult,
+  error: Schema.Union([SalesforceError, EnvironmentAuthorizationError]),
+});
+
+const WsSalesforceDataRpc = Rpc.make(WS_METHODS.salesforceData, {
+  payload: SalesforceDataRequest,
+  success: SalesforceDataResult,
   error: Schema.Union([SalesforceError, EnvironmentAuthorizationError]),
 });
 
@@ -2279,6 +2288,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsIssueTrackersMutateNotificationsRpc,
   WsSalesforceGetStateRpc,
   WsSalesforceMutateRpc,
+  WsSalesforceDataRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,

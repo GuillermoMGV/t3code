@@ -4038,6 +4038,10 @@ export default function ChatView(props: ChatViewProps) {
           onAddPullRequests={addPullRequestsSurfaceStable}
           onAddDevice={addDeviceSurfaceStable}
           onAddSideChat={sideChatsOffered ? openSideChatStable : undefined}
+          onAddSalesforceExport={() =>
+            useRightPanelStore.getState().open(activeThreadRef, "salesforce-export")
+          }
+          salesforceExportAvailable={activeProject !== null}
           browserAvailable={canOperatePreview && browserAvailable}
           terminalAvailable={activeProject !== null && canOperateTerminal}
           diffAvailable={isServerThread && isGitRepo}

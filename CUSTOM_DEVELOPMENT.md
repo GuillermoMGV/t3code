@@ -83,6 +83,7 @@ Trucos que ahorran tiempo:
 | `docs/personal/build-windows.ps1`       | Compila el instalador Windows y lo verifica como el release oficial. No instala.                |
 | `docs/personal/build-and-install.ps1`   | `build-windows.ps1` + cierra la app, copia los datos e instala. Versión automática.             |
 | `docs/personal/mock-issue-trackers.mjs` | APIs de Linear y Jira simuladas para probar la integración sin credenciales reales (ver abajo). |
+| `docs/personal/mock-salesforce-api.mjs` | REST API de Salesforce simulada para probar Salesforce Export sin tocar una org (ver abajo).    |
 
 ## Personalizaciones del fork
 
@@ -224,6 +225,42 @@ Qué hace: en los mensajes de un hilo (tuyos y del agente) cuya carpeta es un pr
 | `apps/web/src/state/salesforce.ts` (fork)                | consulta `recordLinks`                                                                                                           |
 
 Tests: `vp test run apps/web/src/components/chat/salesforceRecordIds.logic.test.ts packages/contracts/src/salesforce.test.ts`. Para probarlo en dev con Replay, edita temporalmente el texto de `apps/server/scripts/dev-replay/command_output_transcript.ndjson` para que incluya un ID, crea un hilo en una carpeta con `sfdx-project.json` (`node src/bin.ts thread start --base-dir <.t3> --provider devReplay --model command-output <carpeta> "..."`) y revierte el transcript. Probado así contra las orgs reales de este equipo: detección (ID de 18 y código en línea enlazados; bloque SQL, SHA y un 18 con checksum erróneo no), orden con la org por defecto primero y apertura en la sandbox `Properti DEV` con un ID inexistente (`sf org open --path` correcto, ~35 s). Limitaciones: un ID de 15 caracteres atípico sin los ceros reservados no se enlaza; no hay entrada en la paleta de comandos.
+
+### Salesforce Export en el panel derecho
+
+Qué hace: una pestaña **Salesforce Export** en el panel derecho del hilo (junto a Browser, Terminal, Files, Diff, Device y Side chat; atajo `E` en el selector) inspirada en el «Data Export» de Salesforce Inspector. Ejecuta SOQL contra la **org por defecto del hilo** (la de la fila Salesforce del panel de detalles) y muestra el resultado en una tabla. Sin proyecto DX, sin `sf` o sin org, la pestaña explica qué falta y remite a esa fila.
+
+- **Editor:** pestañas de consulta (+ para añadir, × para cerrar; cada una se llama como el objeto de su `FROM`), «Clear» y `Ctrl+Enter` para ejecutar. «Templates» trae consultas habituales; «History» guarda las últimas 30 de **cada org**; «Saved» guarda consultas con la etiqueta de «Query label» → «Save query». Pestañas, historial, guardadas e interruptores viven en el `localStorage` del navegador (`t3code:salesforce-export:v1`), compartidos por todos los hilos.
+- **Interruptores:** «Deleted/archived records» usa `queryAll`; «Tooling API» usa `/tooling/` (los dos a la vez no existen en la API, así que el primero se desactiva).
+- **Run export / Stop:** pide la primera página y sigue `nextRecordsUrl` desde el cliente, página a página (2.000 registros), hasta un máximo de 50.000 (`MAX_EXPORT_RECORDS`). «Stop» deja de pedir páginas y conserva lo cargado. La línea de estado muestra «Exported N records · X ms» (o «Stopped at N of M»).
+- **Query plan** (`?explain=`) y **Field info** (describe del objeto del `FROM`): se muestran compactos bajo el editor. Un clic en un campo lo inserta en el cursor (sustituto barato del autocompletado).
+- **Resultados:** relaciones aplanadas (`Owner.Name`), subconsultas como JSON, tabla virtualizada (solo las filas visibles están en el DOM). Las columnas que acaban en `Id` con un ID válido abren el registro en la org del hilo (`sf org open --path`, como los IDs del chat). «Filter» filtra por todas las palabras; el ojo oculta columnas vacías. «Copy (Excel)» copia TSV, «Copy (CSV)», «Copy (JSON)» y el botón de descarga guarda un CSV; todo sobre las filas y columnas visibles.
+- **Delete records:** borra los registros **mostrados** (con el filtro aplicado) con `DELETE /composite/sobjects?allOrNone=false`, de 200 en 200. Pide confirmación con el número de registros, la org y el usuario; si la org es de producción (o Dev Hub) añade un aviso rojo. Los fallos se informan por registro y los borrados desaparecen de la tabla. No disponible con Tooling API.
+- **Cómo llama a la API:** el servidor obtiene token, instance URL y versión de API con `sf org display --target-org <usuario> --json` (que renueva la sesión), lo guarda en memoria y llama a la REST API con `HttpClient`. Ante un 401 lo pide de nuevo una vez. El token nunca sale del servicio (test incluido). Todo pasa por un único RPC `salesforce.data` (consulta, página siguiente, plan, describe y borrado) con permiso operate.
+
+| Parte    | Archivos nuevos                                                                                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Servidor | `apps/server/src/salesforce/SalesforceDataService.ts` (+ test)                                                                                                      |
+| Web      | `apps/web/src/components/salesforceExport/SalesforceExportPanel.tsx`, `SalesforceExportTable.tsx`, `salesforceExportStore.ts`, `salesforceExport.logic.ts` (+ test) |
+| Mock     | `docs/personal/mock-salesforce-api.mjs`                                                                                                                             |
+
+| Toca                                                        | Qué añade                                                                                       |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `packages/contracts/src/rpc.ts`                             | import, método `salesforce.data`, su `Rpc.make` y el registro en el grupo                       |
+| `apps/server/src/auth/RpcAuthorization.ts`                  | permiso operate de `salesforce.data`                                                            |
+| `apps/server/src/observability/RpcInstrumentation.ts`       | categoría del método                                                                            |
+| `apps/server/src/server.ts`, `ws.ts`, `ws.test.ts`          | capa `SalesforceDataService`, handler y mock                                                    |
+| `apps/web/src/rightPanelStore.ts`                           | tipo `salesforce-export` (lista de tipos, unión de superficies y `singletonSurface`)            |
+| `apps/web/src/closedViewStore.ts`                           | `salesforce-export` válido al reabrir una pestaña cerrada                                       |
+| `apps/web/src/components/RightPanelTabs.tsx`                | import del icono, props opcionales, entrada en los dos selectores (vacío y «+»), título e icono |
+| `apps/web/src/components/chat/RightPanelSurfaceContent.tsx` | import diferido del panel y su `case`                                                           |
+| `apps/web/src/components/ChatView.tsx`                      | `onAddSalesforceExport` y `salesforceExportAvailable` en `ChatRightPanel`                       |
+| `packages/contracts/src/salesforce.ts` (fork)               | esquemas `SalesforceDataRequest`/`SalesforceDataResult` y el motivo de error `api`              |
+| `apps/web/src/state/salesforce.ts` (fork)                   | comando `data`                                                                                  |
+
+Probar sin org real: `node docs/personal/mock-salesforce-api.mjs` (puerto 4569, `MOCK_SALESFORCE_PORT` lo cambia; 4.500 cuentas en páginas de 2.000 con 400 ms de retardo, plan, describe de Account, error con `FORM` y un borrado que falla de cada lote) y arranca dev con `$env:T3CODE_SALESFORCE_API_URL = 'http://127.0.0.1:4569'`: con esa variable el servicio no llama a `sf org display` y **todas** las peticiones van al mock, aunque la org del hilo sea real. Comprueba primero que la tabla muestra «Mock Account …» antes de probar un borrado. Probado así (proyecto DX temporal con `target-org` = `Properti DEV` y luego `PROPERTI PROD`): exportación con LIMIT, paginación hasta 4.500, Stop a 2.000, filtro, ocultar columnas vacías, plan, field info, error de SOQL, borrado de 333 registros en 2 lotes con 2 fallos informados, aviso de producción (cancelado), historial por org, mensaje sin proyecto DX y atajo `E`. Tests: `vp test run apps/server/src/salesforce/SalesforceDataService.test.ts apps/web/src/components/salesforceExport/salesforceExport.logic.test.ts`.
+
+Limitaciones: sin autocompletado de campos mientras se escribe (solo insertar desde Field info); los resultados son uno por panel, no por pestaña de consulta; no hay exportación Bulk API, así que el máximo práctico son 50.000 registros; no está en la app móvil ni en la paleta de comandos. Copiar y descargar no se probaron en el navegador integrado (la lógica de formatos sí tiene tests). No se ha ejecutado contra una org real.
 
 ### Tarjetas de tickets y PR bajo las respuestas del agente
 

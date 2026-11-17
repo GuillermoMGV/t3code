@@ -37,6 +37,7 @@ import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dn
 import { CSS } from "@dnd-kit/utilities";
 import {
   Smartphone,
+  CloudDownload,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -145,6 +146,9 @@ export interface RightPanelTabsProps {
   onAddDevice: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
+  /** Fork-only Salesforce Export panel; absent outside threads. */
+  onAddSalesforceExport?: (() => void) | undefined;
+  salesforceExportAvailable?: boolean;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -182,6 +186,7 @@ const SURFACE_DISABLED_REASONS = {
   pullRequests: "No linked pull requests are available for this thread.",
   device: "Devices are only available from a thread.",
   sideChat: "Side chats start after the first message.",
+  salesforceExport: "Salesforce Export is only available from a project thread.",
 } as const;
 
 // Closed keepMounted popups must stop blocking shortcuts once their exit transition ends.
@@ -207,6 +212,7 @@ const SURFACE_UNAVAILABLE_HINTS = {
   pullRequests: "No linked pull requests available.",
   device: "Available from a thread.",
   sideChat: "Available after the first message.",
+  salesforceExport: "Available when a project is open.",
 } as const;
 
 type TabContextMenuAction =
@@ -326,6 +332,8 @@ function RightPanelEmptyState(props: {
   onAddDevice: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
+  onAddSalesforceExport?: (() => void) | undefined;
+  salesforceExportAvailable: boolean;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -406,6 +414,19 @@ function RightPanelEmptyState(props: {
             available: props.sideChatAvailable && !props.sideChatDisabledReason,
             disabledReason: props.sideChatDisabledReason ?? SURFACE_UNAVAILABLE_HINTS.sideChat,
             onClick: props.onAddSideChat,
+          },
+        ]
+      : []),
+    ...(props.onAddSalesforceExport
+      ? [
+          {
+            label: "Salesforce Export",
+            description: "Run SOQL against this thread's org and export the records.",
+            icon: CloudDownload,
+            shortcut: "E",
+            available: props.salesforceExportAvailable,
+            disabledReason: SURFACE_UNAVAILABLE_HINTS.salesforceExport,
+            onClick: props.onAddSalesforceExport,
           },
         ]
       : []),
@@ -596,6 +617,8 @@ function surfaceTitle(
       return surface.title ?? surface.target?.name ?? "Device";
     case "side-chat":
       return "Side chat";
+    case "salesforce-export":
+      return "Salesforce Export";
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
       if (!snapshot || snapshot.navStatus._tag === "Idle") return "Browser";
@@ -684,6 +707,8 @@ function SurfaceIcon({
       );
     case "pull-requests":
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
+    case "salesforce-export":
+      return <CloudDownload className="size-3 shrink-0" />;
     case "side-chat":
       return <SideChatTabIcon environmentId={environmentId} threadId={surface.threadId} />;
     case "device":
@@ -1161,6 +1186,18 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           },
         ]
       : []),
+    ...(props.onAddSalesforceExport
+      ? [
+          {
+            label: "Salesforce Export",
+            icon: CloudDownload,
+            shortcut: "E",
+            available: props.salesforceExportAvailable === true,
+            disabledReason: SURFACE_DISABLED_REASONS.salesforceExport,
+            onClick: props.onAddSalesforceExport,
+          },
+        ]
+      : []),
   ] as const;
 
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -1547,6 +1584,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequests={props.onAddPullRequests}
             onAddDevice={props.onAddDevice}
             onAddSideChat={props.onAddSideChat}
+            onAddSalesforceExport={props.onAddSalesforceExport}
+            salesforceExportAvailable={props.salesforceExportAvailable === true}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}
             diffAvailable={props.diffAvailable}

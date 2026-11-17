@@ -33,6 +33,11 @@ const DevicePanel = lazy(() =>
   import("../device/DevicePanel").then((module) => ({ default: module.DevicePanel })),
 );
 const FilePreviewPanel = lazy(() => import("../files/FilePreviewPanel"));
+const SalesforceExportPanel = lazy(() =>
+  import("../salesforceExport/SalesforceExportPanel").then((module) => ({
+    default: module.SalesforceExportPanel,
+  })),
+);
 
 type RightPanelTerminalProps = Omit<
   PersistentThreadTerminalPanelProps,
@@ -197,6 +202,15 @@ export function RightPanelSurfaceContent(props: {
               props.onCloseSurface(surface);
               useRightPanelStore.getState().show(threadRef);
             }}
+          />
+        </Suspense>
+      );
+    case "salesforce-export":
+      return (
+        <Suspense fallback={null}>
+          <SalesforceExportPanel
+            environmentId={props.environmentId}
+            cwd={props.files.workspaceRoot ?? null}
           />
         </Suspense>
       );
