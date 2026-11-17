@@ -37,7 +37,7 @@ Reglas:
 - Trabaja en `custom` (o en una rama creada desde `custom`). Nunca hagas commits en `main`: es una copia exacta de `upstream/main`.
 - Sube solo a `origin` (`GuillermoMGV/t3code`). El push a `upstream` está bloqueado (`DISABLED`); no lo desbloquees ni abras PRs contra `pingdotgg/t3code`.
 - Sin `--force`, `reset --hard` ni reescritura de historia sin permiso explícito del usuario. Integra el oficial con merge, no con rebase.
-- En los conflictos de sincronización, conserva la intención de ambos lados; no elijas ours/theirs en bloque. Los archivos propios del fork son `CUSTOM_DEVELOPMENT.md`, `docs/personal/*` y el bloque inicial de `AGENTS.md`.
+- En los conflictos de sincronización, conserva la intención de ambos lados; no elijas ours/theirs en bloque. Los archivos propios del fork son `CUSTOM_DEVELOPMENT.md`, `docs/personal/*`, el bloque inicial de `AGENTS.md` y lo que lista «Personalizaciones del fork».
 - No pongas en Git `.t3/`, `release/`, `.env`, tokens ni URLs de emparejamiento (llevan credenciales).
 - En desarrollo usa siempre `--home-dir .t3`. Nunca apuntes un servidor de desarrollo a `~/.t3/userdata`: son los datos reales de la app instalada.
 
@@ -80,6 +80,51 @@ Trucos que ahorran tiempo:
 | `docs/personal/sync-upstream.ps1`     | Actualiza `main` desde el oficial y la integra en `custom`. Se detiene ante cualquier problema. |
 | `docs/personal/build-windows.ps1`     | Compila el instalador Windows y lo verifica como el release oficial. No instala.                |
 | `docs/personal/build-and-install.ps1` | `build-windows.ps1` + cierra la app, copia los datos e instala. Versión automática.             |
+| `docs/personal/mock-linear.mjs`       | API GraphQL de Linear simulada para probar la integración sin una key real (ver abajo).         |
+
+## Personalizaciones del fork
+
+Funciones propias de este fork. Cada una vive sobre todo en archivos nuevos; la tabla «Toca» lista las líneas añadidas en archivos oficiales, que son los únicos puntos donde una sincronización puede dar conflicto. Al resolverlo, conserva el cambio oficial y vuelve a añadir la línea del fork.
+
+### Ticket de Linear en el panel del hilo
+
+Qué hace: el panel de detalles del hilo (icono arriba a la derecha) muestra el ticket de Linear asociado con título, identificador, **estado con su color y asignado**, y se actualiza cada minuto mientras está abierto.
+
+- **Conectar:** la fila «Connect Linear» pide una personal API key (Linear → Settings → Security & access → Personal API keys). Se valida contra Linear y se guarda en `userdata/secrets/linear-api-key.bin`.
+- **Vincular automáticamente:** si un mensaje tuyo del hilo contiene una URL `https://linear.app/<workspace>/issue/ABC-123/...`, el ticket aparece solo.
+- **Vincular a mano:** «Link Linear issue» abre un diálogo con tus tickets abiertos; acepta una URL, un identificador (`PRO-123`) o palabras para buscar por título (Enter).
+- **Menú ⋯:** abrir en Linear, copiar enlace, cambiar de ticket, refrescar, desvincular (también oculta los tickets detectados en el hilo) y desconectar Linear.
+- La fila se puede ocultar con el clic derecho en el panel → «Linear issue».
+- Los vínculos se guardan en `userdata/linear-links.json` (por hilo: ticket manual y detectados descartados), no en el modelo del hilo: no viajan al exportar o migrar un hilo a otra máquina.
+
+| Parte     | Archivos nuevos                                                                                                                                                   |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contratos | `packages/contracts/src/linear.ts` (+ test)                                                                                                                       |
+| Servidor  | `apps/server/src/linear/linearApi.ts` (GraphQL), `LinearService.ts` (key, vínculos, RPC) (+ test)                                                                 |
+| Web       | `apps/web/src/state/linear.ts`, `components/chat/ThreadDetailsLinearRow.tsx`, `LinearIssueDialog.tsx`, `LinearIssueParts.tsx`, `linearIssueRow.logic.ts` (+ test) |
+
+| Toca (archivos oficiales)                             | Qué añade                                                                     |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `packages/contracts/src/rpc.ts`                       | import, 3 métodos en `WS_METHODS`, 3 `Rpc.make` y su registro en `WsRpcGroup` |
+| `packages/contracts/src/index.ts`                     | `export * from "./linear.ts"`                                                 |
+| `apps/server/src/auth/RpcAuthorization.ts`            | permisos de los 3 métodos (leer: orchestration read; modificar: operate)      |
+| `apps/server/src/observability/RpcInstrumentation.ts` | categoría de los 3 métodos                                                    |
+| `apps/server/src/server.ts`                           | import y capa `LinearService.layer`                                           |
+| `apps/server/src/ws.ts`                               | import, `yield* LinearService` y los 3 handlers                               |
+| `apps/server/src/ws.test.ts`                          | import y `Layer.mock(LinearService)`                                          |
+| `apps/web/src/components/chat/threadDetailsItems.ts`  | elemento `linear` del menú «Choose what to show»                              |
+| `apps/web/src/components/chat/ThreadDetailsPanel.tsx` | import y la sección que renderiza la fila                                     |
+
+Probar sin key real: la variable `T3CODE_LINEAR_API_URL` redirige el servidor a otra URL de API.
+
+```powershell
+node docs/personal/mock-linear.mjs   # en otra terminal; escucha en 127.0.0.1:4567, key «test-key»
+$env:T3CODE_LINEAR_API_URL = 'http://127.0.0.1:4567/graphql'
+. ./docs/personal/custom-env.ps1
+vp run dev --home-dir .t3 --no-seed
+```
+
+Tests: `vp test run packages/contracts/src/linear.test.ts apps/server/src/linear/LinearService.test.ts apps/web/src/components/chat/linearIssueRow.logic.test.ts`. Las consultas usan el esquema público de Linear (`searchIssues`, `issue(id)` con identificador, `viewer.assignedIssues`); se comprobaron contra su SDL oficial, pero solo se han ejecutado contra el mock.
 
 ## Entorno y arranque
 
@@ -282,6 +327,7 @@ Si la app nueva falla con tus datos, cierra la app, renombra `~/.t3/userdata` y 
 - `vp i` puede mostrar `Agent skills awaiting approval`. Es una función de pnpm para skills de agentes incluidas en dependencias; no hace falta aprobarlas para desarrollar ni compilar.
 - La cuenta activa de `gh` en este equipo es la de trabajo. Este repo no depende de ella (helper local), pero `gh` sin `--repo` o sin `GH_TOKEN` actuará con esa cuenta.
 - Git del sistema es 2.36; funciona con este flujo, pero conviene actualizarlo cuando sea posible.
+- Los tests de navegador (`*.browser.test.tsx`, por ejemplo `ThreadDetailsPanel.browser.test.tsx`) necesitan el Chromium de Playwright, que no está instalado en este equipo; `check:changed` los marca como fallidos por eso. Debería instalarse con `pnpm exec playwright install chromium-headless-shell` desde `apps/web` (descarga de unos 100 MB; no probado aún).
 
 ## Validación de este equipo (17-11-2026)
 

@@ -116,6 +116,10 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.serverRefreshUsageRates]: AuthDiagnosticsReadScope,
   [WS_METHODS.serverSignalProcess]: AuthEnvironmentMaintainScope,
   [WS_METHODS.serverReportClientActivity]: AuthOrchestrationReadScope,
+  [WS_METHODS.linearGetThreadIssue]: AuthOrchestrationReadScope,
+  [WS_METHODS.linearSearchIssues]: AuthOrchestrationReadScope,
+  // Connecting replaces the stored Linear key; linking edits a thread's details.
+  [WS_METHODS.linearMutate]: AuthOrchestrationOperateScope,
   [WS_METHODS.scheduledTasksSubscribe]: AuthOrchestrationReadScope,
   [WS_METHODS.secretsAnswerRequest]: AuthOrchestrationOperateScope,
   // Delivery logs hold request bodies, so they need the same scope as the URL.
