@@ -336,7 +336,13 @@ const make = Effect.gen(function* () {
         // Without --url-only the CLI opens the browser itself, so no session URL reaches us.
         yield* runWrite(
           cwd,
-          ["org", "open", "--target-org", input.target],
+          [
+            "org",
+            "open",
+            "--target-org",
+            input.target,
+            ...(input.recordId === undefined ? [] : ["--path", `/${input.recordId}`]),
+          ],
           "Could not open the org.",
         );
         return {};

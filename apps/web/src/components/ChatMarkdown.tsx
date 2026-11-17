@@ -230,6 +230,8 @@ import {
   nodeToPlainText,
 } from "./chat/MarkdownCodeBlock.logic";
 import { reportMarkdownActionFailure } from "./chat/markdownActionFailure";
+import { salesforceRecordIdComponents } from "./chat/SalesforceRecordIdLink";
+import { rehypeSalesforceRecordIds } from "./chat/salesforceRecordIds.logic";
 
 const isAssetNotFoundError = Schema.is(AssetWorkspaceAssetNotFoundError);
 
@@ -411,12 +413,14 @@ const CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS = [
   rehypeHeadingIds,
   rehypeTextDirection,
   rehypeChipPunctuation,
+  rehypeSalesforceRecordIds,
 ] satisfies NonNullable<ReactMarkdownOptions["rehypePlugins"]>;
 
 const CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS = [
   rehypeHeadingIds,
   rehypeTextDirection,
   rehypeChipPunctuation,
+  rehypeSalesforceRecordIds,
 ] satisfies NonNullable<ReactMarkdownOptions["rehypePlugins"]>;
 
 function markdownUrlTransform(href: string) {
@@ -1050,7 +1054,14 @@ function markdownHeadingRenderer(level: 1 | 2 | 3 | 4 | 5 | 6) {
   };
 }
 
+// Fork-only: record IDs open in a Salesforce org only in a thread's messages.
+function useSalesforceRecordTarget() {
+  const { threadRef, cwd } = use(ChatMarkdownRendererContext);
+  return threadRef && cwd ? { environmentId: threadRef.environmentId, cwd } : null;
+}
+
 const CHAT_MARKDOWN_COMPONENTS = {
+  ...salesforceRecordIdComponents(useSalesforceRecordTarget),
   h1: markdownHeadingRenderer(1),
   h2: markdownHeadingRenderer(2),
   h3: markdownHeadingRenderer(3),
