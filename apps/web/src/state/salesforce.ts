@@ -15,6 +15,14 @@ export const salesforceEnvironment = {
     staleTimeMs: 1_000,
     refreshIntervalMs: 3_000,
   }),
+  /** Whether record IDs in messages can open in an org: polls only until the CLI check ends. */
+  recordLinks: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
+    label: "salesforce:record-links",
+    tag: WS_METHODS.salesforceGetState,
+    staleTimeMs: 60_000,
+    refreshIntervalMs: 3_000,
+    isFinal: (state) => !state.isDxProject || state.cli !== null,
+  }),
   mutate: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "salesforce:mutate",
     tag: WS_METHODS.salesforceMutate,

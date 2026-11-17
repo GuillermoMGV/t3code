@@ -22,6 +22,11 @@ export const SalesforceOrg = Schema.Struct({
 });
 export type SalesforceOrg = typeof SalesforceOrg.Type;
 
+/** A 15- or 18-character record ID; the pattern also keeps it safe as a CLI argument. */
+export const SalesforceRecordId = Schema.String.check(
+  Schema.isPattern(/^[0-9A-Za-z]{15}(?:[0-9A-Za-z]{3})?$/),
+);
+
 export const SalesforceStateInput = Schema.Struct({
   /** The thread's working directory, where `sf` resolves the workspace's default org. */
   cwd: TrimmedNonEmptyString,
@@ -88,6 +93,8 @@ export const SalesforceMutation = Schema.Union([
     type: Schema.Literal("open"),
     cwd: TrimmedNonEmptyString,
     target: TrimmedNonEmptyString,
+    /** Opens this record instead of the org's home page. */
+    recordId: Schema.optional(SalesforceRecordId),
   }),
   Schema.Struct({
     type: Schema.Literal("logout"),

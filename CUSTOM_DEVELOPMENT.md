@@ -169,6 +169,29 @@ Qué hace: en hilos cuya carpeta es un proyecto Salesforce DX (tiene `sfdx-proje
 
 Limitaciones: no hay comandos en la paleta de comandos (es un archivo oficial de 3.000 líneas muy cambiante; el selector de la fila cubre lo mismo). No está implementado el login por device code (`sf org login device`). Cerrar sesión y abrir org no se han probado contra orgs reales, por seguridad. Probado en el proyecto real `PROPERTI`: org por defecto correcta, cambio DEV ↔ QA2 (restaurado a QA2), cambio externo reflejado, confirmación de PROD (cancelada), estados reales de las 23 orgs, diálogo de re-autenticación y login iniciado y cancelado (proceso terminado, puerto 1717 libre, sin org añadida). Ningún token en registros ni trazas.
 
+### IDs de Salesforce clicables en el chat
+
+Qué hace: en los mensajes de un hilo (tuyos y del agente) cuya carpeta es un proyecto Salesforce DX, los IDs de registro aparecen subrayados con puntos. Un clic abre un menú con las orgs autenticadas: primero la **org por defecto** del workspace (con ✓), después las favoritas (★) y el resto, cada una con su tipo (**PROD** en rojo) y su estado. Elegir una ejecuta `sf org open --target-org <org> --path /<id>` en el servidor: el CLI abre el navegador y la URL con sesión nunca llega a T3 Code. Sirve para abrir el registro en cualquier org, no solo en la del hilo. El menú tiene buscador y «Copy ID».
+
+- **Qué se detecta** (`salesforceRecordIds.logic.ts`): palabras sueltas de 15 o 18 caracteres alfanuméricos que empiezan por dígito o minúscula (prefijos estándar `001`, `500`… y personalizados `a0X`, `m00`…). Las de 18 deben tener el **checksum** correcto (los 3 últimos caracteres). Las de 15, al no tener checksum, deben tener los ceros reservados en las posiciones 6-8 y alguna letra fuera de `a-f`: así no casan SHA de git, hashes hex, números ni palabras. Nada pegado a `_`, `-` u otras letras.
+- **Dónde no se detecta:** bloques de código (se copian como código), enlaces y botones. El código en línea sí, solo si contiene un ID y nada más (los agentes suelen escribir `` `001…` ``).
+- **Cuándo no aparece:** fuera de un proyecto DX, sin `sf` instalado (el ID queda como texto) o en markdown que no es un mensaje de hilo (descripciones de PR, vistas de archivos).
+- **Rendimiento:** la detección es un plugin rehype que corre al parsear el mensaje, y el parse ya está en la caché compartida del renderizador. Cada ID lee un booleano de una consulta (`salesforce.getState`) que deja de repetirse en cuanto termina la comprobación del CLI. La lista completa de orgs solo se consulta (cada 3 s) mientras el menú está abierto.
+
+| Parte     | Archivos nuevos                                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------ |
+| Contratos | `packages/contracts/src/salesforce.test.ts`                                                                        |
+| Web       | `apps/web/src/components/chat/salesforceRecordIds.logic.ts` (+ test), `components/chat/SalesforceRecordIdLink.tsx` |
+
+| Toca                                                     | Qué añade                                                                                                                        |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/ChatMarkdown.tsx`               | 2 imports, `rehypeSalesforceRecordIds` en las 2 listas de plugins rehype, `useSalesforceRecordTarget` y el spread de componentes |
+| `packages/contracts/src/salesforce.ts` (fork)            | `SalesforceRecordId` y `recordId` opcional en la mutación `open`                                                                 |
+| `apps/server/src/salesforce/SalesforceService.ts` (fork) | `--path /<id>` en `open`                                                                                                         |
+| `apps/web/src/state/salesforce.ts` (fork)                | consulta `recordLinks`                                                                                                           |
+
+Tests: `vp test run apps/web/src/components/chat/salesforceRecordIds.logic.test.ts packages/contracts/src/salesforce.test.ts`. Para probarlo en dev con Replay, edita temporalmente el texto de `apps/server/scripts/dev-replay/command_output_transcript.ndjson` para que incluya un ID, crea un hilo en una carpeta con `sfdx-project.json` (`node src/bin.ts thread start --base-dir <.t3> --provider devReplay --model command-output <carpeta> "..."`) y revierte el transcript. Probado así contra las orgs reales de este equipo: detección (ID de 18 y código en línea enlazados; bloque SQL, SHA y un 18 con checksum erróneo no), orden con la org por defecto primero y apertura en la sandbox `Properti DEV` con un ID inexistente (`sf org open --path` correcto, ~35 s). Limitaciones: un ID de 15 caracteres atípico sin los ceros reservados no se enlaza; no hay entrada en la paleta de comandos.
+
 ### Ramas y ticket en la lista de pull requests
 
 Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → rama destino` y, a su derecha, el **ticket** de Linear o Jira de la PR: clave, estado (con su color) y asignado.
