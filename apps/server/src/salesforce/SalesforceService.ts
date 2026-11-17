@@ -22,6 +22,7 @@ import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
+import * as ServerConfig from "../config.ts";
 import { describeSfFailure, makeSfCli, parseOrgList } from "./sfCli.ts";
 
 // Fork-only Salesforce org manager; see CUSTOM_DEVELOPMENT.md. The `sf` CLI owns every file
@@ -36,7 +37,24 @@ const LegacyTargetOrgConfig = Schema.fromJsonString(
 const decodeTargetOrgConfig = Schema.decodeUnknownOption(TargetOrgConfig);
 const decodeLegacyTargetOrgConfig = Schema.decodeUnknownOption(LegacyTargetOrgConfig);
 
+const FAVORITES_FILE = "salesforce-favorites.json";
+const FavoritesFile = Schema.fromJsonString(
+  Schema.Struct({ usernames: Schema.Array(Schema.String) }),
+);
+const decodeFavoritesFile = Schema.decodeUnknownOption(FavoritesFile);
+const encodeFavoritesFile = Schema.encodeEffect(FavoritesFile);
+
 const WATCH_DEBOUNCE = "750 millis";
+
+/** The favorites list after starring or unstarring one org, without duplicates. */
+export function nextFavorites(
+  favorites: ReadonlyArray<string>,
+  username: string,
+  favorite: boolean,
+): string[] {
+  const others = favorites.filter((item) => item !== username);
+  return favorite ? [...others, username] : others;
+}
 
 /** Orgs with their `isDefault` flag recomputed for a `target-org` value. */
 export function markDefaultOrg(
@@ -78,6 +96,7 @@ const emptyState = (isDxProject: boolean): SalesforceState => ({
   error: null,
   login: null,
   lastLogin: null,
+  favorites: [],
 });
 
 export class SalesforceService extends Context.Service<
@@ -102,6 +121,42 @@ const make = Effect.gen(function* () {
   const entries = new Map<string, Entry>();
   let cli: SalesforceState["cli"] = null;
   let globalWatchStarted = false;
+
+  const { stateDir } = yield* ServerConfig.ServerConfig;
+  const favoritesPath = path.join(stateDir, FAVORITES_FILE);
+  const favoritesLock = yield* Semaphore.make(1);
+  // A missing or unreadable file means no favorites yet.
+  let favorites: ReadonlyArray<string> = yield* fileSystem.readFileString(favoritesPath).pipe(
+    Effect.map((json) =>
+      decodeFavoritesFile(json).pipe(
+        Option.map((file) => file.usernames),
+        Option.getOrElse((): ReadonlyArray<string> => []),
+      ),
+    ),
+    Effect.orElseSucceed((): ReadonlyArray<string> => []),
+  );
+
+  // Writes run under favoritesLock, so one temporary name is enough.
+  const setFavorite = (username: string, favorite: boolean) =>
+    favoritesLock.withPermits(1)(
+      Effect.gen(function* () {
+        const next = nextFavorites(favorites, username, favorite);
+        const json = yield* encodeFavoritesFile({ usernames: next });
+        const tempPath = `${favoritesPath}.tmp`;
+        yield* fileSystem.writeFileString(tempPath, `${json}\n`);
+        yield* fileSystem.rename(tempPath, favoritesPath);
+        favorites = next;
+      }).pipe(
+        Effect.mapError(
+          (cause) =>
+            new SalesforceError({
+              reason: "storage",
+              detail: "Could not save the favorite orgs.",
+              cause,
+            }),
+        ),
+      ),
+    );
 
   const now = DateTime.now.pipe(Effect.map(DateTime.formatIso));
   const update = (cwd: string, patch: Partial<SalesforceState>) =>
@@ -234,7 +289,7 @@ const make = Effect.gen(function* () {
   });
 
   const getState = Effect.fn("SalesforceService.getState")(function* (input: SalesforceStateInput) {
-    return (yield* ensureEntry(input.cwd)).state;
+    return { ...(yield* ensureEntry(input.cwd)).state, favorites };
   });
 
   /** Runs a write command; `sf` decides, and its JSON error becomes the message. */
@@ -292,6 +347,9 @@ const make = Effect.gen(function* () {
           "Could not log out of the org.",
         );
         yield* forkBackground(loadOrgs(cwd, false));
+        return {};
+      case "setFavorite":
+        yield* setFavorite(input.username, input.favorite);
         return {};
       case "cancelLogin": {
         const fiber = entry.loginFiber;

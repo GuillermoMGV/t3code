@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   currentSalesforceOrg,
+  favoritesFirst,
   filterSalesforceOrgs,
   isProductionOrg,
   salesforceAliasProblem,
@@ -67,6 +68,12 @@ it("filters orgs by every word of the query", () => {
   expect(filterSalesforceOrgs([prod, qa2], "properti qa2")).toEqual([qa2]);
   expect(filterSalesforceOrgs([prod, qa2], "sandbox.my")).toEqual([qa2]);
   expect(filterSalesforceOrgs([prod, qa2], "  ")).toEqual([prod, qa2]);
+});
+
+it("lists favorite orgs first and keeps the CLI order within each group", () => {
+  const dev = org({ alias: "Properti DEV", username: "dev@properti.ch" });
+  expect(favoritesFirst([prod, qa2, dev], [dev.username, qa2.username])).toEqual([qa2, dev, prod]);
+  expect(favoritesFirst([prod, qa2], ["gone@example.com"])).toEqual([prod, qa2]);
 });
 
 describe("salesforceAliasProblem", () => {

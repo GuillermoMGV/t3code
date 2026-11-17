@@ -27,6 +27,7 @@ import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SalesforceStatusDot, SalesforceTypeBadge } from "./SalesforceOrgParts";
 import {
+  favoritesFirst,
   filterSalesforceOrgs,
   salesforceOrgHealth,
   salesforceOrgName,
@@ -40,6 +41,7 @@ interface SalesforceOrgsDialogProps {
   state: SalesforceState;
   onOpenChange: (open: boolean) => void;
   onSetDefault: (org: SalesforceOrg) => void;
+  onSetFavorite: (org: SalesforceOrg, favorite: boolean) => void;
   onOpenOrg: (org: SalesforceOrg) => void;
   onReauth: (org: SalesforceOrg) => void;
   onLogout: (org: SalesforceOrg) => void;
@@ -50,7 +52,7 @@ interface SalesforceOrgsDialogProps {
 export function SalesforceOrgsDialog(props: SalesforceOrgsDialogProps) {
   const [query, setQuery] = useState("");
   const { state } = props;
-  const orgs = filterSalesforceOrgs(state.orgs, query);
+  const orgs = favoritesFirst(filterSalesforceOrgs(state.orgs, query), state.favorites);
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogPopup className="max-w-3xl">
@@ -92,7 +94,12 @@ export function SalesforceOrgsDialog(props: SalesforceOrgsDialogProps) {
                 </p>
               ) : null}
               {orgs.map((org) => (
-                <OrgRow key={org.username} org={org} {...props} />
+                <OrgRow
+                  key={org.username}
+                  org={org}
+                  favorite={state.favorites.includes(org.username)}
+                  {...props}
+                />
               ))}
             </div>
           </div>
@@ -104,13 +111,15 @@ export function SalesforceOrgsDialog(props: SalesforceOrgsDialogProps) {
 
 function OrgRow({
   org,
+  favorite,
   onSetDefault,
+  onSetFavorite,
   onOpenOrg,
   onReauth,
   onLogout,
-}: { org: SalesforceOrg } & Pick<
+}: { org: SalesforceOrg; favorite: boolean } & Pick<
   SalesforceOrgsDialogProps,
-  "onSetDefault" | "onOpenOrg" | "onReauth" | "onLogout"
+  "onSetDefault" | "onSetFavorite" | "onOpenOrg" | "onReauth" | "onLogout"
 >) {
   const health = salesforceOrgHealth(org);
   const action = (label: string, icon: ReactNode, onClick: () => void) => (
@@ -134,35 +143,52 @@ function OrgRow({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-3 rounded-md px-2 py-1.5",
-        org.isDefault && "bg-accent",
+        "flex min-w-0 items-center gap-3 rounded-md pr-2",
+        org.isDefault ? "bg-accent" : "hover:bg-accent/50",
       )}
     >
-      <SalesforceStatusDot org={org} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="flex min-w-0 items-center gap-2 text-sm">
-          <span className="truncate font-medium">{salesforceOrgName(org)}</span>
-          <SalesforceTypeBadge type={org.type} />
-          {org.isDefault ? <span className="text-muted-foreground text-xs">Default</span> : null}
+      <button
+        type="button"
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-3 rounded-md py-1.5 pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+          org.isDefault ? "cursor-default" : "cursor-pointer",
+        )}
+        aria-label={
+          org.isDefault
+            ? `${salesforceOrgName(org)} is the default org`
+            : `Set ${salesforceOrgName(org)} as the default org`
+        }
+        aria-pressed={org.isDefault}
+        onClick={() => onSetDefault(org)}
+      >
+        <SalesforceStatusDot org={org} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="truncate font-medium">{salesforceOrgName(org)}</span>
+            <SalesforceTypeBadge type={org.type} />
+            {org.isDefault ? <span className="text-muted-foreground text-xs">Default</span> : null}
+          </span>
+          <span className="truncate text-muted-foreground text-xs">
+            {org.username}
+            {org.instanceUrl ? ` · ${org.instanceUrl.replace(/^https:\/\//, "")}` : ""}
+          </span>
+          <span
+            className={cn(
+              "truncate text-xs",
+              health === "error" ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {salesforceStatusLabel(org)}
+            {org.lastUsed ? ` · last used ${new Date(org.lastUsed).toLocaleDateString()}` : ""}
+          </span>
         </span>
-        <span className="truncate text-muted-foreground text-xs">
-          {org.username}
-          {org.instanceUrl ? ` · ${org.instanceUrl.replace(/^https:\/\//, "")}` : ""}
-        </span>
-        <span
-          className={cn(
-            "truncate text-xs",
-            health === "error" ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-          {salesforceStatusLabel(org)}
-          {org.lastUsed ? ` · last used ${new Date(org.lastUsed).toLocaleDateString()}` : ""}
-        </span>
-      </div>
+      </button>
       <div className="flex shrink-0 items-center gap-0.5">
-        {!org.isDefault
-          ? action("Set as default org", <StarIcon aria-hidden />, () => onSetDefault(org))
-          : null}
+        {action(
+          favorite ? "Remove from favorites" : "Add to favorites",
+          <StarIcon aria-hidden className={cn(favorite && "fill-current text-warning")} />,
+          () => onSetFavorite(org, !favorite),
+        )}
         {action("Open in browser", <ExternalLinkIcon aria-hidden />, () => onOpenOrg(org))}
         {health !== "connected"
           ? action("Re-authenticate", <KeyRoundIcon aria-hidden />, () => onReauth(org))

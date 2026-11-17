@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { SalesforceOrg } from "@t3tools/contracts";
 
-import { keepKnownStatuses, markDefaultOrg } from "./SalesforceService.ts";
+import { keepKnownStatuses, markDefaultOrg, nextFavorites } from "./SalesforceService.ts";
 import { describeSfFailure, parseOrgList, parseSfJson, parseSfVersion } from "./sfCli.ts";
 
 const sandbox = {
@@ -127,4 +127,10 @@ it("keeps statuses from the last full check for orgs a quick list returns", () =
       ],
     ).map((item) => item.connectedStatus),
   ).toEqual(["Connected", null, "x"]);
+});
+
+it("stars and unstars orgs without duplicates", () => {
+  expect(nextFavorites(["a", "b"], "b", true)).toEqual(["a", "b"]);
+  expect(nextFavorites(["a"], "c", true)).toEqual(["a", "c"]);
+  expect(nextFavorites(["a", "b"], "a", false)).toEqual(["b"]);
 });

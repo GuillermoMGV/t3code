@@ -64,6 +64,18 @@ export function filterSalesforceOrgs(
   });
 }
 
+/** Favorite orgs first, each group in the CLI's order. */
+export function favoritesFirst(
+  orgs: ReadonlyArray<SalesforceOrg>,
+  favorites: ReadonlyArray<string>,
+): SalesforceOrg[] {
+  const starred = new Set(favorites);
+  return [
+    ...orgs.filter((org) => starred.has(org.username)),
+    ...orgs.filter((org) => !starred.has(org.username)),
+  ];
+}
+
 /** Why an alias cannot be used for a new org, or null when it can. */
 export function salesforceAliasProblem(
   alias: string,

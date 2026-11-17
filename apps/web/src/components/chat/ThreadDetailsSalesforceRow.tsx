@@ -6,6 +6,7 @@ import {
   ListIcon,
   PlusIcon,
   RefreshCwIcon,
+  StarIcon,
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import {
 import { SalesforceOrgsDialog } from "./SalesforceOrgsDialog";
 import {
   currentSalesforceOrg,
+  favoritesFirst,
   filterSalesforceOrgs,
   isProductionOrg,
   salesforceOrgName,
@@ -78,6 +80,11 @@ export function ThreadDetailsSalesforceRow({
     void run({ type: "open", cwd, target: org.alias ?? org.username }, "Could not open the org");
   };
   const refresh = () => void run({ type: "refresh", cwd, checkStatus: true }, "Could not refresh");
+  const setFavorite = (org: SalesforceOrg, favorite: boolean) =>
+    void run(
+      { type: "setFavorite", cwd, username: org.username, favorite },
+      "Could not update favorites",
+    );
 
   const section = (children: ReactNode) => (
     <ThreadDetailsSection
@@ -122,7 +129,7 @@ export function ThreadDetailsSalesforceRow({
         : state.loading
           ? "Loading Salesforce orgs…"
           : "No default org";
-  const orgs = filterSalesforceOrgs(state.orgs, query);
+  const orgs = favoritesFirst(filterSalesforceOrgs(state.orgs, query), state.favorites);
 
   return section(
     <>
@@ -174,6 +181,9 @@ export function ThreadDetailsSalesforceRow({
               <MenuItem key={org.username} onClick={() => chooseDefault(org)}>
                 <SalesforceStatusDot org={org} />
                 <span className="min-w-0 flex-1 truncate">{salesforceOrgName(org)}</span>
+                {state.favorites.includes(org.username) ? (
+                  <StarIcon aria-label="Favorite" className="fill-current text-warning" />
+                ) : null}
                 <SalesforceTypeBadge type={org.type} />
                 {org.isDefault ? <CheckIcon aria-hidden /> : null}
               </MenuItem>
@@ -207,6 +217,7 @@ export function ThreadDetailsSalesforceRow({
         state={state}
         onOpenChange={setManageOpen}
         onSetDefault={chooseDefault}
+        onSetFavorite={setFavorite}
         onOpenOrg={openOrg}
         onReauth={(org) => setLogin({ reauth: org })}
         onLogout={(org) => setConfirmation({ kind: "logout", org })}

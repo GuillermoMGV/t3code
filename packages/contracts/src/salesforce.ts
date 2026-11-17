@@ -59,6 +59,8 @@ export const SalesforceState = Schema.Struct({
   error: Schema.NullOr(Schema.String),
   login: Schema.NullOr(SalesforceLoginState),
   lastLogin: Schema.NullOr(SalesforceLoginResult),
+  /** Usernames of the orgs starred as favorites; shared by every workspace on this machine. */
+  favorites: Schema.Array(Schema.String),
 });
 export type SalesforceState = typeof SalesforceState.Type;
 
@@ -92,13 +94,19 @@ export const SalesforceMutation = Schema.Union([
     cwd: TrimmedNonEmptyString,
     target: TrimmedNonEmptyString,
   }),
+  Schema.Struct({
+    type: Schema.Literal("setFavorite"),
+    cwd: TrimmedNonEmptyString,
+    username: TrimmedNonEmptyString,
+    favorite: Schema.Boolean,
+  }),
 ]);
 export type SalesforceMutation = typeof SalesforceMutation.Type;
 
 export const SalesforceMutationResult = Schema.Struct({});
 
 export class SalesforceError extends Schema.TaggedError<SalesforceError>()("SalesforceError", {
-  reason: Schema.Literals(["cliMissing", "invalidInput", "command", "busy"]),
+  reason: Schema.Literals(["cliMissing", "invalidInput", "command", "busy", "storage"]),
   detail: Schema.String,
   cause: Schema.optional(Schema.Defect()),
 }) {
