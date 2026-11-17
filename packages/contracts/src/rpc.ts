@@ -378,6 +378,13 @@ import {
   IssueTrackerNotificationsResult,
 } from "./issueTrackerNotifications.ts";
 import {
+  SlackError,
+  SlackMutation,
+  SlackMutationResult,
+  SlackState,
+  SlackStateInput,
+} from "./slack.ts";
+import {
   SalesforceError,
   SalesforceMutation,
   SalesforceMutationResult,
@@ -582,6 +589,8 @@ export const WS_METHODS = {
   issueTrackersMutate: "issueTrackers.mutate",
   issueTrackersGetNotifications: "issueTrackers.getNotifications",
   issueTrackersMutateNotifications: "issueTrackers.mutateNotifications",
+  slackGetState: "slack.getState",
+  slackMutate: "slack.mutate",
   salesforceGetState: "salesforce.getState",
   salesforceMutate: "salesforce.mutate",
   serverSignalProcess: "server.signalProcess",
@@ -1109,6 +1118,18 @@ const WsIssueTrackersMutateNotificationsRpc = Rpc.make(
     error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
   },
 );
+
+const WsSlackGetStateRpc = Rpc.make(WS_METHODS.slackGetState, {
+  payload: SlackStateInput,
+  success: SlackState,
+  error: Schema.Union([SlackError, EnvironmentAuthorizationError]),
+});
+
+const WsSlackMutateRpc = Rpc.make(WS_METHODS.slackMutate, {
+  payload: SlackMutation,
+  success: SlackMutationResult,
+  error: Schema.Union([SlackError, EnvironmentAuthorizationError]),
+});
 
 const WsSalesforceGetStateRpc = Rpc.make(WS_METHODS.salesforceGetState, {
   payload: SalesforceStateInput,
@@ -2277,6 +2298,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsIssueTrackersMutateRpc,
   WsIssueTrackersGetNotificationsRpc,
   WsIssueTrackersMutateNotificationsRpc,
+  WsSlackGetStateRpc,
+  WsSlackMutateRpc,
   WsSalesforceGetStateRpc,
   WsSalesforceMutateRpc,
   WsServerGetUsageSummaryRpc,

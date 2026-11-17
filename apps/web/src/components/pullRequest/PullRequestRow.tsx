@@ -25,6 +25,7 @@ import {
   PullRequestRowLines,
 } from "./PullRequestListRow";
 import { PullRequestIssueBadges, PullRequestTargetBranches } from "./PullRequestIssueBadges";
+import { PullRequestReviewActions } from "./PullRequestReviewActions";
 import { PullRequestLabelChip, PullRequestReviewDecisionGlyph } from "./pullRequestPresentation";
 
 const LABEL_SLOTS = [
@@ -253,6 +254,7 @@ function PullRequestRowImpl({
           updatedAt={entry.updatedAt}
         />
       </button>
+      <PullRequestReviewActions entry={entry} />
       {hostActions.size > 0 ? (
         <PullRequestSpeedActions
           entry={entry}

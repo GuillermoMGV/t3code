@@ -1338,6 +1338,10 @@ export const make = Effect.gen(function* () {
       viewerReviewRequested:
         input.item.author?.login.toLowerCase() !== viewer &&
         input.item.reviewRequestLogins.some((login) => login.toLowerCase() === viewer),
+      // Fork-only: the Remind reviewer button; see CUSTOM_DEVELOPMENT.md.
+      reviewRequestLogins: input.item.reviewRequestLogins.flatMap((login) =>
+        login.trim().length > 0 ? [login.trim()] : [],
+      ),
       labels: input.item.labels,
       ...(input.item.reviewDecision === undefined || input.item.reviewDecision === null
         ? {}

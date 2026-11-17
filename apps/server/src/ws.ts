@@ -250,6 +250,7 @@ import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as TriageService from "./triage/TriageService.ts";
 import * as IssueTrackerService from "./issueTrackers/IssueTrackerService.ts";
 import * as IssueTrackerNotifications from "./issueTrackers/IssueTrackerNotifications.ts";
+import * as SlackService from "./slack/SlackService.ts";
 import * as SalesforceService from "./salesforce/SalesforceService.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewGuideService.ts";
@@ -1584,6 +1585,7 @@ export const layerWsRpc = (
       const triage = yield* TriageService.TriageService;
       const issueTrackers = yield* IssueTrackerService.IssueTrackerService;
       const trackerNotifications = yield* IssueTrackerNotifications.IssueTrackerNotifications;
+      const slack = yield* SlackService.SlackService;
       const salesforce = yield* SalesforceService.SalesforceService;
       const hostResources = yield* HostResources.HostResources;
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
@@ -2720,6 +2722,8 @@ export const layerWsRpc = (
         [WS_METHODS.issueTrackersGetNotifications]: (_input) => trackerNotifications.get,
         [WS_METHODS.issueTrackersMutateNotifications]: (input) =>
           trackerNotifications.mutate(input),
+        [WS_METHODS.slackGetState]: (_input) => slack.getState,
+        [WS_METHODS.slackMutate]: (input) => slack.mutate(input),
         [WS_METHODS.salesforceGetState]: (input) => salesforce.getState(input),
         [WS_METHODS.salesforceMutate]: (input) => salesforce.mutate(input),
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),

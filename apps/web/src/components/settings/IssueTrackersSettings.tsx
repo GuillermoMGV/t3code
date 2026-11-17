@@ -20,6 +20,7 @@ import { Spinner } from "../ui/spinner";
 import { toastManager } from "../ui/toast";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { searchableSetting } from "./settingsSearch";
+import { SlackSettingsSection } from "./SlackSettingsSection";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 
 // Fork-only Linear and Jira integration; see CUSTOM_DEVELOPMENT.md.
@@ -100,6 +101,7 @@ function IssueTrackerConnections({ environmentId }: { environmentId: Environment
           apiToken: values.apiToken ?? "",
         })}
       />
+      <SlackSettingsSection environmentId={environmentId} />
     </SettingsPageContainer>
   );
 }

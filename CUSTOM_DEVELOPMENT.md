@@ -83,6 +83,7 @@ Trucos que ahorran tiempo:
 | `docs/personal/build-windows.ps1`       | Compila el instalador Windows y lo verifica como el release oficial. No instala.                |
 | `docs/personal/build-and-install.ps1`   | `build-windows.ps1` + cierra la app, copia los datos e instala. Versión automática.             |
 | `docs/personal/mock-issue-trackers.mjs` | APIs de Linear y Jira simuladas para probar la integración sin credenciales reales (ver abajo). |
+| `docs/personal/mock-slack.mjs`          | API de Slack simulada para probar «Remind» sin enviar mensajes reales.                          |
 
 ## Personalizaciones del fork
 
@@ -279,6 +280,39 @@ El filtro se aplica en el cliente sobre las PR ya cargadas, sin tocar la consult
 | `apps/web/src/components/pullRequest/PullRequestsPage.tsx`       | imports, `base` en `updateSearch`, filtrado de grupos, props del menú y `PullRequestIssuesProvider` alrededor de la lista |
 | `apps/web/src/components/pullRequest/usePullRequestListView.ts`  | campo `base` en `PullRequestsSearch`                                                                                      |
 | `apps/web/src/routes/_chat.pull-requests.tsx`                    | lectura del parámetro `base` de la URL                                                                                    |
+
+### Atajos de revisión en la lista de pull requests
+
+Qué hace: a la derecha de cada fila de la página **Pull requests** aparecen, solo cuando aplican, dos botones:
+
+- **Address review** (llave inglesa): en PR abiertas con «changes requested». Un clic busca el hilo de esa PR y le envía un turno que pide al agente leer los comentarios de revisión sin resolver, aplicar los cambios, pasar las comprobaciones y hacer commit y push, con la URL de la PR. Orden de búsqueda: hilo vinculado a la PR (`pullRequests`, `linkedPullRequest`, `branchPullRequest`), luego hilo en la rama de la PR (primero el mismo proyecto; un mismo repo suele estar añadido como varios proyectos) y luego hilo vinculado al ticket de la PR (`getThreadSummaries`); gana el más reciente. Una rama igual a la base (PR desde `main` de un fork) no cuenta. Sin hilo, prepara un **worktree en la rama de la PR** (`git.preparePullRequestThread`, como «Check out PR into thread»), crea el hilo «Address review on #N» con el modelo y el modo por defecto del proyecto, le envía el mismo turno, vincula la PR y el ticket y lo abre. Si no hay ningún modelo disponible, deja el prompt en un borrador sobre ese worktree.
+- **Remind** (campana): en PR abiertas sin aprobar con revisores pedidos que aún no han revisado (GitHub quita la petición en cuanto el revisor revisa, así que se usa `reviewRequestLogins`; el autor queda fuera). Abre un popover con un mensaje corto e informal elegido al azar entre plantillas (nombre de pila del revisor si GitHub lo da, y la URL), editable, con «Another message» para cambiarlo y **Send**. Tras enviar, un toast confirma a quién. Sin Slack conectado, el botón lleva a Ajustes.
+
+**Slack:** Ajustes → Issue trackers → **Slack**. El servidor de T3 no puede usar el conector de Slack de Claude, así que usa un **user token** propio: crea una app en <https://api.slack.com/apps>, añade los _User Token Scopes_ `chat:write`, `im:write`, `users:read` y `users:read.email`, instálala en el workspace y pega el _User OAuth Token_ (`xoxp-…`). Se valida con `auth.test` y se guarda en `userdata/secrets/slack-user-token.bin`. El mensaje sale como tú: `conversations.open` + `chat.postMessage` al DM del revisor.
+
+Cómo se encuentra al revisor en Slack: 1) el mapeo manual (`slack-reviewers.json` en `userdata`, login de GitHub → email o ID de miembro de Slack); 2) si no hay, `users.list` (caché de 10 min) buscando un único miembro activo cuyo handle sea el login de GitHub o cuyo nombre sea el nombre de GitHub; con cero o varios candidatos no adivina. Si falla, el popover pide el email de Slack del revisor, lo resuelve con `users.lookupByEmail` y lo recuerda. La sección de Slack en Ajustes lista, añade y borra mapeos.
+
+| Parte     | Archivos nuevos                                                                                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contratos | `packages/contracts/src/slack.ts`                                                                                                                                     |
+| Servidor  | `apps/server/src/slack/SlackService.ts`, `slackApi.ts` (+ `SlackService.test.ts`)                                                                                     |
+| Web       | `components/pullRequest/PullRequestReviewActions.tsx`, `pullRequestReviewActions.logic.ts` (+ test), `components/settings/SlackSettingsSection.tsx`, `state/slack.ts` |
+| Mock      | `docs/personal/mock-slack.mjs`                                                                                                                                        |
+
+También cambia archivos del fork: `PullRequestIssueBadges.tsx` exporta `usePullRequestIssue`, e `IssueTrackersSettings.tsx` muestra la sección de Slack.
+
+| Toca (archivos oficiales)                                                                                   | Qué añade                                                          |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `packages/contracts/src/pullRequest.ts`                                                                     | campo opcional `reviewRequestLogins` en `PullRequestListEntry`     |
+| `apps/server/src/pullRequest/PullRequestService.ts`                                                         | rellena `reviewRequestLogins` en cada entrada de la lista          |
+| `packages/contracts/src/rpc.ts`, `index.ts`                                                                 | `slack.getState` y `slack.mutate`, export de `slack.ts`            |
+| `apps/server/src/{server,ws,ws.test}.ts`, `auth/RpcAuthorization.ts`, `observability/RpcInstrumentation.ts` | una línea de registro cada uno                                     |
+| `apps/web/src/components/pullRequest/PullRequestRow.tsx`                                                    | import y `<PullRequestReviewActions />` antes de las speed actions |
+| `apps/web/src/components/settings/settingsSearch.ts`                                                        | entrada de búsqueda «Slack»                                        |
+
+Probar sin Slack real: `node docs/personal/mock-slack.mjs` (puerto 4569, token `xoxp-test`, miembros `ada@example.com`, `grace@example.com`…; `GET /mock/sent` lista lo enviado) y arranca dev con `$env:T3CODE_SLACK_API_URL = 'http://127.0.0.1:4569/api'`. Para la lista, añade una carpeta con `git init` y `origin` en `https://github.com/pingdotgg/t3code.git` y busca una PR con cambios pedidos y revisor pendiente (por ejemplo #31721). **Antes de probar «Address review» pon `"defaultModelSelection": {"instanceId": "devReplay", "model": "command-output"}` en `.t3/userdata/settings.json`**: sin hilo que coincida, el botón crea un hilo y arranca un turno real con el modelo por defecto (en una prueba sin ese ajuste arrancó Codex). Probado así: los botones solo salen en las filas que aplican; «Remind» sin Slack abre Ajustes; conectar con el mock; revisor desconocido → pide email → enviado y mapeo guardado; segundo envío sin pedir email; toast «Reminder sent to Ada on Slack»; «Another message» cambia el texto; «Address review» con un hilo Replay en la rama de la PR (en otro proyecto del mismo repo) le envía el turno y lo abre; sin hilo, crea el worktree `t3code/pr-31721/…`, el hilo y arranca el turno. Tests: `vp test run apps/server/src/slack/SlackService.test.ts apps/web/src/components/pullRequest/pullRequestReviewActions.logic.test.ts`.
+
+Limitaciones: la API de Slack solo se ha probado contra el mock (las llamadas siguen la documentación de la Web API). Los revisores pedidos solo salen de proveedores que los informan (GitHub sí; en Bitbucket y Azure DevOps la lista incluye a quien ya aprobó, aunque el botón desaparece al aprobarse la PR); los equipos pedidos como revisores no cuentan. «Address review» no pregunta aunque haya varios hilos candidatos, y el vínculo al ticket no se ha probado en la app (la PR de prueba no tenía clave). No existe en la app móvil ni en la paleta de comandos.
 
 ### Página de tickets: empezar un hilo desde un ticket
 
