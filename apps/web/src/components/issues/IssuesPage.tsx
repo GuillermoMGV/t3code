@@ -1,4 +1,4 @@
-import { RegistryContext, useAtomValue } from "@effect/atom-react";
+import { RegistryContext } from "@effect/atom-react";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { pickableProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
@@ -29,9 +29,8 @@ import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useScratchProject } from "~/hooks/useScratchProject";
 import { buildSidebarProjectPickerEntries } from "~/sidebarProjectGrouping";
-import { useThreadShells } from "~/state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
-import { issueTrackerEnvironment, threadIssuesAtom } from "~/state/issueTrackers";
+import { issueTrackerEnvironment } from "~/state/issueTrackers";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { buildThreadRouteParams } from "~/threadRoutes";
@@ -89,10 +88,10 @@ import {
   issueStateOptions,
   issueThreadPrompt,
   resolveIssuesTracker,
-  threadsByIssue,
   threadsForIssue,
 } from "./issuesPage.logic";
 import { IssuePullRequestsLine, useIssuePullRequests } from "./IssuePullRequests";
+import { useThreadsByIssue } from "./useIssueThreads";
 
 // Fork-only Issues page (start a thread from a Linear or Jira issue); see CUSTOM_DEVELOPMENT.md.
 
@@ -206,14 +205,6 @@ function IssuesUnavailable({ description }: { description: string }) {
       </EmptyContent>
     </Empty>
   );
-}
-
-/** The threads already linked to each issue, from the links the thread list loads anyway. */
-function useThreadsByIssue() {
-  const threads = useThreadShells();
-  const environmentIds = [...new Set(threads.map((thread) => thread.environmentId))].toSorted();
-  const threadIssues = useAtomValue(threadIssuesAtom(environmentIds));
-  return threadsByIssue(threadIssues, threads);
 }
 
 function IssueList({

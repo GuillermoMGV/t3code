@@ -7,7 +7,14 @@ import {
   type TrackerNotification,
   type TrackerNotificationKind,
 } from "@t3tools/contracts";
-import { AtSignIcon, BellIcon, CheckCheckIcon, CircleIcon, CircleCheckIcon } from "lucide-react";
+import {
+  AtSignIcon,
+  BellIcon,
+  CheckCheckIcon,
+  CircleIcon,
+  CircleCheckIcon,
+  MessageSquareTextIcon,
+} from "lucide-react";
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import { useOpenLink } from "~/browser/useOpenLink";
@@ -28,11 +35,13 @@ import { toastManager } from "../ui/toast";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
+  canCheckCommentInThread,
   filterNotifications,
   notificationFilterSources,
   type NotificationTrackerFilter,
   unreadBadgeLabel,
 } from "./SidebarIssueNotifications.logic";
+import { useCheckCommentInThread } from "./useCheckCommentInThread";
 
 // Fork-only notifications bell for Linear, Jira and Slack mentions; see CUSTOM_DEVELOPMENT.md.
 
@@ -102,6 +111,7 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
   const openLink = useOpenLink(null);
   const [refreshing, setRefreshing] = useState(false);
   const [trackerFilter, setTrackerFilter] = useState<NotificationTrackerFilter>("all");
+  const [open, setOpen] = useState(false);
   const data = query.data;
   if (data === null || data.connected.length === 0) return null;
   const filterSources = notificationFilterSources(data.connected, data.notifications);
@@ -124,7 +134,7 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
     await run({ type: "refresh" });
     setRefreshing(false);
   };
-  const open = (notification: TrackerNotification, event: ReactMouseEvent<HTMLElement>) => {
+  const openIssue = (notification: TrackerNotification, event: ReactMouseEvent<HTMLElement>) => {
     if (!notification.read) void run({ type: "markRead", ids: [notification.id] });
     void openLink(notification.issue.url, { event });
   };
@@ -134,7 +144,7 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
 
   return (
     <SidebarMenuItem className="shrink-0">
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -226,21 +236,12 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
                 {data.checkedAt === null ? "Checking…" : "No notifications in the last days."}
               </p>
             ) : (
-              <ul className="-mx-2 min-h-0 flex-1 overflow-y-auto">
-                {visible.map((notification) => (
-                  <NotificationRow
-                    key={notification.id}
-                    notification={notification}
-                    onOpen={(event) => open(notification, event)}
-                    onToggleRead={() =>
-                      void run({
-                        type: notification.read ? "markUnread" : "markRead",
-                        ids: [notification.id],
-                      })
-                    }
-                  />
-                ))}
-              </ul>
+              <NotificationList
+                notifications={visible}
+                onOpen={openIssue}
+                onRun={(input) => void run(input)}
+                onLeave={() => setOpen(false)}
+              />
             )}
           </div>
         </PopoverPopup>
@@ -249,14 +250,58 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
   );
 }
 
+/** Mounted only while the popover is open, so the thread lookup costs nothing otherwise. */
+function NotificationList({
+  notifications,
+  onOpen,
+  onRun,
+  onLeave,
+}: {
+  notifications: ReadonlyArray<TrackerNotification>;
+  onOpen: (notification: TrackerNotification, event: ReactMouseEvent<HTMLElement>) => void;
+  onRun: (input: IssueTrackerNotificationsMutation) => void;
+  onLeave: () => void;
+}) {
+  const checkInThread = useCheckCommentInThread();
+  return (
+    <ul className="-mx-2 min-h-0 flex-1 overflow-y-auto">
+      {notifications.map((notification) => (
+        <NotificationRow
+          key={notification.id}
+          notification={notification}
+          onOpen={(event) => onOpen(notification, event)}
+          onToggleRead={() =>
+            onRun({
+              type: notification.read ? "markUnread" : "markRead",
+              ids: [notification.id],
+            })
+          }
+          onCheckInThread={
+            canCheckCommentInThread(notification)
+              ? () => {
+                  if (!notification.read) onRun({ type: "markRead", ids: [notification.id] });
+                  onLeave();
+                  void checkInThread({ issue: notification.issue, tracker: notification.tracker });
+                }
+              : null
+          }
+        />
+      ))}
+    </ul>
+  );
+}
+
 function NotificationRow({
   notification,
   onOpen,
   onToggleRead,
+  onCheckInThread,
 }: {
   notification: TrackerNotification;
   onOpen: (event: ReactMouseEvent<HTMLElement>) => void;
   onToggleRead: () => void;
+  /** Null for notifications that are not comments. */
+  onCheckInThread: (() => void) | null;
 }) {
   const { issue, read } = notification;
   const toggleLabel = read ? "Mark as unread" : "Mark as read";
@@ -269,42 +314,50 @@ function NotificationRow({
         source={notification.tracker}
         className={read ? "mt-0.5 size-4 shrink-0 text-muted-foreground" : "mt-0.5 size-4 shrink-0"}
       />
-      <button
-        type="button"
-        className="min-w-0 flex-1 cursor-pointer text-left"
-        aria-label={`Open ${issue.key} in ${sourceLabel}`}
-        onClick={onOpen}
-      >
-        <span className={read ? "block text-xs text-muted-foreground" : "block text-xs"}>
-          <span className="font-medium">{notification.actor ?? "Someone"}</span>{" "}
-          {KIND_LABELS[notification.kind]}
-          {notification.detail ? ` · ${notification.detail}` : ""}
-          <span className="text-muted-foreground">
-            {" "}
-            · {sourceLabel} ·{formatRelativeTimeLabel(notification.createdAt)}
-          </span>
-        </span>
-        <span
-          className={
-            read
-              ? "block truncate text-sm text-muted-foreground"
-              : "block truncate text-sm font-medium"
-          }
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+        <button
+          type="button"
+          className="w-full min-w-0 cursor-pointer text-left"
+          aria-label={`Open ${issue.key} in ${sourceLabel}`}
+          onClick={onOpen}
         >
-          {isSlack ? (
-            issue.key
-          ) : (
-            <>
-              <span className="font-mono text-xs">{issue.key}</span> {issue.title}
-            </>
-          )}
-        </span>
-        {notification.text ? (
-          <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
-            {notification.text}
+          <span className={read ? "block text-xs text-muted-foreground" : "block text-xs"}>
+            <span className="font-medium">{notification.actor ?? "Someone"}</span>{" "}
+            {KIND_LABELS[notification.kind]}
+            {notification.detail ? ` · ${notification.detail}` : ""}
+            <span className="text-muted-foreground">
+              {" "}
+              · {sourceLabel} ·{formatRelativeTimeLabel(notification.createdAt)}
+            </span>
           </span>
-        ) : null}
-      </button>
+          <span
+            className={
+              read
+                ? "block truncate text-sm text-muted-foreground"
+                : "block truncate text-sm font-medium"
+            }
+          >
+            {isSlack ? (
+              issue.key
+            ) : (
+              <>
+                <span className="font-mono text-xs">{issue.key}</span> {issue.title}
+              </>
+            )}
+          </span>
+          {notification.text ? (
+            <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
+              {notification.text}
+            </span>
+          ) : null}
+        </button>
+        {onCheckInThread === null ? null : (
+          <Button variant="outline" size="xs" onClick={onCheckInThread}>
+            <MessageSquareTextIcon aria-hidden />
+            Check comment in thread
+          </Button>
+        )}
+      </div>
       <Tooltip>
         <TooltipTrigger
           render={

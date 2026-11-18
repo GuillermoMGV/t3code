@@ -2,9 +2,12 @@ import type { TrackerNotification } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  canCheckCommentInThread,
+  checkCommentPrompt,
   filterNotifications,
   notificationFilterSources,
   unreadBadgeLabel,
+  withCheckCommentPrompt,
 } from "./SidebarIssueNotifications.logic";
 
 const item = (id: string, tracker: TrackerNotification["tracker"]) =>
@@ -39,5 +42,23 @@ describe("unreadBadgeLabel", () => {
     [250, "9+"],
   ])("%i reads %s", (count, label) => {
     expect(unreadBadgeLabel(count)).toBe(label);
+  });
+});
+
+describe("check comment in thread", () => {
+  it("offers it for Linear and Jira comments and mentions only", () => {
+    expect(canCheckCommentInThread({ tracker: "linear", kind: "comment" })).toBe(true);
+    expect(canCheckCommentInThread({ tracker: "jira", kind: "mention" })).toBe(true);
+    expect(canCheckCommentInThread({ tracker: "slack", kind: "mention" })).toBe(false);
+    expect(canCheckCommentInThread({ tracker: "jira", kind: "statusChanged" })).toBe(false);
+  });
+
+  it("keeps what the user typed and never adds the prompt twice", () => {
+    const prompt = checkCommentPrompt({ key: "PRO-1", title: "Login", url: "https://x/PRO-1" });
+    expect(withCheckCommentPrompt("", prompt)).toBe(prompt);
+    expect(withCheckCommentPrompt("  ", prompt)).toBe(prompt);
+    const withDraft = `draft\n\n${prompt}`;
+    expect(withCheckCommentPrompt("draft\n", prompt)).toBe(withDraft);
+    expect(withCheckCommentPrompt(withDraft, prompt)).toBe(withDraft);
   });
 });

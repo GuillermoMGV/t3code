@@ -27,3 +27,26 @@ export function filterNotifications(
 export function unreadBadgeLabel(count: number): string {
   return count > 9 ? "9+" : String(count);
 }
+
+/** Linear and Jira comments (mentions are comments too) can be followed up from a thread. */
+export function canCheckCommentInThread(
+  notification: Pick<TrackerNotification, "tracker" | "kind">,
+): notification is Pick<TrackerNotification, "kind"> & { tracker: "linear" | "jira" } {
+  return (
+    notification.tracker !== "slack" &&
+    (notification.kind === "comment" || notification.kind === "mention")
+  );
+}
+
+/** The composer text; the URL lets a new thread detect and link the issue. */
+export function checkCommentPrompt(
+  issue: Pick<TrackerNotification["issue"], "key" | "title" | "url">,
+): string {
+  return `Check the last comment posted on ${issue.key} (${issue.title}).\n\n${issue.url}`;
+}
+
+/** Text the user already typed stays; the prompt goes after it, once. */
+export function withCheckCommentPrompt(current: string, prompt: string): string {
+  if (current.includes(prompt)) return current;
+  return current.trim().length === 0 ? prompt : `${current.trimEnd()}\n\n${prompt}`;
+}
