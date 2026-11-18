@@ -1,16 +1,19 @@
-import type { IssueTrackerKind, TrackerNotification } from "@t3tools/contracts";
+import type { NotificationSource, TrackerNotification } from "@t3tools/contracts";
 
-// Fork-only notifications bell for Linear and Jira; see CUSTOM_DEVELOPMENT.md.
+// Fork-only notifications bell for Linear, Jira and Slack mentions; see CUSTOM_DEVELOPMENT.md.
 
-export type NotificationTrackerFilter = "all" | IssueTrackerKind;
+export type NotificationTrackerFilter = "all" | NotificationSource;
 
-/** The tracker filter only helps when both trackers are connected or have items. */
-export function showsTrackerFilter(
-  connected: ReadonlyArray<IssueTrackerKind>,
+const SOURCE_ORDER: ReadonlyArray<NotificationSource> = ["linear", "jira", "slack"];
+
+/** The sources the filter offers; it only helps with two or more, connected or with items. */
+export function notificationFilterSources(
+  connected: ReadonlyArray<NotificationSource>,
   notifications: ReadonlyArray<TrackerNotification>,
-): boolean {
-  const trackers = new Set([...connected, ...notifications.map((item) => item.tracker)]);
-  return trackers.has("linear") && trackers.has("jira");
+): NotificationSource[] {
+  const present = new Set([...connected, ...notifications.map((item) => item.tracker)]);
+  const sources = SOURCE_ORDER.filter((source) => present.has(source));
+  return sources.length > 1 ? sources : [];
 }
 
 export function filterNotifications(

@@ -4,6 +4,7 @@ import {
   type IssueKey,
   type IssueTrackerMutation,
   type ThreadId,
+  type TrackerIssue,
 } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -29,6 +30,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { IssueFieldPicker, useShownIssue } from "./IssueFieldPicker";
 import { IssueTrackerLinkDialog } from "./IssueTrackerLinkDialog";
 import { IssueAssigneeBadge, IssueStateBadge, IssueTrackerIcon } from "./IssueTrackerParts";
 import {
@@ -294,21 +296,55 @@ function IssueTrackerRow({
                 : `Open ${issue.key} in ${label}`}
             </TooltipPopup>
           </Tooltip>
-          {/* The panel is narrow; separate lines keep the state and assignee readable. */}
-          <div className="flex flex-col ps-9 pe-1.5 text-xs text-muted-foreground">
-            <div className="flex h-6 min-w-0 items-center gap-2.5">
-              <span className="shrink-0 tabular-nums">{issue.key}</span>
-              <IssueStateBadge state={issue.state} className="text-foreground/80" />
-              <span className="flex-1" />
-              {menu(issue.key, issue.url)}
-            </div>
-            <IssueAssigneeBadge assignee={issue.assignee} className="h-5 text-foreground/80" />
-          </div>
+          <IssueFields
+            environmentId={environmentId}
+            issue={issue}
+            menu={menu(issue.key, issue.url)}
+          />
+
           {dialog}
         </div>
       );
     }
   }
+}
+
+/** Key, then state, then assignee, each on its own line: the panel is narrow. */
+function IssueFields({
+  environmentId,
+  issue: listed,
+  menu,
+}: {
+  environmentId: EnvironmentId;
+  issue: TrackerIssue;
+  menu: ReactNode;
+}) {
+  const issue = useShownIssue(environmentId, listed);
+  return (
+    <div className="flex flex-col ps-9 pe-1.5 text-xs text-muted-foreground">
+      <div className="flex h-6 min-w-0 items-center gap-2.5">
+        <span className="shrink-0 tabular-nums">{issue.key}</span>
+        <span className="flex-1" />
+        {menu}
+      </div>
+      <IssueFieldPicker
+        environmentId={environmentId}
+        issue={issue}
+        field="state"
+        className="-ms-1 h-5 self-start px-1 text-foreground/80"
+      >
+        {issue.state === null ? <span>No status</span> : <IssueStateBadge state={issue.state} />}
+      </IssueFieldPicker>
+      <IssueFieldPicker
+        environmentId={environmentId}
+        issue={issue}
+        field="assignee"
+        className="-ms-1 h-5 self-start px-1 text-foreground/80"
+      >
+        <IssueAssigneeBadge assignee={issue.assignee} />
+      </IssueFieldPicker>
+    </div>
+  );
 }
 
 function WarningIcon() {

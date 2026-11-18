@@ -136,6 +136,16 @@ export const IssueTrackerFilterOptionsResult = Schema.Struct({
 });
 export type IssueTrackerFilterOptionsResult = typeof IssueTrackerFilterOptionsResult.Type;
 
+export const IssueTrackerEditOptionsInput = IssueRef;
+/** What one issue can be changed to; ids are what `setIssueState` and `setIssueAssignee` take. */
+export const IssueTrackerEditOptionsResult = Schema.Struct({
+  /** Linear: the issue team's workflow states. Jira: the statuses its transitions lead to. */
+  states: Schema.Array(Schema.Struct({ id: Schema.String, ...TrackerIssueState.fields })),
+  /** Linear: the team's members. Jira: the users assignable to the issue. */
+  assignees: Schema.Array(Schema.Struct({ id: Schema.String, ...TrackerIssueAssignee.fields })),
+});
+export type IssueTrackerEditOptionsResult = typeof IssueTrackerEditOptionsResult.Type;
+
 export const IssueTrackerConnection = Schema.Struct({
   tracker: IssueTrackerKind,
   connected: Schema.Boolean,
@@ -179,12 +189,28 @@ export const IssueTrackerMutation = Schema.Union([
   }),
   /** Drops the cached issues, so the next thread list read asks the trackers again. */
   Schema.Struct({ type: Schema.Literal("refreshIssues") }),
+  /** A Linear workflow state id, or a Jira transition id. */
+  Schema.Struct({
+    type: Schema.Literal("setIssueState"),
+    tracker: IssueTrackerKind,
+    key: IssueKey,
+    stateId: TrimmedNonEmptyString,
+  }),
+  /** A Linear user id or a Jira account id; null unassigns. */
+  Schema.Struct({
+    type: Schema.Literal("setIssueAssignee"),
+    tracker: IssueTrackerKind,
+    key: IssueKey,
+    assigneeId: Schema.NullOr(TrimmedNonEmptyString),
+  }),
 ]);
 export type IssueTrackerMutation = typeof IssueTrackerMutation.Type;
 
 export const IssueTrackerMutationResult = Schema.Struct({
   /** The account the new credentials belong to, after connecting. */
   account: Schema.optional(Schema.String),
+  /** The issue as the tracker reads it after a state or assignee change. */
+  issue: Schema.optional(TrackerIssue),
 });
 export type IssueTrackerMutationResult = typeof IssueTrackerMutationResult.Type;
 

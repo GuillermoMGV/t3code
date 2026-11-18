@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   filterNotifications,
-  showsTrackerFilter,
+  notificationFilterSources,
   unreadBadgeLabel,
 } from "./SidebarIssueNotifications.logic";
 
@@ -20,12 +20,14 @@ describe("notification tracker filter", () => {
   });
 
   it.each([
-    [["linear", "jira"], [], true],
-    [["linear"], [item("b", "jira")], true],
-    [["linear"], [item("a", "linear")], false],
-    [[], [], false],
-  ] as const)("shows the filter for %j connected with %j items: %s", (connected, list, shown) => {
-    expect(showsTrackerFilter(connected, list)).toBe(shown);
+    [["linear", "jira"], [], ["linear", "jira"]],
+    [["slack", "linear"], [], ["linear", "slack"]],
+    [["linear"], [item("b", "jira")], ["linear", "jira"]],
+    [["linear"], [item("a", "linear")], []],
+    [["slack"], [], []],
+    [[], [], []],
+  ] as const)("offers sources for %j connected with %j items: %j", (connected, list, sources) => {
+    expect(notificationFilterSources(connected, list)).toEqual(sources);
   });
 });
 

@@ -1,7 +1,6 @@
-// Minimal mock of the Slack Web API (port 4569, token "xoxp-test") for local checks of the
-// "Remind reviewer" button. Nothing reaches Slack: sent messages are printed and listed at
-// GET /mock/sent. Start the server with T3CODE_SLACK_API_URL=http://127.0.0.1:4569/api.
-// See CUSTOM_DEVELOPMENT.md, "Personalizaciones del fork". MOCK_SLACK_PORT moves it.
+// Mock Slack Web API (port 4569 or MOCK_SLACK_PORT, token "xoxp-test") for "Remind" and mentions.
+// GET /mock/sent lists sent messages; GET /mock/mention adds a mention. Point the server at it with
+// T3CODE_SLACK_API_URL=http://127.0.0.1:4569/api. See CUSTOM_DEVELOPMENT.md.
 import * as NodeHttp from "node:http";
 
 const PORT = Number(process.env.MOCK_SLACK_PORT ?? 4569);
@@ -30,6 +29,31 @@ const members = [
 ];
 const sent = [];
 
+const ago = (minutes) => String(Date.now() / 1000 - minutes * 60);
+const mention = (user, ts, text, channel) => ({
+  user,
+  username: members.find((member) => member.id === user)?.name,
+  ts,
+  text,
+  channel,
+  permalink: `https://acme.slack.com/archives/${channel.id}/p${ts.replace(".", "")}`,
+});
+const mentions = [
+  mention("U001", ago(20), "<@U000> can you check <https://example.com/pr/1|this PR>?", {
+    id: "C100",
+    name: "deploys",
+  }),
+  mention("U002", ago(60 * 5), "Hey <@U000>, the build is green &amp; ready", {
+    id: "D200",
+    is_im: true,
+  }),
+  mention("U000", ago(60 * 6), "my own note to <@U000>", { id: "C100", name: "deploys" }),
+  mention("U003", ago(60 * 30), "<!here> <@U000> old one from yesterday", {
+    id: "C300",
+    name: "general",
+  }),
+];
+
 const readBody = (req) =>
   new Promise((resolve) => {
     let data = "";
@@ -44,13 +68,26 @@ NodeHttp.createServer(async (req, res) => {
   };
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
   if (url.pathname === "/mock/sent") return json(sent);
+  if (url.pathname === "/mock/mention") {
+    mentions.unshift(
+      mention("U001", ago(0), `<@U000> new mention ${mentions.length}`, {
+        id: "C100",
+        name: "deploys",
+      }),
+    );
+    return json(mentions[0]);
+  }
   if (req.headers.authorization !== `Bearer ${TOKEN}`)
     return json({ ok: false, error: "invalid_auth" });
   const params = await readBody(req);
   const method = url.pathname.split("/").at(-1);
   switch (method) {
     case "auth.test":
-      return json({ ok: true, user: "dev", team: "Acme", user_id: "U000" });
+      return json({ ok: true, user: "dev", team: "Acme", user_id: "U000", team_id: "T000" });
+    case "search.messages": {
+      if (params.get("query") !== "<@U000>") return json({ ok: false, error: "bad_query" });
+      return json({ ok: true, messages: { total: mentions.length, matches: mentions } });
+    }
     case "users.list":
       return json({ ok: true, members, response_metadata: { next_cursor: "" } });
     case "users.lookupByEmail": {

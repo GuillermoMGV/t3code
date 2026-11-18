@@ -1401,7 +1401,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "issue-trackers-slack",
     title: "Slack",
     to: "/settings/issue-trackers",
-    searchTerms: ["slack reviewer remind reminder pull request message token integration"],
+    searchTerms: [
+      "slack reviewer remind reminder pull request message token integration mention notifications",
+    ],
   },
   {
     id: "archive",

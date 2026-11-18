@@ -4,6 +4,8 @@ import {
   type IssueTrackerConnection,
   type IssueTrackerConnectionsResult,
   type IssueTrackerFilterOptionsResult,
+  type IssueTrackerEditOptionsResult,
+  type IssueRef,
   type IssueTrackerKind,
   type IssueTrackerLinkSource,
   type IssueTrackerMutation,
@@ -143,6 +145,9 @@ export class IssueTrackerService extends Context.Service<
     readonly getFilterOptions: (
       tracker: IssueTrackerKind,
     ) => Effect.Effect<IssueTrackerFilterOptionsResult, IssueTrackerError>;
+    readonly getEditOptions: (
+      ref: IssueRef,
+    ) => Effect.Effect<IssueTrackerEditOptionsResult, IssueTrackerError>;
     readonly getConnections: Effect.Effect<IssueTrackerConnectionsResult, IssueTrackerError>;
     readonly getThreadSummaries: Effect.Effect<IssueTrackerSummariesResult, IssueTrackerError>;
     readonly getIssues: (
@@ -472,6 +477,44 @@ const make = Effect.gen(function* () {
     return yield* jira.filterOptions(credentials.value);
   });
 
+  const getEditOptions = Effect.fn("IssueTrackerService.getEditOptions")(function* (ref: IssueRef) {
+    if (ref.tracker === "linear") {
+      const apiKey = yield* readLinearKey;
+      if (Option.isNone(apiKey)) return yield* notConnected("linear");
+      return yield* linear.editOptions(apiKey.value, ref.key);
+    }
+    const credentials = yield* readJiraCredentials;
+    if (Option.isNone(credentials)) return yield* notConnected("jira");
+    return yield* jira.editOptions(credentials.value, ref.key);
+  });
+
+  /** Applies the change, then reads the issue back so every cache shows the new value. */
+  const updateIssue = Effect.fn("IssueTrackerService.updateIssue")(function* (
+    input: Extract<IssueTrackerMutation, { type: "setIssueState" | "setIssueAssignee" }>,
+  ) {
+    if (input.tracker === "linear") {
+      const apiKey = yield* readLinearKey;
+      if (Option.isNone(apiKey)) return yield* notConnected("linear");
+      yield* linear.updateIssue(
+        apiKey.value,
+        input.key,
+        input.type === "setIssueState"
+          ? { stateId: input.stateId }
+          : { assigneeId: input.assigneeId },
+      );
+    } else {
+      const credentials = yield* readJiraCredentials;
+      if (Option.isNone(credentials)) return yield* notConnected("jira");
+      yield* input.type === "setIssueState"
+        ? jira.transitionIssue(credentials.value, input.key, input.stateId)
+        : jira.assignIssue(credentials.value, input.key, input.assigneeId);
+    }
+    issueCache.delete(`${input.tracker}:${input.key}`);
+    keyCache.delete(input.key);
+    const issue = yield* fetchAndCache(input.tracker, input.key);
+    return Option.isSome(issue) && issue.value !== null ? { issue: issue.value } : {};
+  });
+
   const connection = Effect.fn("IssueTrackerService.connection")(function* (
     tracker: IssueTrackerKind,
   ) {
@@ -539,6 +582,9 @@ const make = Effect.gen(function* () {
         issueCache.clear();
         keyCache.clear();
         return {};
+      case "setIssueState":
+      case "setIssueAssignee":
+        return yield* updateIssue(input);
       case "link":
       case "unlink":
         yield* writeLock.withPermits(1)(
@@ -565,6 +611,7 @@ const make = Effect.gen(function* () {
     getThreadIssues,
     search,
     getFilterOptions,
+    getEditOptions,
     getConnections,
     getThreadSummaries,
     getIssues,

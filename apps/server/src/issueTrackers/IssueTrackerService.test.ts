@@ -120,13 +120,23 @@ describe("applyThreadLinkMutation", () => {
 });
 
 function httpAnswering(answer: (url: URL) => { status: number; body: unknown }) {
-  const requests: Array<{ url: URL; authorization: string | undefined; body: string }> = [];
+  const requests: Array<{
+    method: string;
+    url: URL;
+    authorization: string | undefined;
+    body: string;
+  }> = [];
   const http = HttpClient.make((request) =>
     Effect.sync(() => {
       const url = new URL(request.url);
       const body =
         request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : "";
-      requests.push({ url, authorization: request.headers.authorization, body });
+      requests.push({
+        method: request.method,
+        url,
+        authorization: request.headers.authorization,
+        body,
+      });
       const { status, body: responseBody } = answer(url);
       return HttpClientResponse.fromWeb(request, Response.json(responseBody, { status }));
     }),
@@ -210,6 +220,81 @@ describe("makeLinearApi", () => {
       expect(yield* api.filterOptions("lin_api_key")).toEqual({
         states: ["Backlog", "Todo", "Done"],
         projects: ["Login revamp", "Payments"],
+      });
+    }),
+  );
+
+  it.effect("offers the team's states and active members, and updates by identifier", () =>
+    Effect.gen(function* () {
+      const { requests, http } = httpAnswering(() => ({
+        status: 200,
+        body: {
+          data: {
+            issue: {
+              team: {
+                states: {
+                  nodes: [
+                    {
+                      id: "s-done",
+                      name: "Done",
+                      color: "#5e6ad2",
+                      type: "completed",
+                      position: 0,
+                    },
+                    {
+                      id: "s-todo",
+                      name: "Todo",
+                      color: "#e2e2e2",
+                      type: "unstarted",
+                      position: 0,
+                    },
+                  ],
+                },
+                members: {
+                  nodes: [
+                    { id: "u-2", name: "Grace Hopper", avatarUrl: null, active: true },
+                    { id: "u-3", name: "Gone Person", active: false },
+                    { id: "u-1", name: "Ada Lovelace", avatarUrl: "https://avatar/ada" },
+                  ],
+                },
+              },
+            },
+            issueUpdate: { success: true },
+          },
+        },
+      }));
+      const api = yield* makeLinearApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
+      expect(yield* api.editOptions("lin_api_key", key("PRO-1"))).toEqual({
+        states: [
+          { id: "s-todo", name: "Todo", color: "#e2e2e2", category: "unstarted" },
+          { id: "s-done", name: "Done", color: "#5e6ad2", category: "completed" },
+        ],
+        assignees: [
+          { id: "u-1", name: "Ada Lovelace", avatarUrl: "https://avatar/ada" },
+          { id: "u-2", name: "Grace Hopper", avatarUrl: null },
+        ],
+      });
+      yield* api.updateIssue("lin_api_key", key("PRO-1"), { assigneeId: null });
+      expect(JSON.parse(requests[1]!.body).variables).toEqual({
+        id: "PRO-1",
+        input: { assigneeId: null },
+      });
+    }),
+  );
+
+  it.effect("reports Linear's reason when an update is rejected", () =>
+    Effect.gen(function* () {
+      const { http } = httpAnswering(() => ({
+        status: 200,
+        body: { data: null, errors: [{ message: "Invalid state for this team" }] },
+      }));
+      const api = yield* makeLinearApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
+      const error = yield* api
+        .updateIssue("lin_api_key", key("PRO-1"), { stateId: "s-x" })
+        .pipe(Effect.flip);
+      expect(error).toMatchObject({
+        reason: "invalidInput",
+        detail: "Invalid state for this team",
       });
     }),
   );
@@ -310,6 +395,81 @@ describe("makeJiraApi", () => {
       }));
       const api = yield* makeJiraApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
       expect(yield* api.issue(JIRA_CREDENTIALS, key("OPS-404"))).toBeNull();
+    }),
+  );
+
+  it.effect("offers each transition's status once and the assignable people", () =>
+    Effect.gen(function* () {
+      const { requests, http } = httpAnswering((url) =>
+        url.pathname.endsWith("/transitions")
+          ? {
+              status: 200,
+              body: {
+                transitions: [
+                  {
+                    id: "31",
+                    to: { name: "Done", statusCategory: { key: "done", colorName: "green" } },
+                  },
+                  {
+                    id: "11",
+                    to: { name: "To Do", statusCategory: { key: "new", colorName: "blue-gray" } },
+                  },
+                  {
+                    id: "41",
+                    to: { name: "Done", statusCategory: { key: "done", colorName: "green" } },
+                  },
+                ],
+              },
+            }
+          : {
+              status: 200,
+              body: [
+                { accountId: "a-2", displayName: "Grace Hopper", accountType: "atlassian" },
+                { accountId: "bot", displayName: "Automation", accountType: "app" },
+                {
+                  accountId: "a-1",
+                  displayName: "Ada Lovelace",
+                  avatarUrls: { "24x24": "https://avatar/24" },
+                },
+                { accountId: "a-3", displayName: "Gone Person", active: false },
+              ],
+            },
+      );
+      const api = yield* makeJiraApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
+      expect(yield* api.editOptions(JIRA_CREDENTIALS, key("OPS-7"))).toEqual({
+        states: [
+          { id: "11", name: "To Do", color: "#8590a2", category: "new" },
+          { id: "31", name: "Done", color: "#22a06b", category: "done" },
+        ],
+        assignees: [
+          { id: "a-1", name: "Ada Lovelace", avatarUrl: "https://avatar/24" },
+          { id: "a-2", name: "Grace Hopper", avatarUrl: null },
+        ],
+      });
+      expect(requests.map((request) => request.url.searchParams.get("issueKey"))).toContain(
+        "OPS-7",
+      );
+    }),
+  );
+
+  it.effect("transitions and assigns, and reports why Jira refused", () =>
+    Effect.gen(function* () {
+      const { requests, http } = httpAnswering((url) =>
+        url.pathname.endsWith("/assignee")
+          ? { status: 200, body: {} }
+          : {
+              status: 400,
+              body: { errorMessages: [], errors: { resolution: "Resolution is required." } },
+            },
+      );
+      const api = yield* makeJiraApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
+      yield* api.assignIssue(JIRA_CREDENTIALS, key("OPS-7"), null);
+      expect(requests[0]).toMatchObject({ method: "PUT", body: '{"accountId":null}' });
+      const error = yield* api
+        .transitionIssue(JIRA_CREDENTIALS, key("OPS-7"), "31")
+        .pipe(Effect.flip);
+      expect(requests[1]).toMatchObject({ method: "POST", body: '{"transition":{"id":"31"}}' });
+      expect(error).toMatchObject({ reason: "invalidInput", detail: "Resolution is required." });
     }),
   );
 

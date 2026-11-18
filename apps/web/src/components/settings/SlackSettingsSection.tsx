@@ -15,9 +15,9 @@ import { toastManager } from "../ui/toast";
 import { searchableSetting } from "./settingsSearch";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 
-// Fork-only Slack reviewer reminders; see CUSTOM_DEVELOPMENT.md.
+// Fork-only Slack reviewer reminders and mentions; see CUSTOM_DEVELOPMENT.md.
 
-const SCOPES = "chat:write, im:write, users:read, users:read.email";
+const SCOPES = "chat:write, im:write, users:read, users:read.email, search:read";
 
 /** Connects a Slack user token and maps reviewers whose Slack account T3 Code cannot guess. */
 export function SlackSettingsSection({ environmentId }: { environmentId: EnvironmentId }) {
@@ -67,7 +67,7 @@ export function SlackSettingsSection({ environmentId }: { environmentId: Environ
           title="Not connected"
           description={
             <>
-              Sends reviewers Slack reminders from your account. Create an app at{" "}
+              For reviewer reminders and mentions. In{" "}
               <a
                 className="underline underline-offset-2"
                 href="https://api.slack.com/apps"
@@ -75,9 +75,8 @@ export function SlackSettingsSection({ environmentId }: { environmentId: Environ
                 rel="noreferrer"
               >
                 api.slack.com/apps
-              </a>
-              , add the user token scopes {SCOPES}, install it to your workspace and paste its User
-              OAuth Token.
+              </a>{" "}
+              create an app with user scopes {SCOPES}, install it, paste its User OAuth Token.
             </>
           }
         />

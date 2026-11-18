@@ -76,6 +76,43 @@ const decodeProjects = Schema.decodeUnknownEffect(
   Schema.Struct({ values: Schema.optional(Schema.Array(Schema.Struct({ name: Schema.String }))) }),
 );
 const decodeMyself = Schema.decodeUnknownEffect(Schema.Struct({ displayName: Schema.String }));
+const JiraStatusCategory = Schema.optional(
+  Schema.NullOr(
+    Schema.Struct({
+      key: Schema.optional(Schema.String),
+      colorName: Schema.optional(Schema.String),
+    }),
+  ),
+);
+const decodeTransitions = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    transitions: Schema.optional(
+      Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          to: Schema.Struct({ name: Schema.String, statusCategory: JiraStatusCategory }),
+        }),
+      ),
+    ),
+  }),
+);
+const decodeAssignableUsers = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Struct({
+      accountId: Schema.String,
+      displayName: Schema.String,
+      accountType: Schema.optional(Schema.String),
+      active: Schema.optional(Schema.Boolean),
+      avatarUrls: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+    }),
+  ),
+);
+const decodeErrorBody = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    errorMessages: Schema.optional(Schema.Array(Schema.String)),
+    errors: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  }),
+);
 
 // Jira names a status category's color; these follow Atlassian's design tokens.
 const CATEGORY_COLORS: Readonly<Record<string, string>> = {
@@ -192,14 +229,18 @@ export const makeJiraApi = Effect.gen(function* () {
     credentials: JiraCredentials,
     path: string,
     body?: unknown,
+    method: "POST" | "PUT" = "POST",
   ) {
     const authorization = `Basic ${Base64.encode(
       new TextEncoder().encode(`${credentials.email}:${credentials.apiToken}`),
     )}`;
+    const url = `${credentials.siteUrl}${path}`;
     const base = (
       body === undefined
-        ? HttpClientRequest.get(`${credentials.siteUrl}${path}`)
-        : HttpClientRequest.post(`${credentials.siteUrl}${path}`)
+        ? HttpClientRequest.get(url)
+        : method === "PUT"
+          ? HttpClientRequest.put(url)
+          : HttpClientRequest.post(url)
     ).pipe(
       HttpClientRequest.setHeader("Authorization", authorization),
       HttpClientRequest.setHeader("Accept", "application/json"),
@@ -310,6 +351,102 @@ export const makeJiraApi = Effect.gen(function* () {
       "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC",
     );
 
+  /** Jira's own words for a rejected change, such as a transition that needs a field set. */
+  const expectNoContent = Effect.fn("JiraApi.expectNoContent")(function* (
+    response: HttpClientResponse.HttpClientResponse,
+    fallback: string,
+  ) {
+    if (response.status >= 200 && response.status < 300) return;
+    const body = yield* response.json.pipe(
+      Effect.flatMap(decodeErrorBody),
+      Effect.orElseSucceed(() => ({ errorMessages: [], errors: {} })),
+    );
+    const messages = [...(body.errorMessages ?? []), ...Object.values(body.errors ?? {})];
+    return yield* jiraError("invalidInput", messages.length > 0 ? messages.join(" ") : fallback);
+  });
+
+  /** The statuses the issue's transitions lead to, once each, to do first; assignable users A to Z. */
+  const editOptions = Effect.fn("JiraApi.editOptions")(function* (
+    credentials: JiraCredentials,
+    key: IssueKey,
+  ) {
+    const encodedKey = encodeURIComponent(key);
+    const [transitions, users] = yield* Effect.all(
+      [
+        request(credentials, `/rest/api/3/issue/${encodedKey}/transitions`).pipe(
+          Effect.flatMap(readJson),
+          Effect.flatMap((json) => decodeTransitions(json).pipe(Effect.mapError(invalidResponse))),
+        ),
+        request(
+          credentials,
+          `/rest/api/3/user/assignable/search?issueKey=${encodedKey}&maxResults=1000`,
+        ).pipe(
+          Effect.flatMap(readJson),
+          Effect.flatMap((json) =>
+            decodeAssignableUsers(json).pipe(Effect.mapError(invalidResponse)),
+          ),
+        ),
+      ],
+      { concurrency: 2 },
+    );
+    const all = transitions.transitions ?? [];
+    // Several transitions can lead to one status; the first one stands for it.
+    const unique = all.filter(
+      (transition, index) =>
+        all.findIndex((other) => other.to.name === transition.to.name) === index,
+    );
+    return {
+      states: unique
+        .toSorted(
+          (left, right) =>
+            statusCategoryRank(left.to.statusCategory?.key) -
+            statusCategoryRank(right.to.statusCategory?.key),
+        )
+        .map((transition) => ({
+          id: transition.id,
+          name: transition.to.name,
+          color: CATEGORY_COLORS[transition.to.statusCategory?.colorName ?? ""] ?? "#8590a2",
+          category: transition.to.statusCategory?.key ?? "",
+        })),
+      assignees: users
+        // Apps and deactivated accounts cannot own work, though Jira lists some of them.
+        .filter((user) => user.active !== false && user.accountType !== "app")
+        .toSorted((left, right) => left.displayName.localeCompare(right.displayName))
+        .map((user) => ({
+          id: user.accountId,
+          name: user.displayName,
+          avatarUrl: user.avatarUrls?.["24x24"] ?? user.avatarUrls?.["48x48"] ?? null,
+        })),
+    };
+  });
+
+  const transitionIssue = Effect.fn("JiraApi.transitionIssue")(function* (
+    credentials: JiraCredentials,
+    key: IssueKey,
+    transitionId: string,
+  ) {
+    const response = yield* request(
+      credentials,
+      `/rest/api/3/issue/${encodeURIComponent(key)}/transitions`,
+      { transition: { id: transitionId } },
+    );
+    yield* expectNoContent(response, `Jira did not change the status of ${key}.`);
+  });
+
+  const assignIssue = Effect.fn("JiraApi.assignIssue")(function* (
+    credentials: JiraCredentials,
+    key: IssueKey,
+    accountId: string | null,
+  ) {
+    const response = yield* request(
+      credentials,
+      `/rest/api/3/issue/${encodeURIComponent(key)}/assignee`,
+      { accountId },
+      "PUT",
+    );
+    yield* expectNoContent(response, `Jira did not change the assignee of ${key}.`);
+  });
+
   // request, readJson: used by the notifications bell (IssueTrackerNotifications.ts).
   return {
     myself,
@@ -318,6 +455,9 @@ export const makeJiraApi = Effect.gen(function* () {
     assignedOpenIssues,
     recentIssues,
     filterOptions,
+    editOptions,
+    transitionIssue,
+    assignIssue,
     request,
     readJson,
   };

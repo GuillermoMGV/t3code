@@ -35,6 +35,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { buildThreadRouteParams } from "~/threadRoutes";
 import { formatRelativeTimeLabel } from "~/timestampFormat";
+import { IssueFieldPicker, useShownIssue } from "../chat/IssueFieldPicker";
 import { IssueAssigneeBadge, IssueStateBadge, IssueTrackerIcon } from "../chat/IssueTrackerParts";
 import { useIssueSearch } from "../chat/useIssueSearch";
 import { useSortedProjectGroups } from "../CommandPaletteLookups";
@@ -268,6 +269,7 @@ function IssueList({
         {issues.map((issue) => (
           <IssueRow
             key={issue.key}
+            environmentId={environmentId}
             issue={issue}
             threads={threadsForIssue(threadsByIssueKey, issue)}
             pullRequests={pullRequestsByKey.get(issue.key) ?? []}
@@ -349,18 +351,21 @@ function useProjectChoices(): ReadonlyArray<ProjectChoice> {
 }
 
 function IssueRow({
-  issue,
+  environmentId,
+  issue: listed,
   threads,
   pullRequests,
   projectChoices,
   onStart,
 }: {
+  environmentId: EnvironmentId;
   issue: TrackerIssue;
   threads: ReadonlyArray<EnvironmentThreadShell>;
   pullRequests: ReadonlyArray<EnvironmentPullRequestEntry>;
   projectChoices: ReadonlyArray<ProjectChoice>;
   onStart: (projectRef: ScopedProjectRef) => void;
 }) {
+  const issue = useShownIssue(environmentId, listed);
   const openLink = useOpenLink(null);
   const openIssue = (event: ReactMouseEvent) => {
     event.preventDefault();
@@ -385,8 +390,22 @@ function IssueRow({
           <span className="min-w-0 truncate">{issue.title}</span>
         </div>
         <div className="flex min-w-0 items-center gap-3 text-muted-foreground text-xs">
-          <IssueStateBadge state={issue.state} className="shrink-0" />
-          <IssueAssigneeBadge assignee={issue.assignee} />
+          <IssueFieldPicker
+            environmentId={environmentId}
+            issue={issue}
+            field="state"
+            className="-mx-1 shrink-0 px-1"
+          >
+            {issue.state === null ? "No status" : <IssueStateBadge state={issue.state} />}
+          </IssueFieldPicker>
+          <IssueFieldPicker
+            environmentId={environmentId}
+            issue={issue}
+            field="assignee"
+            className="-mx-1 px-1"
+          >
+            <IssueAssigneeBadge assignee={issue.assignee} />
+          </IssueFieldPicker>
           {issue.project ? <IssueProject project={issue.project} /> : null}
           {issue.priorityLabel ? <span className="shrink-0">{issue.priorityLabel}</span> : null}
           <span className="shrink-0">Updated {formatRelativeTimeLabel(issue.updatedAt)}</span>

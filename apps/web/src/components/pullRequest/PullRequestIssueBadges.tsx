@@ -17,10 +17,12 @@ import {
 
 import { useOpenLink } from "~/browser/useOpenLink";
 import { issueTrackerEnvironment } from "~/state/issueTrackers";
-import { SidebarThreadIssueBadges } from "../sidebar/SidebarThreadIssueBadges";
+import { IssueFieldPicker, useShownIssue } from "../chat/IssueFieldPicker";
+import { IssueAssigneeChip, IssueStateChip } from "../sidebar/SidebarThreadIssueBadges";
 import { Badge } from "../ui/badge";
 import { MiddleTruncate } from "../ui/middle-truncate";
 import { toastManager } from "../ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { pullRequestIssueKey } from "./pullRequestIssue.logic";
 import { targetBranchKind } from "./pullRequestTargetBranch.logic";
 
@@ -96,11 +98,26 @@ export function usePullRequestIssue(entry: IssueEntry): TrackerIssue | undefined
   return key === null ? undefined : index.get(issueIndexKey(entry.environmentId, key));
 }
 
-/** The linked issue's key, state and assignee; a click opens the issue instead of the row. */
+/**
+ * The linked issue's key, state and assignee. A click on the key opens the issue; the state and
+ * assignee open pickers that change them in the tracker. None of them opens the row.
+ */
 export function PullRequestIssueBadges({ entry }: { entry: IssueEntry }) {
+  const listed = usePullRequestIssue(entry);
+  if (listed === undefined) return null;
+  return <IssueBadges environmentId={entry.environmentId} listed={listed} />;
+}
+
+function IssueBadges({
+  environmentId,
+  listed,
+}: {
+  environmentId: EnvironmentId;
+  listed: TrackerIssue;
+}) {
   const openLink = useOpenLink(null);
-  const issue = usePullRequestIssue(entry);
-  if (issue === undefined) return null;
+  const issue = useShownIssue(environmentId, listed);
+  const label = ISSUE_TRACKER_LABELS[issue.tracker];
   const open = (event: ReactMouseEvent | ReactKeyboardEvent) => {
     event.stopPropagation();
     event.preventDefault();
@@ -110,21 +127,39 @@ export function PullRequestIssueBadges({ entry }: { entry: IssueEntry }) {
     );
   };
   return (
-    // The row is a button, so this follows the checks popover: a focusable span, not a nested button.
-    <span
-      role="link"
-      tabIndex={0}
-      aria-label={`Open ${issue.key} in ${ISSUE_TRACKER_LABELS[issue.tracker]}`}
-      className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
-      onClick={open}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") open(event);
-      }}
-    >
-      <Badge variant="outline" size="sm" className="shrink-0">
-        {issue.key}
-      </Badge>
-      <SidebarThreadIssueBadges issue={issue} />
+    <span className="inline-flex min-w-0 shrink-0 items-center gap-1">
+      <Tooltip>
+        {/* The row is a button, so this follows the checks popover: a focusable span, not a nested button. */}
+        <TooltipTrigger
+          render={
+            <span
+              role="link"
+              tabIndex={0}
+              aria-label={`Open ${issue.key} in ${label}`}
+              className="inline-flex shrink-0 cursor-pointer rounded-md hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
+              onClick={open}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") open(event);
+              }}
+            />
+          }
+        >
+          <Badge variant="outline" size="sm" className="shrink-0">
+            {issue.key}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipPopup side="top" className="max-w-72">
+          {`Open ${label} ${issue.key}: ${issue.title}`}
+        </TooltipPopup>
+      </Tooltip>
+      {issue.state ? (
+        <IssueFieldPicker environmentId={environmentId} issue={issue} field="state" nested>
+          <IssueStateChip state={issue.state} />
+        </IssueFieldPicker>
+      ) : null}
+      <IssueFieldPicker environmentId={environmentId} issue={issue} field="assignee" nested>
+        <IssueAssigneeChip assignee={issue.assignee} />
+      </IssueFieldPicker>
     </span>
   );
 }

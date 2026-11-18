@@ -2,9 +2,9 @@ import { describe, expect, it } from "@effect/vitest";
 
 import {
   adfToText,
-  applyJiraReadState,
+  applyReadState,
   deriveJiraNotifications,
-  initialJiraReadIds,
+  initialReadIds,
   type JiraNotificationIssue,
   mergeNotifications,
   toLinearNotification,
@@ -127,7 +127,7 @@ describe("Jira read state", () => {
   const events = deriveJiraNotifications([issue], options);
 
   it("starts events older than a day as read on the first check", () => {
-    expect(initialJiraReadIds(events, Date.parse("2026-11-17T12:00:00Z"))).toEqual([
+    expect(initialReadIds(events, Date.parse("2026-11-17T12:00:00Z"))).toEqual([
       "jira:OPS-7:history:102:assignee",
       "jira:OPS-7:history:100:assignee",
       "jira:OPS-7:history:100:status",
@@ -135,7 +135,7 @@ describe("Jira read state", () => {
   });
 
   it("marks only the stored ids as read", () => {
-    const read = applyJiraReadState(events, new Set(["jira:OPS-7:comment:10"]));
+    const read = applyReadState(events, new Set(["jira:OPS-7:comment:10"]));
     expect(read.filter((event) => event.read).map((event) => event.id)).toEqual([
       "jira:OPS-7:comment:10",
     ]);

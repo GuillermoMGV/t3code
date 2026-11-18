@@ -5,6 +5,8 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
+import { SlackSearchMatch } from "./slackMentions.ts";
+
 // Fork-only Slack reviewer reminders; see CUSTOM_DEVELOPMENT.md.
 
 const SLACK_API_URL = "https://slack.com/api";
@@ -33,7 +35,17 @@ const SlackUser = Schema.Struct({
 });
 export type SlackUser = typeof SlackUser.Type;
 
-const AuthTest = Schema.Struct({ user: Schema.String, team: Schema.String });
+const AuthTest = Schema.Struct({
+  user: Schema.String,
+  team: Schema.String,
+  user_id: Schema.optional(Schema.String),
+  team_id: Schema.optional(Schema.String),
+});
+const SearchData = Schema.Struct({
+  messages: Schema.Struct({ matches: Schema.optional(Schema.Array(Schema.Unknown)) }),
+});
+// One match at a time, so an odd message type cannot fail the whole list.
+const decodeSearchMatch = Schema.decodeUnknownOption(SlackSearchMatch);
 const UserData = Schema.Struct({ user: SlackUser });
 const UserList = Schema.Struct({
   members: Schema.Array(SlackUser),
@@ -123,6 +135,30 @@ export const makeSlackApi = Effect.gen(function* () {
     return `${auth.user} · ${auth.team}`;
   });
 
+  /** The token owner's member and workspace ids. */
+  const identity = Effect.fn("SlackApi.identity")(function* (token: string) {
+    const auth = yield* call(token, "auth.test", {}, AuthTest).pipe(Effect.flatMap(required));
+    if (auth.user_id === undefined) return yield* invalidResponse("auth.test without user_id");
+    return { userId: auth.user_id, teamId: auth.team_id ?? auth.team };
+  });
+
+  /** Newest messages that mention the user; needs the `search:read` user scope. */
+  const searchMentions = Effect.fn("SlackApi.searchMentions")(function* (
+    token: string,
+    userId: string,
+  ) {
+    const data = yield* call(
+      token,
+      "search.messages",
+      { query: `<@${userId}>`, sort: "timestamp", sort_dir: "desc", count: "50" },
+      SearchData,
+    ).pipe(Effect.flatMap(required));
+    return (data.messages.matches ?? []).flatMap((raw) => {
+      const match = decodeSearchMatch(raw);
+      return Option.isSome(match) ? [match.value] : [];
+    });
+  });
+
   const userByEmail = Effect.fn("SlackApi.userByEmail")(function* (token: string, email: string) {
     const found = yield* call(token, "users.lookupByEmail", { email }, UserData, "users_not_found");
     return Option.map(found, (data) => data.user);
@@ -162,7 +198,15 @@ export const makeSlackApi = Effect.gen(function* () {
     yield* call(token, "chat.postMessage", { channel: open.channel.id, text }, Envelope);
   });
 
-  return { account, userByEmail, userById, listUsers, sendDirectMessage };
+  return {
+    account,
+    identity,
+    searchMentions,
+    userByEmail,
+    userById,
+    listUsers,
+    sendDirectMessage,
+  };
 });
 
 export type SlackApi = Effect.Success<typeof makeSlackApi>;

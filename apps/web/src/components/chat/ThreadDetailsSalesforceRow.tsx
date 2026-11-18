@@ -14,6 +14,7 @@ import { useState, type ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
 import { Menu, MenuItem, MenuPopup, MenuSearchInput, MenuSeparator, MenuTrigger } from "../ui/menu";
+import { Spinner } from "../ui/spinner";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SalesforceLoginDialog } from "./SalesforceLoginDialog";
@@ -64,19 +65,30 @@ export function ThreadDetailsSalesforceRow({
   const [manageOpen, setManageOpen] = useState(false);
   const [login, setLogin] = useState<{ reauth: SalesforceOrg | null } | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  // Kept until the polled state shows the new default, so the label never flashes the old org.
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [openingInstance, setOpeningInstance] = useState(false);
   const openInBrowser = useOpenSalesforceOrgInBrowser({ environmentId, threadId }, cwd);
   const state = salesforce.state;
   if (state === null || !state.isDxProject) return null;
 
+  const current = currentSalesforceOrg(state);
+  if (switchingTo !== null && current?.username === switchingTo) setSwitchingTo(null);
+  const switchingOrg =
+    switchingTo === null ? null : (state.orgs.find((org) => org.username === switchingTo) ?? null);
+
   const run = salesforce.run;
-  const setDefault = (org: SalesforceOrg) =>
+  const setDefault = (org: SalesforceOrg) => {
+    setSwitchingTo(org.username);
     void run(
       { type: "setDefault", cwd, target: org.alias ?? org.username },
       "Could not switch org",
-    );
+    ).then((ok) => {
+      if (!ok) setSwitchingTo(null);
+    });
+  };
   const chooseDefault = (org: SalesforceOrg) => {
-    if (org.isDefault) return;
+    if (org.isDefault || switchingTo !== null) return;
     if (isProductionOrg(org)) setConfirmation({ kind: "production", org });
     else setDefault(org);
   };
@@ -125,15 +137,16 @@ export function ThreadDetailsSalesforceRow({
     );
   }
 
-  const current = currentSalesforceOrg(state);
   const label =
-    current !== null
-      ? salesforceOrgName(current)
-      : state.defaultOrg !== null
-        ? state.defaultOrg
-        : state.loading
-          ? "Loading Salesforce orgs…"
-          : "No default org";
+    switchingOrg !== null
+      ? `Connecting to ${salesforceOrgName(switchingOrg)}…`
+      : current !== null
+        ? salesforceOrgName(current)
+        : state.defaultOrg !== null
+          ? state.defaultOrg
+          : state.loading
+            ? "Loading Salesforce orgs…"
+            : "No default org";
   const orgs = favoritesFirst(filterSalesforceOrgs(state.orgs, query), state.favorites);
 
   return section(
@@ -161,8 +174,17 @@ export function ThreadDetailsSalesforceRow({
             >
               {label}
             </span>
-            {current ? <SalesforceTypeBadge type={current.type} /> : null}
-            {current ? <SalesforceStatusDot org={current} /> : null}
+            {switchingOrg ? (
+              <>
+                <SalesforceTypeBadge type={switchingOrg.type} />
+                <Spinner size="xs" tone="muted" aria-label="Connecting" />
+              </>
+            ) : current ? (
+              <>
+                <SalesforceTypeBadge type={current.type} />
+                <SalesforceStatusDot org={current} />
+              </>
+            ) : null}
             <ChevronDownIcon aria-hidden className={THREAD_DETAILS_PANEL_CHEVRON_CLASS} />
           </TooltipTrigger>
           <TooltipPopup side="top" className="max-w-72">
@@ -183,8 +205,16 @@ export function ThreadDetailsSalesforceRow({
           />
           <div className="max-h-72 overflow-y-auto">
             {orgs.map((org) => (
-              <MenuItem key={org.username} onClick={() => chooseDefault(org)}>
-                <SalesforceStatusDot org={org} />
+              <MenuItem
+                key={org.username}
+                disabled={switchingTo !== null}
+                onClick={() => chooseDefault(org)}
+              >
+                {org.username === switchingTo ? (
+                  <Spinner size="xs" tone="muted" aria-label="Connecting" />
+                ) : (
+                  <SalesforceStatusDot org={org} />
+                )}
                 <span className="min-w-0 flex-1 truncate">{salesforceOrgName(org)}</span>
                 {state.favorites.includes(org.username) ? (
                   <StarIcon aria-label="Favorite" className="fill-current text-warning" />
@@ -216,7 +246,7 @@ export function ThreadDetailsSalesforceRow({
           </MenuItem>
         </MenuPopup>
       </Menu>
-      {current !== null ? (
+      {current !== null && switchingOrg === null ? (
         <ThreadDetailsControl
           type="button"
           variant="ghost"
@@ -236,6 +266,7 @@ export function ThreadDetailsSalesforceRow({
       <SalesforceOrgsDialog
         open={manageOpen}
         state={state}
+        switchingTo={switchingTo}
         onOpenChange={setManageOpen}
         onSetDefault={chooseDefault}
         onSetFavorite={setFavorite}

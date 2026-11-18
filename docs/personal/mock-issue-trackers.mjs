@@ -78,6 +78,30 @@ const jiraIssues = [
   },
 ];
 
+// State and assignee pickers: what the issues can change to.
+const LINEAR_STATES = [
+  { id: "ls-backlog", name: "Backlog", color: "#bec2c8", type: "backlog", position: 0 },
+  { id: "ls-todo", name: "Todo", color: "#e2e2e2", type: "unstarted", position: 0 },
+  { id: "ls-progress", name: "In Progress", color: "#f2c94c", type: "started", position: 0 },
+  { id: "ls-review", name: "In Review", color: "#0f783c", type: "started", position: 1 },
+  { id: "ls-done", name: "Done", color: "#5e6ad2", type: "completed", position: 0 },
+];
+const LINEAR_MEMBERS = [
+  { id: "lu-ada", name: "Ada Lovelace", avatarUrl: null, active: true },
+  { id: "lu-grace", name: "Grace Hopper", avatarUrl: null, active: true },
+  { id: "lu-guillermo", name: "Guillermo Miranda", avatarUrl: null, active: true },
+];
+const JIRA_STATUSES = [
+  { id: "11", name: "To Do", statusCategory: { key: "new", colorName: "blue-gray" } },
+  { id: "21", name: "In Progress", statusCategory: { key: "indeterminate", colorName: "yellow" } },
+  { id: "31", name: "Done", statusCategory: { key: "done", colorName: "green" } },
+];
+const JIRA_USERS = [
+  { accountId: "acc-ada", displayName: "Ada Lovelace", accountType: "atlassian" },
+  { accountId: "acc-guillermo", displayName: "Guillermo Miranda", accountType: "atlassian" },
+  { accountId: "acc-bot", displayName: "Automation for Jira", accountType: "app" },
+];
+
 // Notifications bell: times are relative to start, so the 3-day Jira window always holds them.
 // GET /mock/notify on either port adds a fresh event, to watch the badge appear.
 const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
@@ -224,6 +248,27 @@ NodeHttp.createServer(async (req, res) => {
   if (query.includes("viewer")) {
     return sendJson(res, 200, { data: { viewer: { name: "Guillermo Miranda" } } });
   }
+  if (query.includes("query EditOptions")) {
+    const team = { states: { nodes: LINEAR_STATES }, members: { nodes: LINEAR_MEMBERS } };
+    return sendJson(res, 200, { data: { issue: { team } } });
+  }
+  if (query.includes("issueUpdate")) {
+    const issue = linearIssues.find((item) => item.identifier === variables.id);
+    if (!issue)
+      return sendJson(res, 200, { data: null, errors: [{ message: "Entity not found" }] });
+    const { stateId, assigneeId } = variables.input;
+    if (stateId !== undefined) {
+      const state = LINEAR_STATES.find((item) => item.id === stateId);
+      if (!state) return sendJson(res, 200, { data: null, errors: [{ message: "Invalid state" }] });
+      issue.state = { name: state.name, color: state.color, type: state.type };
+    }
+    if (assigneeId !== undefined) {
+      const member = LINEAR_MEMBERS.find((item) => item.id === assigneeId);
+      issue.assignee = member ? { name: member.name, avatarUrl: member.avatarUrl } : null;
+    }
+    issue.updatedAt = new Date().toISOString();
+    return sendJson(res, 200, { data: { issueUpdate: { success: true } } });
+  }
   if (query.includes("issue(id")) {
     // MOCK_LINEAR_ANY_KEY=1 answers every `PRO-` key, to test pull request badges on real lists.
     const found =
@@ -267,6 +312,40 @@ NodeHttp.createServer(async (req, res) => {
   if (req.headers.authorization !== JIRA_AUTH) return sendJson(res, 401, {});
   if (url.pathname === "/rest/api/3/myself") {
     return sendJson(res, 200, { accountId: ME, displayName: "Guillermo Miranda" });
+  }
+  // /rest/api/3/issue/{key}/transitions and /rest/api/3/issue/{key}/assignee
+  const [, , , , section, editKey, edit] = url.pathname.split("/");
+  if (section === "issue" && (edit === "transitions" || edit === "assignee")) {
+    const issue = jiraIssues.find((item) => item.key === decodeURIComponent(editKey));
+    if (!issue) return sendJson(res, 404, { errorMessages: ["Issue does not exist"] });
+    if (edit === "transitions" && req.method === "GET") {
+      const transitions = JIRA_STATUSES.filter(
+        (status) => status.name !== issue.fields.status.name,
+      ).map((status) => ({ id: status.id, name: status.name, to: status }));
+      return sendJson(res, 200, { transitions });
+    }
+    const body = JSON.parse(raw || "{}");
+    if (edit === "transitions") {
+      const status = JIRA_STATUSES.find((item) => item.id === body.transition?.id);
+      // Like a real workflow screen: "Done" needs a resolution this mock never gets.
+      if (status?.name === "Done") {
+        return sendJson(res, 400, {
+          errorMessages: [],
+          errors: { resolution: "Resolution is required." },
+        });
+      }
+      if (!status) return sendJson(res, 400, { errorMessages: ["Transition is not valid."] });
+      issue.fields.status = { name: status.name, statusCategory: status.statusCategory };
+    } else {
+      const user = JIRA_USERS.find((item) => item.accountId === body.accountId);
+      issue.fields.assignee = user ? { displayName: user.displayName, avatarUrls: {} } : null;
+    }
+    issue.fields.updated = jiraTime(new Date().toISOString());
+    res.writeHead(204);
+    return res.end();
+  }
+  if (url.pathname === "/rest/api/3/user/assignable/search") {
+    return sendJson(res, 200, JIRA_USERS);
   }
   const issueMatch = /^\/rest\/api\/3\/issue\/([^/]+)$/.exec(url.pathname);
   if (issueMatch) {

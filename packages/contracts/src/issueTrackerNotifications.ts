@@ -1,8 +1,15 @@
 import * as Schema from "effect/Schema";
 
-import { IssueKey, IssueTrackerKind } from "./issueTracker.ts";
+// Fork-only notifications bell for Linear, Jira and Slack mentions; see CUSTOM_DEVELOPMENT.md.
 
-// Fork-only notifications bell for Linear and Jira; see CUSTOM_DEVELOPMENT.md.
+export const NotificationSource = Schema.Literals(["linear", "jira", "slack"]);
+export type NotificationSource = typeof NotificationSource.Type;
+
+export const NOTIFICATION_SOURCE_LABELS: Readonly<Record<NotificationSource, string>> = {
+  linear: "Linear",
+  jira: "Jira",
+  slack: "Slack",
+};
 
 export const TrackerNotificationKind = Schema.Literals([
   "assigned",
@@ -17,11 +24,12 @@ export const TrackerNotificationKind = Schema.Literals([
 export type TrackerNotificationKind = typeof TrackerNotificationKind.Type;
 
 export const TrackerNotification = Schema.Struct({
-  /** `linear:<id>` or `jira:<key>:<event>`; stable across polls. */
+  /** `linear:<id>`, `jira:<key>:<event>` or `slack:<channel>:<ts>`; stable across polls. */
   id: Schema.String,
-  tracker: IssueTrackerKind,
+  tracker: NotificationSource,
   kind: TrackerNotificationKind,
-  issue: Schema.Struct({ key: IssueKey, title: Schema.String, url: Schema.String }),
+  /** For Slack, `key` is the channel (`#general`, `Direct message`) and `url` the permalink. */
+  issue: Schema.Struct({ key: Schema.String, title: Schema.String, url: Schema.String }),
   /** Who did it; null for automations. */
   actor: Schema.NullOr(Schema.String),
   /** Comment text, shortened, for comments and mentions. */
@@ -39,12 +47,12 @@ export const IssueTrackerNotificationsResult = Schema.Struct({
   /** Newest first. */
   notifications: Schema.Array(TrackerNotification),
   unreadCount: Schema.Number,
-  /** Trackers with saved credentials; the bell hides when empty. */
-  connected: Schema.Array(IssueTrackerKind),
+  /** Sources with saved credentials; the bell hides when empty. */
+  connected: Schema.Array(NotificationSource),
   /** When the server last asked the trackers; null before the first check. */
   checkedAt: Schema.NullOr(Schema.String),
-  /** The last check's failure per tracker; the other tracker's items still show. */
-  errors: Schema.Array(Schema.Struct({ tracker: IssueTrackerKind, message: Schema.String })),
+  /** The last check's failure per source; the other sources' items still show. */
+  errors: Schema.Array(Schema.Struct({ tracker: NotificationSource, message: Schema.String })),
 });
 export type IssueTrackerNotificationsResult = typeof IssueTrackerNotificationsResult.Type;
 

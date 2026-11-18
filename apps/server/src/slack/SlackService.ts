@@ -17,6 +17,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
 import { makeSlackApi, type SlackUser } from "./slackApi.ts";
+import { slackDisplayName } from "./slackMentions.ts";
 
 // Fork-only Slack reviewer reminders; see CUSTOM_DEVELOPMENT.md.
 
@@ -67,9 +68,6 @@ export function matchSlackUser(
   );
   return byName.length === 1 ? byName[0]! : null;
 }
-
-const slackUserLabel = (user: SlackUser) =>
-  user.profile?.display_name || user.real_name || user.profile?.real_name || user.name || user.id;
 
 const storageError = (detail: string) => (cause: unknown) =>
   new SlackError({ reason: "storage", detail, cause });
@@ -268,7 +266,7 @@ const make = Effect.gen(function* () {
             mappings[input.login.toLowerCase()] = slackUser;
           });
         }
-        return { recipient: slackUserLabel(user) };
+        return { recipient: slackDisplayName(user) };
       }
     }
   });

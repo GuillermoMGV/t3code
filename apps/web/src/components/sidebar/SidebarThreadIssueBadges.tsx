@@ -24,44 +24,56 @@ function shortName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
+/** The state as a small outline badge in its tracker's color. */
+export function IssueStateChip({ state }: { state: NonNullable<TrackerIssue["state"]> }) {
+  return (
+    <Badge variant="outline" size="sm" className="min-w-0 shrink">
+      <span
+        aria-hidden
+        className="size-1.5 shrink-0 rounded-full"
+        // Each tracker defines its states' colors; showing them keeps states recognizable.
+        style={{ backgroundColor: state.color }}
+      />
+      <span className="truncate">{state.name}</span>
+    </Badge>
+  );
+}
+
+/** The assignee's avatar and first name as a small outline badge. */
+export function IssueAssigneeChip({ assignee }: { assignee: TrackerIssue["assignee"] }) {
+  return (
+    <Badge variant="outline" size="sm" className="min-w-0 shrink">
+      {assignee === null ? (
+        <UserRoundIcon aria-hidden />
+      ) : assignee.avatarUrl ? (
+        <img
+          alt=""
+          src={assignee.avatarUrl}
+          className="size-3 shrink-0 rounded-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="inline-flex size-3 shrink-0 items-center justify-center rounded-full bg-muted text-4xs"
+        >
+          {assigneeInitials(assignee.name)}
+        </span>
+      )}
+      <span className="truncate">
+        {assignee === null ? "Unassigned" : shortName(assignee.name)}
+      </span>
+    </Badge>
+  );
+}
+
 export function SidebarThreadIssueBadges({ issue }: { issue: TrackerIssue }) {
   const label = ISSUE_TRACKER_LABELS[issue.tracker];
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex min-w-0 shrink items-center gap-1" />}>
-        {issue.state ? (
-          <Badge variant="outline" size="sm" className="min-w-0 shrink">
-            <span
-              aria-hidden
-              className="size-1.5 shrink-0 rounded-full"
-              // Each tracker defines its states' colors; showing them keeps states recognizable.
-              style={{ backgroundColor: issue.state.color }}
-            />
-            <span className="truncate">{issue.state.name}</span>
-          </Badge>
-        ) : null}
-        <Badge variant="outline" size="sm" className="min-w-0 shrink">
-          {issue.assignee === null ? (
-            <UserRoundIcon aria-hidden />
-          ) : issue.assignee.avatarUrl ? (
-            <img
-              alt=""
-              src={issue.assignee.avatarUrl}
-              className="size-3 shrink-0 rounded-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span
-              aria-hidden
-              className="inline-flex size-3 shrink-0 items-center justify-center rounded-full bg-muted text-4xs"
-            >
-              {assigneeInitials(issue.assignee.name)}
-            </span>
-          )}
-          <span className="truncate">
-            {issue.assignee === null ? "Unassigned" : shortName(issue.assignee.name)}
-          </span>
-        </Badge>
+        {issue.state ? <IssueStateChip state={issue.state} /> : null}
+        <IssueAssigneeChip assignee={issue.assignee} />
       </TooltipTrigger>
       <TooltipPopup side="top" className="max-w-72">
         {`${label} ${issue.key}: ${issue.title}`}

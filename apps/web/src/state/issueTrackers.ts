@@ -6,6 +6,7 @@ import {
   createEnvironmentRpcQueryAtomFamily,
 } from "@t3tools/client-runtime/state/runtime";
 
+import { issueEditKey } from "../components/chat/issueFieldPicker.logic";
 import { threadIssueKey } from "../components/issues/issuesPage.logic";
 import { connectionAtomRuntime } from "../connection/runtime";
 
@@ -67,11 +68,34 @@ export const issueTrackerEnvironment = {
     staleTimeMs: 30_000,
     refreshIntervalMs: 60_000,
   }),
+  /** What one issue's state and assignee pickers offer; loaded when a picker opens. */
+  editOptions: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
+    label: "issue-trackers:edit-options",
+    tag: WS_METHODS.issueTrackersGetEditOptions,
+    staleTimeMs: 60_000,
+  }),
   mutate: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "issue-trackers:mutate",
     tag: WS_METHODS.issueTrackersMutate,
+    onSuccess: ({ environmentId, input }, registry, result) =>
+      Effect.sync(() => {
+        if (input.type !== "setIssueState" && input.type !== "setIssueAssignee") return;
+        if (result.issue !== undefined) {
+          registry.set(editedIssueAtom(issueEditKey(environmentId, input)), result.issue);
+        }
+        // The thread list's badges come from the server cache the change just refreshed.
+        registry.refresh(threadSummaries({ environmentId, input: {} }));
+      }),
   }),
 };
+
+/** The issue as read back after a state or assignee change here, keyed by `issueEditKey`. */
+export const editedIssueAtom = Atom.family((key: string) =>
+  Atom.make<TrackerIssue | null>(null).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`issue-trackers:edited:${key}`),
+  ),
+);
 
 // One derived atom per set of environments; a new atom per render would refetch.
 const threadIssuesAtoms = new Map<

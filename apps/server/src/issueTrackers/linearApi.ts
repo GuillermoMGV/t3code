@@ -80,6 +80,38 @@ const FilterOptionsData = Schema.Struct({
   }),
   projects: Schema.Struct({ nodes: Schema.Array(Schema.Struct({ name: Schema.String })) }),
 });
+const EditOptionsData = Schema.Struct({
+  issue: Schema.NullOr(
+    Schema.Struct({
+      team: Schema.Struct({
+        states: Schema.Struct({
+          nodes: Schema.Array(
+            Schema.Struct({
+              id: Schema.String,
+              name: Schema.String,
+              color: Schema.String,
+              type: Schema.String,
+              position: Schema.Number,
+            }),
+          ),
+        }),
+        members: Schema.Struct({
+          nodes: Schema.Array(
+            Schema.Struct({
+              id: Schema.String,
+              name: Schema.String,
+              avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
+              active: Schema.optional(Schema.Boolean),
+            }),
+          ),
+        }),
+      }),
+    }),
+  ),
+});
+const IssueUpdateData = Schema.Struct({
+  issueUpdate: Schema.Struct({ success: Schema.Boolean }),
+});
 const AssignedData = Schema.Struct({
   viewer: Schema.Struct({
     assignedIssues: Schema.Struct({ nodes: Schema.Array(LinearIssueNode) }),
@@ -310,6 +342,88 @@ export const makeLinearApi = Effect.gen(function* () {
     };
   });
 
+  /** The issue team's states in board order and its active members A to Z. */
+  const editOptions = Effect.fn("LinearApi.editOptions")(function* (apiKey: string, key: IssueKey) {
+    const result = yield* graphql(
+      apiKey,
+      `
+        query EditOptions($id: String!) {
+          issue(id: $id) {
+            team {
+              states(first: 100) {
+                nodes {
+                  id
+                  name
+                  color
+                  type
+                  position
+                }
+              }
+              members(first: 250) {
+                nodes {
+                  id
+                  name
+                  avatarUrl
+                  active
+                }
+              }
+            }
+          }
+        }
+      `,
+      { id: key },
+    );
+    const team = (yield* expectData(EditOptionsData, result)).issue?.team;
+    if (team === undefined) {
+      return yield* linearError("invalidInput", `Linear cannot find ${key}.`);
+    }
+    return {
+      states: team.states.nodes
+        .toSorted(
+          (left, right) =>
+            stateTypeRank(left.type) - stateTypeRank(right.type) || left.position - right.position,
+        )
+        .map((state) => ({
+          id: state.id,
+          name: state.name,
+          color: state.color,
+          category: state.type,
+        })),
+      assignees: team.members.nodes
+        .filter((member) => member.active !== false)
+        .toSorted((left, right) => left.name.localeCompare(right.name))
+        .map((member) => ({
+          id: member.id,
+          name: member.name,
+          avatarUrl: member.avatarUrl ?? null,
+        })),
+    };
+  });
+
+  /** `issueUpdate` takes the identifier as its id; null fields clear them. */
+  const updateIssue = Effect.fn("LinearApi.updateIssue")(function* (
+    apiKey: string,
+    key: IssueKey,
+    input: { readonly stateId: string } | { readonly assigneeId: string | null },
+  ) {
+    const result = yield* graphql(
+      apiKey,
+      `
+        mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
+          issueUpdate(id: $id, input: $input) {
+            success
+          }
+        }
+      `,
+      { id: key, input },
+    );
+    if (result._tag === "errors") return yield* linearError("invalidInput", result.message);
+    const { issueUpdate } = yield* expectData(IssueUpdateData, result);
+    if (!issueUpdate.success) {
+      return yield* linearError("invalidInput", `Linear did not update ${key}.`);
+    }
+  });
+
   // graphql: used by the notifications bell (IssueTrackerNotifications.ts).
   return {
     viewerName,
@@ -318,6 +432,8 @@ export const makeLinearApi = Effect.gen(function* () {
     assignedOpenIssues,
     recentIssues,
     filterOptions,
+    editOptions,
+    updateIssue,
     graphql,
   };
 });

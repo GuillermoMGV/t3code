@@ -1,12 +1,13 @@
 import { useAtomValue } from "@effect/atom-react";
 import {
-  ISSUE_TRACKER_LABELS,
+  NOTIFICATION_SOURCE_LABELS,
   type EnvironmentId,
   type IssueTrackerNotificationsMutation,
+  type NotificationSource,
   type TrackerNotification,
   type TrackerNotificationKind,
 } from "@t3tools/contracts";
-import { BellIcon, CheckCheckIcon, CircleIcon, CircleCheckIcon } from "lucide-react";
+import { AtSignIcon, BellIcon, CheckCheckIcon, CircleIcon, CircleCheckIcon } from "lucide-react";
 import { useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import { useOpenLink } from "~/browser/useOpenLink";
@@ -27,12 +28,12 @@ import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   filterNotifications,
+  notificationFilterSources,
   type NotificationTrackerFilter,
-  showsTrackerFilter,
   unreadBadgeLabel,
 } from "./SidebarIssueNotifications.logic";
 
-// Fork-only notifications bell for Linear and Jira; see CUSTOM_DEVELOPMENT.md.
+// Fork-only notifications bell for Linear, Jira and Slack mentions; see CUSTOM_DEVELOPMENT.md.
 
 const KIND_LABELS: Readonly<Record<TrackerNotificationKind, string>> = {
   assigned: "assigned you",
@@ -45,7 +46,18 @@ const KIND_LABELS: Readonly<Record<TrackerNotificationKind, string>> = {
   other: "updated",
 };
 
-/** The bell in the sidebar footer; hidden until Linear or Jira is connected. */
+function NotificationSourceIcon({
+  source,
+  className,
+}: {
+  source: NotificationSource;
+  className: string;
+}) {
+  if (source === "slack") return <AtSignIcon aria-hidden className={className} />;
+  return <IssueTrackerIcon tracker={source} className={className} />;
+}
+
+/** The bell in the sidebar footer; hidden until Linear, Jira or Slack is connected. */
 export function SidebarIssueNotificationsItem() {
   const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
   const connectedEnvironmentIds = useConnectedEnvironmentIds();
@@ -67,8 +79,12 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
   const [trackerFilter, setTrackerFilter] = useState<NotificationTrackerFilter>("all");
   const data = query.data;
   if (data === null || data.connected.length === 0) return null;
-  const withFilter = showsTrackerFilter(data.connected, data.notifications);
-  const visible = filterNotifications(data.notifications, withFilter ? trackerFilter : "all");
+  const filterSources = notificationFilterSources(data.connected, data.notifications);
+  const withFilter = filterSources.length > 0;
+  const activeFilter = filterSources.some((source) => source === trackerFilter)
+    ? trackerFilter
+    : "all";
+  const visible = filterNotifications(data.notifications, activeFilter);
   const visibleUnreadIds = visible.filter((item) => !item.read).map((item) => item.id);
 
   const run = async (input: IssueTrackerNotificationsMutation) => {
@@ -126,7 +142,7 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
                 // With a tracker chosen, only what is shown is marked.
                 onClick={() =>
                   void run(
-                    withFilter && trackerFilter !== "all"
+                    activeFilter !== "all"
                       ? { type: "markRead", ids: visibleUnreadIds }
                       : { type: "markAllRead" },
                   )
@@ -158,24 +174,26 @@ function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) 
             </div>
             {data.errors.map((error) => (
               <p key={error.tracker} className="pb-2 text-xs text-destructive-foreground">
-                {ISSUE_TRACKER_LABELS[error.tracker]}: {error.message}
+                {NOTIFICATION_SOURCE_LABELS[error.tracker]}: {error.message}
               </p>
             ))}
             {withFilter ? (
               <ToggleGroup
                 aria-label="Show notifications from"
                 className="mb-2 self-start"
-                value={[trackerFilter]}
+                value={[activeFilter]}
                 onValueChange={(next) => {
                   const value = next[0];
-                  if (value === "all" || value === "linear" || value === "jira") {
-                    setTrackerFilter(value);
-                  }
+                  const source = filterSources.find((candidate) => candidate === value);
+                  if (value === "all" || source !== undefined) setTrackerFilter(source ?? "all");
                 }}
               >
                 <Toggle value="all">All</Toggle>
-                <Toggle value="linear">{ISSUE_TRACKER_LABELS.linear}</Toggle>
-                <Toggle value="jira">{ISSUE_TRACKER_LABELS.jira}</Toggle>
+                {filterSources.map((source) => (
+                  <Toggle key={source} value={source}>
+                    {NOTIFICATION_SOURCE_LABELS[source]}
+                  </Toggle>
+                ))}
               </ToggleGroup>
             ) : null}
             {visible.length === 0 ? (
@@ -217,16 +235,19 @@ function NotificationRow({
 }) {
   const { issue, read } = notification;
   const toggleLabel = read ? "Mark as unread" : "Mark as read";
+  const sourceLabel = NOTIFICATION_SOURCE_LABELS[notification.tracker];
+  // Slack items name the channel instead of an issue.
+  const isSlack = notification.tracker === "slack";
   return (
     <li className="group flex items-start gap-2 rounded-md px-2 py-2 hover:bg-accent/50">
-      <IssueTrackerIcon
-        tracker={notification.tracker}
+      <NotificationSourceIcon
+        source={notification.tracker}
         className={read ? "mt-0.5 size-4 shrink-0 text-muted-foreground" : "mt-0.5 size-4 shrink-0"}
       />
       <button
         type="button"
         className="min-w-0 flex-1 cursor-pointer text-left"
-        aria-label={`Open ${issue.key} in ${ISSUE_TRACKER_LABELS[notification.tracker]}`}
+        aria-label={`Open ${issue.key} in ${sourceLabel}`}
         onClick={onOpen}
       >
         <span className={read ? "block text-xs text-muted-foreground" : "block text-xs"}>
@@ -235,8 +256,7 @@ function NotificationRow({
           {notification.detail ? ` · ${notification.detail}` : ""}
           <span className="text-muted-foreground">
             {" "}
-            · {ISSUE_TRACKER_LABELS[notification.tracker]} ·{" "}
-            {formatRelativeTimeLabel(notification.createdAt)}
+            · {sourceLabel} ·{formatRelativeTimeLabel(notification.createdAt)}
           </span>
         </span>
         <span
@@ -246,7 +266,13 @@ function NotificationRow({
               : "block truncate text-sm font-medium"
           }
         >
-          <span className="font-mono text-xs">{issue.key}</span> {issue.title}
+          {isSlack ? (
+            issue.key
+          ) : (
+            <>
+              <span className="font-mono text-xs">{issue.key}</span> {issue.title}
+            </>
+          )}
         </span>
         {notification.text ? (
           <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">

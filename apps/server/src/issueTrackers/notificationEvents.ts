@@ -10,7 +10,7 @@ const TEXT_LIMIT = 400;
 const MAX_NOTIFICATIONS = 100;
 /** How far back Jira events are derived; older ones drop out of the list. */
 export const JIRA_WINDOW_MS = 3 * 24 * 60 * 60_000;
-/** On the first Jira check, events older than this start out read so the badge is not flooded. */
+/** On a first Jira or Slack check, items older than this start out read so the badge stays calm. */
 const JIRA_INITIAL_UNREAD_MS = 24 * 60 * 60_000;
 
 const asKey = (value: string): IssueKey | null => {
@@ -287,16 +287,16 @@ export function deriveJiraNotifications(
   return sortNewestFirst(events);
 }
 
-/** Read flags for Jira events from the ids the user marked read on this server. */
-export function applyJiraReadState(
+/** Read flags for Jira and Slack items from the ids the user marked read on this server. */
+export function applyReadState(
   events: ReadonlyArray<TrackerNotification>,
   readIds: ReadonlySet<string>,
 ): TrackerNotification[] {
   return events.map((event) => ({ ...event, read: readIds.has(event.id) }));
 }
 
-/** The ids that start out read on the first Jira check: everything older than a day. */
-export function initialJiraReadIds(
+/** The ids that start out read on a source's first check: everything older than a day. */
+export function initialReadIds(
   events: ReadonlyArray<TrackerNotification>,
   nowMs: number,
 ): string[] {
@@ -309,7 +309,7 @@ function sortNewestFirst(items: ReadonlyArray<TrackerNotification>): TrackerNoti
   return [...items].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
-/** Both trackers' items in one list, newest first, without repeats, capped. */
+/** Every source's items in one list, newest first, without repeats, capped. */
 export function mergeNotifications(
   ...lists: ReadonlyArray<ReadonlyArray<TrackerNotification>>
 ): TrackerNotification[] {

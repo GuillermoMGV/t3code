@@ -39,6 +39,8 @@ import {
 interface SalesforceOrgsDialogProps {
   open: boolean;
   state: SalesforceState;
+  /** Username of the org being set as default, while the CLI switches. */
+  switchingTo: string | null;
   onOpenChange: (open: boolean) => void;
   onSetDefault: (org: SalesforceOrg) => void;
   onSetFavorite: (org: SalesforceOrg, favorite: boolean) => void;
@@ -112,6 +114,7 @@ export function SalesforceOrgsDialog(props: SalesforceOrgsDialogProps) {
 function OrgRow({
   org,
   favorite,
+  switchingTo,
   onSetDefault,
   onSetFavorite,
   onOpenOrg,
@@ -119,9 +122,10 @@ function OrgRow({
   onLogout,
 }: { org: SalesforceOrg; favorite: boolean } & Pick<
   SalesforceOrgsDialogProps,
-  "onSetDefault" | "onSetFavorite" | "onOpenOrg" | "onReauth" | "onLogout"
+  "switchingTo" | "onSetDefault" | "onSetFavorite" | "onOpenOrg" | "onReauth" | "onLogout"
 >) {
   const health = salesforceOrgHealth(org);
+  const connecting = org.username === switchingTo;
   const action = (label: string, icon: ReactNode, onClick: () => void) => (
     <Tooltip>
       <TooltipTrigger
@@ -151,7 +155,7 @@ function OrgRow({
         type="button"
         className={cn(
           "flex min-w-0 flex-1 items-center gap-3 rounded-md py-1.5 pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-          org.isDefault ? "cursor-default" : "cursor-pointer",
+          org.isDefault || switchingTo !== null ? "cursor-default" : "cursor-pointer",
         )}
         aria-label={
           org.isDefault
@@ -159,14 +163,24 @@ function OrgRow({
             : `Set ${salesforceOrgName(org)} as the default org`
         }
         aria-pressed={org.isDefault}
+        aria-busy={connecting}
+        disabled={switchingTo !== null}
         onClick={() => onSetDefault(org)}
       >
-        <SalesforceStatusDot org={org} />
+        {connecting ? (
+          <Spinner size="xs" tone="muted" aria-label="Connecting" />
+        ) : (
+          <SalesforceStatusDot org={org} />
+        )}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-2 text-sm">
             <span className="truncate font-medium">{salesforceOrgName(org)}</span>
             <SalesforceTypeBadge type={org.type} />
-            {org.isDefault ? <span className="text-muted-foreground text-xs">Default</span> : null}
+            {connecting ? (
+              <span className="text-muted-foreground text-xs">Connecting…</span>
+            ) : org.isDefault ? (
+              <span className="text-muted-foreground text-xs">Default</span>
+            ) : null}
           </span>
           <span className="truncate text-muted-foreground text-xs">
             {org.username}

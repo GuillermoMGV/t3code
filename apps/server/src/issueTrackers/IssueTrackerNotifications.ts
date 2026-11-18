@@ -3,6 +3,7 @@ import {
   type IssueTrackerKind,
   type IssueTrackerNotificationsMutation,
   type IssueTrackerNotificationsResult,
+  type NotificationSource,
   type TrackerNotification,
 } from "@t3tools/contracts";
 import * as Clock from "effect/Clock";
@@ -19,12 +20,14 @@ import * as Semaphore from "effect/Semaphore";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
+import { makeSlackApi } from "../slack/slackApi.ts";
+import { slackDisplayName, toSlackMentions } from "../slack/slackMentions.ts";
 import { type JiraCredentials, makeJiraApi } from "./jiraApi.ts";
 import { makeLinearApi } from "./linearApi.ts";
 import {
-  applyJiraReadState,
+  applyReadState,
   deriveJiraNotifications,
-  initialJiraReadIds,
+  initialReadIds,
   JIRA_WINDOW_MS,
   JiraNotificationIssue,
   LinearNotificationNode,
@@ -32,7 +35,7 @@ import {
   toLinearNotification,
 } from "./notificationEvents.ts";
 
-// Fork-only notifications bell for Linear and Jira; see CUSTOM_DEVELOPMENT.md.
+// Fork-only notifications bell for Linear, Jira and Slack mentions; see CUSTOM_DEVELOPMENT.md.
 // One server-side poll serves every client, so several open clients never multiply the
 // trackers' rate-limit use.
 
@@ -40,6 +43,9 @@ const POLL_INTERVAL = "5 minutes";
 // Same secret names as IssueTrackerService.ts, which owns connecting and disconnecting.
 const LINEAR_KEY_SECRET = "linear-api-key";
 const JIRA_SECRET = "jira-credentials";
+// Owned by SlackService.ts, which connects Slack for reviewer reminders.
+const SLACK_SECRET = "slack-user-token";
+const SLACK_NAMES_CACHE_MS = 60 * 60_000;
 const STATE_FILE = "issue-tracker-notifications.json";
 
 const LINEAR_QUERY = `query Notifications {
@@ -87,6 +93,13 @@ const StateFile = Schema.fromJsonString(
         readIds: Schema.Array(Schema.String),
       }),
     ),
+    slack: Schema.optional(
+      Schema.Struct({
+        /** `<workspace>:<member>`; another account starts over. */
+        account: Schema.String,
+        readIds: Schema.Array(Schema.String),
+      }),
+    ),
   }),
 );
 type StateFile = typeof StateFile.Type;
@@ -111,6 +124,7 @@ export class IssueTrackerNotifications extends Context.Service<
 const make = Effect.gen(function* () {
   const linear = yield* makeLinearApi;
   const jira = yield* makeJiraApi;
+  const slack = yield* makeSlackApi;
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -122,9 +136,14 @@ const make = Effect.gen(function* () {
   let jiraEvents: TrackerNotification[] = [];
   let jiraReadIds = new Set<string>();
   let jiraSite: string | null = null;
+  let slackItems: TrackerNotification[] = [];
+  let slackReadIds = new Set<string>();
+  let slackAccount: string | null = null;
+  let slackIdentity: { token: string; userId: string; account: string } | null = null;
+  let slackNames: { token: string; names: Map<string, string>; at: number } | null = null;
   let checkedAt: string | null = null;
-  const polled = new Set<IssueTrackerKind>();
-  const errors = new Map<IssueTrackerKind, string>();
+  const polled = new Set<NotificationSource>();
+  const errors = new Map<NotificationSource, string>();
   let jiraAccount: { readonly key: string; readonly accountId: string } | null = null;
 
   const readSecret = (tracker: IssueTrackerKind, name: string) =>
@@ -151,10 +170,16 @@ const make = Effect.gen(function* () {
     ),
   );
 
-  const connectedTrackers = Effect.all([readLinearKey, readJiraCredentials]).pipe(
-    Effect.map(([linearKey, jiraCredentials]) => [
+  // An unreadable Slack token only hides Slack mentions; it must not break the trackers' bell.
+  const readSlackToken = readSecret("linear", SLACK_SECRET).pipe(
+    Effect.orElseSucceed(() => Option.none<string>()),
+  );
+
+  const connectedTrackers = Effect.all([readLinearKey, readJiraCredentials, readSlackToken]).pipe(
+    Effect.map(([linearKey, jiraCredentials, slackToken]): NotificationSource[] => [
       ...(Option.isSome(linearKey) ? (["linear"] as const) : []),
       ...(Option.isSome(jiraCredentials) ? (["jira"] as const) : []),
+      ...(Option.isSome(slackToken) ? (["slack"] as const) : []),
     ]),
   );
 
@@ -166,6 +191,9 @@ const make = Effect.gen(function* () {
     const json = yield* encodeStateFile({
       ...(checkedAt === null ? {} : { checkedAt }),
       ...(jiraSite === null ? {} : { jira: { site: jiraSite, readIds: [...jiraReadIds] } }),
+      ...(slackAccount === null
+        ? {}
+        : { slack: { account: slackAccount, readIds: [...slackReadIds] } }),
     });
     const tempPath = `${statePath}.tmp`;
     yield* fileSystem.writeFileString(tempPath, `${json}\n`);
@@ -179,6 +207,10 @@ const make = Effect.gen(function* () {
   if (initial.jira !== undefined) {
     jiraSite = initial.jira.site;
     jiraReadIds = new Set(initial.jira.readIds);
+  }
+  if (initial.slack !== undefined) {
+    slackAccount = initial.slack.account;
+    slackReadIds = new Set(initial.slack.readIds);
   }
 
   const fetchLinear = Effect.fn("IssueTrackerNotifications.fetchLinear")(function* (
@@ -248,9 +280,32 @@ const make = Effect.gen(function* () {
     });
   });
 
+  const fetchSlack = Effect.fn("IssueTrackerNotifications.fetchSlack")(function* (token: string) {
+    if (slackIdentity?.token !== token) {
+      const { userId, teamId } = yield* slack.identity(token);
+      slackIdentity = { token, userId, account: `${teamId}:${userId}` };
+    }
+    const { userId, account } = slackIdentity;
+    const now = yield* Clock.currentTimeMillis;
+    // Names only make the list readable, so a failed lookup keeps Slack's handles.
+    if (slackNames?.token !== token || now - slackNames.at > SLACK_NAMES_CACHE_MS) {
+      const users = yield* slack.listUsers(token).pipe(Effect.orElseSucceed(() => []));
+      slackNames = {
+        token,
+        names: new Map(users.map((user) => [user.id, slackDisplayName(user)])),
+        at: now,
+      };
+    }
+    const matches = yield* slack.searchMentions(token, userId);
+    return {
+      account,
+      items: toSlackMentions(matches, { userId, names: slackNames.names, nowMs: now }),
+    };
+  });
+
   const recordError = Effect.fn("IssueTrackerNotifications.recordError")(function* (
-    tracker: IssueTrackerKind,
-    error: IssueTrackerError,
+    tracker: NotificationSource,
+    error: { readonly message: string; readonly reason: string },
   ) {
     // Logged once per new message, so a tracker that stays down does not fill the log.
     if (errors.get(tracker) !== error.message) {
@@ -265,13 +320,19 @@ const make = Effect.gen(function* () {
   const poll = pollLock
     .withPermits(1)(
       Effect.gen(function* () {
-        const [linearKey, jiraCredentials] = yield* Effect.all([
+        const [linearKey, jiraCredentials, slackToken] = yield* Effect.all([
           readLinearKey,
           readJiraCredentials,
+          readSlackToken,
         ]);
-        if (Option.isNone(linearKey) && Option.isNone(jiraCredentials)) {
+        if (
+          Option.isNone(linearKey) &&
+          Option.isNone(jiraCredentials) &&
+          Option.isNone(slackToken)
+        ) {
           linearItems = [];
           jiraEvents = [];
+          slackItems = [];
           errors.clear();
           polled.clear();
           return;
@@ -305,7 +366,7 @@ const make = Effect.gen(function* () {
                 Effect.sync(() => {
                   if (jiraSite !== site) {
                     jiraSite = site;
-                    jiraReadIds = new Set(initialJiraReadIds(events, now));
+                    jiraReadIds = new Set(initialReadIds(events, now));
                   } else {
                     // Ids that left the window are no longer needed.
                     const present = new Set(events.map((event) => event.id));
@@ -321,6 +382,31 @@ const make = Effect.gen(function* () {
           jiraEvents = [];
           errors.delete("jira");
           polled.delete("jira");
+        }
+
+        if (Option.isSome(slackToken)) {
+          yield* fetchSlack(slackToken.value).pipe(
+            Effect.matchEffect({
+              onFailure: (error) => recordError("slack", error),
+              onSuccess: ({ account, items }) =>
+                Effect.sync(() => {
+                  if (slackAccount !== account) {
+                    slackAccount = account;
+                    slackReadIds = new Set(initialReadIds(items, now));
+                  } else {
+                    const present = new Set(items.map((item) => item.id));
+                    slackReadIds = new Set([...slackReadIds].filter((id) => present.has(id)));
+                  }
+                  slackItems = items;
+                  errors.delete("slack");
+                }),
+            }),
+          );
+          polled.add("slack");
+        } else {
+          slackItems = [];
+          errors.delete("slack");
+          polled.delete("slack");
         }
 
         checkedAt = DateTime.formatIso(DateTime.makeUnsafe(now));
@@ -343,7 +429,8 @@ const make = Effect.gen(function* () {
     }
     const notifications = mergeNotifications(
       connected.includes("linear") ? linearItems : [],
-      connected.includes("jira") ? applyJiraReadState(jiraEvents, jiraReadIds) : [],
+      connected.includes("jira") ? applyReadState(jiraEvents, jiraReadIds) : [],
+      connected.includes("slack") ? applyReadState(slackItems, slackReadIds) : [],
     );
     return {
       notifications,
@@ -397,11 +484,17 @@ const make = Effect.gen(function* () {
       .filter((item) => wanted.has(item.id) && item.read !== read)
       .map((item) => item.id);
     yield* setLinearRead(linearIds, read);
-    const jiraIds = jiraEvents.filter((event) => wanted.has(event.id)).map((event) => event.id);
-    if (jiraIds.length === 0) return;
-    for (const id of jiraIds) {
-      if (read) jiraReadIds.add(id);
-      else jiraReadIds.delete(id);
+    // Jira and Slack read state is kept on this server only.
+    const local = [
+      { items: jiraEvents, readIds: jiraReadIds },
+      { items: slackItems, readIds: slackReadIds },
+    ].flatMap(({ items, readIds }) =>
+      items.filter((item) => wanted.has(item.id)).map((item) => ({ id: item.id, readIds })),
+    );
+    if (local.length === 0) return;
+    for (const { id, readIds } of local) {
+      if (read) readIds.add(id);
+      else readIds.delete(id);
     }
     yield* saveState;
   });
