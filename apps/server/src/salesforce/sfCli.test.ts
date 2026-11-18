@@ -2,7 +2,13 @@ import { describe, expect, it } from "@effect/vitest";
 import type { SalesforceOrg } from "@t3tools/contracts";
 
 import { keepKnownStatuses, markDefaultOrg, nextFavorites } from "./SalesforceService.ts";
-import { describeSfFailure, parseOrgList, parseSfJson, parseSfVersion } from "./sfCli.ts";
+import {
+  describeSfFailure,
+  parseOrgList,
+  parseOrgOpenUrl,
+  parseSfJson,
+  parseSfVersion,
+} from "./sfCli.ts";
 
 const sandbox = {
   accessToken: "00D-secret-token",
@@ -66,6 +72,14 @@ describe("parseSfJson", () => {
   it("returns null without JSON", () => {
     expect(parseSfJson("'sf' is not recognized as an internal command")).toBeNull();
   });
+});
+
+it("reads only https login URLs from sf org open --url-only", () => {
+  const url = "https://propertiag--qa2.sandbox.my.salesforce.com/secur/frontdoor.jsp?otp=x";
+  expect(parseOrgOpenUrl({ url, orgId: "00D000000000002", username: "u" })).toBe(url);
+  expect(parseOrgOpenUrl({ url: "javascript:alert(1)//x.y/" })).toBeNull();
+  expect(parseOrgOpenUrl({ url: "http://example.com/secur" })).toBeNull();
+  expect(parseOrgOpenUrl(undefined)).toBeNull();
 });
 
 it("reads the CLI version", () => {

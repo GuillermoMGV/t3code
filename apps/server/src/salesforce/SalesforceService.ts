@@ -23,7 +23,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
 import * as ServerConfig from "../config.ts";
-import { describeSfFailure, makeSfCli, parseOrgList } from "./sfCli.ts";
+import { describeSfFailure, makeSfCli, parseOrgList, parseOrgOpenUrl } from "./sfCli.ts";
 
 // Fork-only Salesforce org manager; see CUSTOM_DEVELOPMENT.md. The `sf` CLI owns every file
 // here: this service reads `target-org` to show it quickly, and runs `sf` for everything else.
@@ -303,6 +303,7 @@ const make = Effect.gen(function* () {
             detail: describeSfFailure(json, fallback),
           });
         }
+        return json;
       }),
     );
 
@@ -332,9 +333,9 @@ const make = Effect.gen(function* () {
         );
         yield* refreshDefault(cwd);
         return {};
-      case "open":
+      case "open": {
         // Without --url-only the CLI opens the browser itself, so no session URL reaches us.
-        yield* runWrite(
+        const json = yield* runWrite(
           cwd,
           [
             "org",
@@ -342,10 +343,20 @@ const make = Effect.gen(function* () {
             "--target-org",
             input.target,
             ...(input.recordId === undefined ? [] : ["--path", `/${input.recordId}`]),
+            ...(input.urlOnly === true ? ["--url-only"] : []),
           ],
           "Could not open the org.",
         );
-        return {};
+        if (input.urlOnly !== true) return {};
+        const url = parseOrgOpenUrl(json.result);
+        if (url === null) {
+          return yield* new SalesforceError({
+            reason: "command",
+            detail: "The Salesforce CLI did not return a login URL.",
+          });
+        }
+        return { url };
+      }
       case "logout":
         yield* runWrite(
           cwd,

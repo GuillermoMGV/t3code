@@ -95,6 +95,8 @@ export const SalesforceMutation = Schema.Union([
     target: TrimmedNonEmptyString,
     /** Opens this record instead of the org's home page. */
     recordId: Schema.optional(SalesforceRecordId),
+    /** Returns a one-time login URL instead of opening a browser on the server's machine. */
+    urlOnly: Schema.optional(Schema.Boolean),
   }),
   Schema.Struct({
     type: Schema.Literal("logout"),
@@ -110,7 +112,10 @@ export const SalesforceMutation = Schema.Union([
 ]);
 export type SalesforceMutation = typeof SalesforceMutation.Type;
 
-export const SalesforceMutationResult = Schema.Struct({});
+export const SalesforceMutationResult = Schema.Struct({
+  /** `open` with `urlOnly`: logs in to the org, so never store or log it. */
+  url: Schema.optional(Schema.String),
+});
 
 export class SalesforceError extends Schema.TaggedError<SalesforceError>()("SalesforceError", {
   reason: Schema.Literals(["cliMissing", "invalidInput", "command", "busy", "storage", "api"]),

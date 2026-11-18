@@ -285,6 +285,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
               {visible.salesforce && props.gitCwd !== null ? (
                 <ThreadDetailsSalesforceRow
                   environmentId={props.environmentId}
+                  threadId={props.threadId}
                   cwd={props.gitCwd}
                   separated={density === "full"}
                 />

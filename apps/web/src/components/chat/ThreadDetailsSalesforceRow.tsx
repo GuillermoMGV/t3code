@@ -1,4 +1,4 @@
-import type { EnvironmentId, SalesforceOrg } from "@t3tools/contracts";
+import type { EnvironmentId, SalesforceOrg, ThreadId } from "@t3tools/contracts";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -33,6 +33,7 @@ import {
 } from "./salesforceOrgs.logic";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
+import { useOpenSalesforceOrgInBrowser } from "./useOpenSalesforceOrgInBrowser";
 import {
   THREAD_DETAILS_PANEL_CHEVRON_CLASS,
   THREAD_DETAILS_PANEL_ICON_CLASS,
@@ -49,10 +50,12 @@ type Confirmation =
 /** Renders its own section, so a folder that is not a DX project leaves no empty block. */
 export function ThreadDetailsSalesforceRow({
   environmentId,
+  threadId,
   cwd,
   separated,
 }: {
   environmentId: EnvironmentId;
+  threadId: ThreadId;
   cwd: string;
   separated: boolean;
 }) {
@@ -61,6 +64,8 @@ export function ThreadDetailsSalesforceRow({
   const [manageOpen, setManageOpen] = useState(false);
   const [login, setLogin] = useState<{ reauth: SalesforceOrg | null } | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [openingInstance, setOpeningInstance] = useState(false);
+  const openInBrowser = useOpenSalesforceOrgInBrowser({ environmentId, threadId }, cwd);
   const state = salesforce.state;
   if (state === null || !state.isDxProject) return null;
 
@@ -211,6 +216,22 @@ export function ThreadDetailsSalesforceRow({
           </MenuItem>
         </MenuPopup>
       </Menu>
+      {current !== null ? (
+        <ThreadDetailsControl
+          type="button"
+          variant="ghost"
+          size="sm"
+          part="meta"
+          className="ms-7.5 self-start"
+          disabled={openingInstance}
+          onClick={() => {
+            setOpeningInstance(true);
+            void openInBrowser(current).finally(() => setOpeningInstance(false));
+          }}
+        >
+          {openingInstance ? "Opening instance…" : "Open instance"}
+        </ThreadDetailsControl>
+      ) : null}
 
       <SalesforceOrgsDialog
         open={manageOpen}

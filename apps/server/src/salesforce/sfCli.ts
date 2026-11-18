@@ -86,6 +86,15 @@ export function parseOrgList(result: unknown): SalesforceOrg[] {
   );
 }
 
+const OrgOpenResult = Schema.Struct({ url: Schema.String });
+const decodeOrgOpenResult = Schema.decodeUnknownOption(OrgOpenResult);
+
+/** The login URL from `sf org open --url-only`; null unless it is an `https://` URL. */
+export function parseOrgOpenUrl(result: unknown): string | null {
+  const url = Option.getOrNull(decodeOrgOpenResult(result))?.url;
+  return url !== undefined && /^https:\/\/[^/\s]+\.[^/\s]+\//i.test(url) ? url : null;
+}
+
 /** `2.151.7` from `@salesforce/cli/2.151.7 win32-x64 node-v24.20.0`. */
 export function parseSfVersion(output: string): string | null {
   return /@salesforce\/cli\/(\d+\.\d+\.\d+)/.exec(output)?.[1] ?? null;

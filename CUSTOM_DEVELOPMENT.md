@@ -181,26 +181,27 @@ Qué hace: en hilos cuya carpeta es un proyecto Salesforce DX (tiene `sfdx-proje
 - **Añadir org:** «Add org…» → alias (se valida que no exista), URL de login (Production/Developer, Sandbox o URL propia) y «Set as default» → `sf org login web`. Muestra «Waiting for login in the browser…» con **Cancel login**, que mata el proceso y libera el puerto 1717.
 - **Favoritas:** la estrella de «Manage orgs…» marca o desmarca una org como favorita. Las favoritas salen arriba del todo, en ese diálogo y en el buscador de la fila (con una estrella). Se guardan por usuario de Salesforce en `userdata/salesforce-favorites.json`, compartidas por todos los proyectos y clientes del servidor.
 - **Manage orgs…:** lista con alias, usuario, URL, estado y último uso. Clic en la fila la fija como org por defecto (producción pide confirmación). Acciones por org: favorita, abrir en el navegador (`sf org open`, el CLI abre el navegador y la URL con sesión nunca llega a T3 Code), re-autenticar (si no está conectada; reutiliza alias y URL), copiar usuario y cerrar sesión (con confirmación).
+- **Open instance:** el enlace pequeño bajo la org abre esa org, ya con la sesión iniciada, en el navegador integrado del hilo (panel derecho). El servidor ejecuta `sf org open --url-only` y devuelve la URL de acceso; la web la abre como pestaña del navegador sin guardarla en recientes ni en el historial (lleva una sesión). Si el navegador integrado no está disponible, la abre en el navegador del sistema. Tarda lo que tarde `sf` (30–50 s en este equipo si coincide con la comprobación de estados). Lógica en `useOpenSalesforceOrgInBrowser.ts`; `parseOrgOpenUrl` (`sfCli.ts`, con test) solo acepta URLs `https://`.
 - **Sincronización:** el servidor vigila (solo lectura) `<proyecto>/.sf/`, la carpeta del proyecto, `~/.sf/` y `~/.sfdx/`. Un cambio hecho desde VS Code o la terminal se ve en unos segundos (medido: menos de 7 s).
 - **Carga:** primero la lista rápida (`--skip-connection-status`, ~15 s en este equipo), después los estados en segundo plano (`sf org list`, 20–45 s con 23 orgs). El resultado queda en memoria por carpeta; la web lo lee cada 3 s sin lanzar `sf`.
 - **Seguridad:** `sf org list --json` incluye `accessToken`; el parser (`parseOrgList`) solo deja pasar una lista blanca de campos, con un test que lo comprueba. El runner de procesos solo registra el nombre del comando, no la salida. No se leen los archivos de `~/.sfdx/` con tokens.
 - Sin `sf` instalado, la fila muestra «Salesforce CLI not found» con instrucciones. La fila se oculta con clic derecho en el panel → «Salesforce org».
 
-| Parte     | Archivos nuevos                                                                                                                                                                                             |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Contratos | `packages/contracts/src/salesforce.ts`                                                                                                                                                                      |
-| Servidor  | `apps/server/src/salesforce/sfCli.ts` (ejecuta `sf --json`, parser sin secretos) (+ test), `SalesforceService.ts` (caché por carpeta, vigilancia, escrituras en serie, login cancelable, favoritas)         |
-| Web       | `apps/web/src/state/salesforce.ts`, `components/chat/ThreadDetailsSalesforceRow.tsx`, `SalesforceOrgsDialog.tsx`, `SalesforceLoginDialog.tsx`, `SalesforceOrgParts.tsx`, `salesforceOrgs.logic.ts` (+ test) |
+| Parte     | Archivos nuevos                                                                                                                                                                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contratos | `packages/contracts/src/salesforce.ts`                                                                                                                                                                                                          |
+| Servidor  | `apps/server/src/salesforce/sfCli.ts` (ejecuta `sf --json`, parser sin secretos) (+ test), `SalesforceService.ts` (caché por carpeta, vigilancia, escrituras en serie, login cancelable, favoritas)                                             |
+| Web       | `apps/web/src/state/salesforce.ts`, `components/chat/ThreadDetailsSalesforceRow.tsx`, `SalesforceOrgsDialog.tsx`, `SalesforceLoginDialog.tsx`, `SalesforceOrgParts.tsx`, `salesforceOrgs.logic.ts` (+ test), `useOpenSalesforceOrgInBrowser.ts` |
 
-| Toca (archivos oficiales)                             | Qué añade                                                                        |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `packages/contracts/src/rpc.ts`                       | import, `salesforce.getState` y `salesforce.mutate` (métodos, `Rpc.make`, grupo) |
-| `packages/contracts/src/index.ts`                     | `export * from "./salesforce.ts"`                                                |
-| `apps/server/src/auth/RpcAuthorization.ts`            | permisos (leer: orchestration read; modificar: operate)                          |
-| `apps/server/src/observability/RpcInstrumentation.ts` | categoría de los 2 métodos                                                       |
-| `apps/server/src/server.ts`, `ws.ts`, `ws.test.ts`    | capa del servicio, handlers y mock                                               |
-| `apps/web/src/components/chat/threadDetailsItems.ts`  | elemento `salesforce` del menú «Choose what to show»                             |
-| `apps/web/src/components/chat/ThreadDetailsPanel.tsx` | import y la fila (que pinta su propia sección)                                   |
+| Toca (archivos oficiales)                             | Qué añade                                                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `packages/contracts/src/rpc.ts`                       | import, `salesforce.getState` y `salesforce.mutate` (métodos, `Rpc.make`, grupo)  |
+| `packages/contracts/src/index.ts`                     | `export * from "./salesforce.ts"`                                                 |
+| `apps/server/src/auth/RpcAuthorization.ts`            | permisos (leer: orchestration read; modificar: operate)                           |
+| `apps/server/src/observability/RpcInstrumentation.ts` | categoría de los 2 métodos                                                        |
+| `apps/server/src/server.ts`, `ws.ts`, `ws.test.ts`    | capa del servicio, handlers y mock                                                |
+| `apps/web/src/components/chat/threadDetailsItems.ts`  | elemento `salesforce` del menú «Choose what to show»                              |
+| `apps/web/src/components/chat/ThreadDetailsPanel.tsx` | import y la fila (que pinta su propia sección), con `threadId` para Open instance |
 
 Limitaciones: no hay comandos en la paleta de comandos (es un archivo oficial de 3.000 líneas muy cambiante; el selector de la fila cubre lo mismo). No está implementado el login por device code (`sf org login device`). Cerrar sesión y abrir org no se han probado contra orgs reales, por seguridad. Probado en el proyecto real `PROPERTI`: org por defecto correcta, cambio DEV ↔ QA2 (restaurado a QA2), cambio externo reflejado, confirmación de PROD (cancelada), estados reales de las 23 orgs, diálogo de re-autenticación y login iniciado y cancelado (proceso terminado, puerto 1717 libre, sin org añadida). Ningún token en registros ni trazas.
 
@@ -396,32 +397,6 @@ Qué hace: el icono del calendario con reloj en la parte inferior de la barra la
 | --------------------------------------------------- | ------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarChrome.tsx` | icono `CalendarClockIcon` y el botón «Scheduled tasks» |
 
-### Una cuenta de GitHub por repositorio
-
-Qué hace: si `gh` tiene **varias cuentas en el mismo host** (por ejemplo `Guillermo-Miranda-01` para Properti y `GuillermoMGV` para ASTI, ver `gh auth status`), cada petición a GitHub usa la cuenta que llega a su repositorio, en vez de la cuenta activa para todo. No hay que configurar nada: basta con haber hecho `gh auth login` con cada cuenta.
-
-- **Cómo elige la cuenta:** si el owner del repositorio se llama como una de las cuentas (repo personal, `GuillermoMGV/ASTI`), usa esa. Si no, prueba cada cuenta, la activa primero, con `gh api repos/<owner>/<repo> --jq .permissions.push` y se queda con la primera que puede hacer push; si ninguna, con la primera que puede leerlo; si ninguna lo ve, con la cuenta por defecto (la activa o la elegida en Ajustes → Source Control). El resultado se guarda una hora (un fallo, un minuto) y la lista de cuentas, 5 minutos.
-- **De dónde sale el repositorio:** del `repository` (`owner/nombre`) de la llamada o, si no viene, de los remotos git del proyecto (`cwd`), con la misma regla que usa el proveedor de GitHub. Viaja a `GitHubCredentials` como la referencia `GitHubRequestRepository`, que también separa los lotes de GraphQL para no mezclar cuentas.
-- **Página de pull requests:** las búsquedas «mías» de cada repositorio usan el login de su cuenta, y el servidor añade a `viewers` una entrada `"<host> <owner/nombre>"` cuando un repositorio va con otra cuenta que la de su host, para que sus PR salgan en «Authored». Con varias cuentas no se usa la búsqueda combinada de varios repositorios (`listChangeRequestsAcross`): cada repositorio se lee aparte.
-- **Sin efecto con una sola cuenta por host:** al arrancar, el driver de GitHub mira `gh auth status --json hosts`; si ningún host tiene más de una cuenta, devuelve la instancia original y todo funciona como en el oficial.
-
-| Parte    | Archivos nuevos                                                                                                                                                       |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Servidor | `packages/source-control-github/src/server/GitHubAccountRouting.ts` (elección de cuenta), `GitHubAccountRoutedInstance.ts` (envuelve los métodos del driver) (+ test) |
-
-| Toca (archivos oficiales)                                             | Qué añade                                                                             |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `packages/source-control-github/src/server/GitHubCredentials.ts`      | `routeAccount` y `accountFor`: la cuenta enrutada antes que la elegida en Ajustes     |
-| `packages/source-control-github/src/server/GitHubCredentials.test.ts` | parámetro `routing` en el arnés y tres casos                                          |
-| `packages/source-control-github/src/server/gitHubGraphQlClient.ts`    | `GitHubRequestRepository` en `batchKey`                                               |
-| `packages/source-control-github/src/server/driver.ts`                 | import y `withAccountRouting` sobre la instancia                                      |
-| `apps/server/src/pullRequest/PullRequestService.ts`                   | viewers por repositorio en `listUncached` y su uso en `readSlice`                     |
-| `apps/web/src/components/pullRequest/pullRequestList.logic.ts`        | `pullRequestEntryViewer` mira primero la clave por repositorio (+ un caso en su test) |
-
-Probar: `vp test run packages/source-control-github/src/server/GitHubCredentials.test.ts packages/source-control-github/src/server/GitHubAccountRoutedInstance.test.ts apps/web/src/components/pullRequest/pullRequestList.logic.test.ts`. Probado en dev con los repos reales: antes, `GET /repos/guillermomgv/asti/pulls` devolvía 404 con la cuenta activa; con el cambio devuelve 200 con `GuillermoMGV`, la PR #23 de ASTI sale en «Authored» y las de `Properti-AG/salesforce` siguen saliendo con `Guillermo-Miranda-01`.
-
-Limitaciones: una cuenta añadida con `gh auth login` mientras el servidor corre no activa el enrutado hasta reiniciar (si antes había una sola). Un token guardado en Ajustes, `GH_TOKEN` o la app «T3 Code for GitHub» siguen teniendo prioridad y no se enrutan. Las imágenes de PR sin repositorio conocido y la lista de repos para clonar usan la cuenta por defecto.
-
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
@@ -448,6 +423,32 @@ cd ../..
 
 ```powershell
 vp run dev:desktop --home-dir .t3 --no-seed
+### Una cuenta de GitHub por repositorio
+
+Qué hace: si `gh` tiene **varias cuentas en el mismo host** (por ejemplo `Guillermo-Miranda-01` para Properti y `GuillermoMGV` para ASTI, ver `gh auth status`), cada petición a GitHub usa la cuenta que llega a su repositorio, en vez de la cuenta activa para todo. No hay que configurar nada: basta con haber hecho `gh auth login` con cada cuenta.
+
+- **Cómo elige la cuenta:** si el owner del repositorio se llama como una de las cuentas (repo personal, `GuillermoMGV/ASTI`), usa esa. Si no, prueba cada cuenta, la activa primero, con `gh api repos/<owner>/<repo> --jq .permissions.push` y se queda con la primera que puede hacer push; si ninguna, con la primera que puede leerlo; si ninguna lo ve, con la cuenta por defecto (la activa o la elegida en Ajustes → Source Control). El resultado se guarda una hora (un fallo, un minuto) y la lista de cuentas, 5 minutos.
+- **De dónde sale el repositorio:** del `repository` (`owner/nombre`) de la llamada o, si no viene, de los remotos git del proyecto (`cwd`), con la misma regla que usa el proveedor de GitHub. Viaja a `GitHubCredentials` como la referencia `GitHubRequestRepository`, que también separa los lotes de GraphQL para no mezclar cuentas.
+- **Página de pull requests:** las búsquedas «mías» de cada repositorio usan el login de su cuenta, y el servidor añade a `viewers` una entrada `"<host> <owner/nombre>"` cuando un repositorio va con otra cuenta que la de su host, para que sus PR salgan en «Authored». Con varias cuentas no se usa la búsqueda combinada de varios repositorios (`listChangeRequestsAcross`): cada repositorio se lee aparte.
+- **Sin efecto con una sola cuenta por host:** al arrancar, el driver de GitHub mira `gh auth status --json hosts`; si ningún host tiene más de una cuenta, devuelve la instancia original y todo funciona como en el oficial.
+
+| Parte    | Archivos nuevos                                                                                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Servidor | `packages/source-control-github/src/server/GitHubAccountRouting.ts` (elección de cuenta), `GitHubAccountRoutedInstance.ts` (envuelve los métodos del driver) (+ test) |
+
+| Toca (archivos oficiales)                                             | Qué añade                                                                             |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `packages/source-control-github/src/server/GitHubCredentials.ts`      | `routeAccount` y `accountFor`: la cuenta enrutada antes que la elegida en Ajustes     |
+| `packages/source-control-github/src/server/GitHubCredentials.test.ts` | parámetro `routing` en el arnés y tres casos                                          |
+| `packages/source-control-github/src/server/gitHubGraphQlClient.ts`    | `GitHubRequestRepository` en `batchKey`                                               |
+| `packages/source-control-github/src/server/driver.ts`                 | import y `withAccountRouting` sobre la instancia                                      |
+| `apps/server/src/pullRequest/PullRequestService.ts`                   | viewers por repositorio en `listUncached` y su uso en `readSlice`                     |
+| `apps/web/src/components/pullRequest/pullRequestList.logic.ts`        | `pullRequestEntryViewer` mira primero la clave por repositorio (+ un caso en su test) |
+
+Probar: `vp test run packages/source-control-github/src/server/GitHubCredentials.test.ts packages/source-control-github/src/server/GitHubAccountRoutedInstance.test.ts apps/web/src/components/pullRequest/pullRequestList.logic.test.ts`. Probado en dev con los repos reales: antes, `GET /repos/guillermomgv/asti/pulls` devolvía 404 con la cuenta activa; con el cambio devuelve 200 con `GuillermoMGV`, la PR #23 de ASTI sale en «Authored» y las de `Properti-AG/salesforce` siguen saliendo con `Guillermo-Miranda-01`.
+
+Limitaciones: una cuenta añadida con `gh auth login` mientras el servidor corre no activa el enrutado hasta reiniciar (si antes había una sola). Un token guardado en Ajustes, `GH_TOKEN` o la app «T3 Code for GitHub» siguen teniendo prioridad y no se enrutan. Las imágenes de PR sin repositorio conocido y la lista de repos para clonar usan la cuenta por defecto.
+
 ````
 
 La carpeta ignorada `.t3` mantiene los datos de esta copia separados. No arranques desarrollo contra `~/.t3/userdata`, la instalación real. No establezcas `VITE_HTTP_URL` ni `VITE_WS_URL`: Vite ya hace proxy. No hace falta copiar `.env.example` para el uso local; sus variables habilitan servicios cloud opcionales. No se han configurado proveedores de pago ni credenciales de IA. `Replay (dev)` permite probar turnos locales gratuitos en el modo web.
