@@ -67,6 +67,7 @@ Trucos que ahorran tiempo:
 
 - Los scripts de `docs/personal/` ya activan el entorno; se ejecutan directamente.
 - `build-windows.ps1` y `build-and-install.ps1` exigen el árbol limpio: confirma los cambios antes. Detén el servidor de desarrollo antes de compilar.
+- `build-and-install.ps1` lanza la instalación con `Win32_Process.Create`, fuera de su árbol de procesos: cerrar T3 Code mata las terminales de sus agentes, así que desde un agente de T3 Code el script muere al cerrar la app, pero la instalación sigue y la app se reabre. El progreso queda en `%TEMP%	3code-install-<versión>.log`, cuya última línea es `OK <versión>` o `ERROR …`.
 - Lanza dev y los builds en segundo plano y vigila su salida. Con la salida redirigida, `vp run` oculta la de las tareas hijas: la URL de emparejamiento no aparece y hay que generarla con el comando `pair`.
 - Las comprobaciones de UI se hacen en el navegador: el proveedor `Replay (dev)` hace turnos completos sin coste ni cambios reales en archivos.
 - Para no esperar al typecheck completo, `vp run check:changed` cubre los paquetes afectados por tus cambios.
@@ -81,7 +82,8 @@ Trucos que ahorran tiempo:
 | `docs/personal/setup-local-git.ps1`     | Recrea remotos, bloqueo de push, identidad y credenciales de `GuillermoMGV`. Idempotente.       |
 | `docs/personal/sync-upstream.ps1`       | Actualiza `main` desde el oficial y la integra en `custom`. Se detiene ante cualquier problema. |
 | `docs/personal/build-windows.ps1`       | Compila el instalador Windows y lo verifica como el release oficial. No instala.                |
-| `docs/personal/build-and-install.ps1`   | `build-windows.ps1` + cierra la app, copia los datos e instala. Versión automática.             |
+| `docs/personal/build-and-install.ps1`   | `build-windows.ps1` + `install-windows.ps1`. Versión automática.                                |
+| `docs/personal/install-windows.ps1`     | Cierra la app, copia los datos, instala, comprueba la versión y la reabre (proceso aparte).     |
 | `docs/personal/mock-issue-trackers.mjs` | APIs de Linear y Jira simuladas para probar la integración sin credenciales reales (ver abajo). |
 | `docs/personal/mock-slack.mjs`          | API de Slack simulada para probar «Remind» y las menciones sin tocar Slack real.                |
 | `docs/personal/mock-salesforce-api.mjs` | REST API de Salesforce simulada para probar Salesforce Export sin tocar una org (ver abajo).    |

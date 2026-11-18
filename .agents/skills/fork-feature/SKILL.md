@@ -140,7 +140,11 @@ The pre-commit hook runs format, lint and knip. Browser tests need Playwright's 
 ./docs/personal/build-and-install.ps1   # ~8 min; closes T3 Code, backs up userdata, installs
 ```
 
-Then confirm the installed app is running (`%LOCALAPPDATA%\Programs\t3code`).
+Run it as a background task without `2>&1` (PowerShell 5.1 turns cargo's stderr into a
+terminating error). The install step runs in its own process, so when you run inside T3 Code your
+shell dies with the app while the install carries on and reopens it. Afterwards, read the last line
+of `%TEMP%\t3code-install-<version>.log` (`OK <version>` or `ERROR …`) and confirm the installed app
+is running (`%LOCALAPPDATA%\Programs\t3code`).
 
 ## 9. Report
 
