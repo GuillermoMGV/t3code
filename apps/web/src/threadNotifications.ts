@@ -38,7 +38,10 @@ export function threadNotificationTag(environmentId: EnvironmentId, threadId: Th
 let originalFavicon: HTMLLinkElement | undefined;
 let badgeFavicon: HTMLLinkElement | undefined;
 
-export function setNotificationBadge(count: number) {
+// Fork: the badge shows the bell's unread count (see SidebarIssueNotifications), not thread alerts.
+export function setNotificationBadge(_count: number) {}
+
+export function showNotificationBadge(count: number) {
   const bridge = window.desktopBridge;
   let image: string | null = null;
   if (count > 0 && (!bridge || bridge.getClientPlatform() === "win32")) {

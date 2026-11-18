@@ -8,7 +8,7 @@ import {
   type TrackerNotificationKind,
 } from "@t3tools/contracts";
 import { AtSignIcon, BellIcon, CheckCheckIcon, CircleIcon, CircleCheckIcon } from "lucide-react";
-import { useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import { useOpenLink } from "~/browser/useOpenLink";
 import { useConnectedEnvironmentIds } from "~/state/environments";
@@ -16,6 +16,7 @@ import { issueTrackerNotificationsEnvironment } from "~/state/issueTrackerNotifi
 import { primaryEnvironmentIdAtom } from "~/state/primaryEnvironment";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { showNotificationBadge } from "~/threadNotifications";
 import { formatRelativeTimeLabel } from "~/timestampFormat";
 import { IssueTrackerIcon } from "../chat/IssueTrackerParts";
 import { Badge } from "../ui/badge";
@@ -57,14 +58,38 @@ function NotificationSourceIcon({
   return <IssueTrackerIcon tracker={source} className={className} />;
 }
 
-/** The bell in the sidebar footer; hidden until Linear, Jira or Slack is connected. */
-export function SidebarIssueNotificationsItem() {
+function useNotificationsEnvironmentId(): EnvironmentId | null {
   const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
   const connectedEnvironmentIds = useConnectedEnvironmentIds();
   // The trackers' credentials live on one server; without a local one, the first connected answers.
-  const environmentId = primaryEnvironmentId ?? connectedEnvironmentIds[0] ?? null;
+  return primaryEnvironmentId ?? connectedEnvironmentIds[0] ?? null;
+}
+
+/** The bell in the sidebar footer; hidden until Linear, Jira or Slack is connected. */
+export function SidebarIssueNotificationsItem() {
+  const environmentId = useNotificationsEnvironmentId();
   if (environmentId === null) return null;
   return <NotificationsBell key={environmentId} environmentId={environmentId} />;
+}
+
+/** Shows the bell's unread count on the taskbar icon (desktop) or favicon (web) on every page. */
+export function IssueNotificationsBadgeCoordinator() {
+  const environmentId = useNotificationsEnvironmentId();
+  if (environmentId === null) return null;
+  return <NotificationsBadge key={environmentId} environmentId={environmentId} />;
+}
+
+function NotificationsBadge({ environmentId }: { environmentId: EnvironmentId }) {
+  const { data } = useEnvironmentQuery(
+    issueTrackerNotificationsEnvironment.list({ environmentId, input: {} }),
+  );
+  const count = data !== null && data.connected.length > 0 ? data.unreadCount : 0;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- mirrors the count onto the OS taskbar icon and the favicon
+  useEffect(() => {
+    showNotificationBadge(count);
+    return () => showNotificationBadge(0);
+  }, [count]);
+  return null;
 }
 
 function NotificationsBell({ environmentId }: { environmentId: EnvironmentId }) {

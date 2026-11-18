@@ -194,6 +194,7 @@ Qué hace: con Linear, Jira o Slack conectado, aparece una **campana** en el pie
 - **Límites de Jira:** solo se ven los últimos 3 días. No se detectan menciones en tickets que no te asignaron, no creaste ni sigues (Jira no permite buscarlas). No aparecen otros tipos de aviso de la campana real (reacciones, aprobaciones, avisos de Confluence...). Un ticket con muchísimos cambios puede llegar con el historial recortado. La primera comprobación da por leído todo lo que tenga más de 24 h, para no llenar el globo.
 - **Datos guardados:** `userdata/issue-tracker-notifications.json` contiene solo la hora de la última comprobación y, para Jira y Slack, el sitio o la cuenta (`<workspace>:<miembro>`) y los ids leídos (se podan al salir de su ventana). Las notificaciones no se guardan: tras reiniciar se vuelven a pedir. Las credenciales son las de «Tickets de Linear y Jira» y la de Slack de «Remind», y no se registran nunca.
 - **Superficies:** web y escritorio. Móvil no tiene campana (no tiene la barra lateral de escritorio). Con varios servidores, la campana usa el servidor principal o, sin él, el primero conectado.
+- **Número en el icono de la app:** las sin leer de la campana aparecen también fuera de la app, en cualquier página: un círculo rojo con el número sobre el icono de la barra de tareas en Windows, el globo del Dock en macOS y el favicon en la web. Se actualiza con la misma lectura de cada minuto, no se borra al enfocar la ventana (solo al marcarlas como leídas) y desaparece al cerrar la app. Sustituye al número de upstream, que contaba avisos de escritorio de hilos y se borraba al enfocar: los avisos de hilos siguen saliendo, pero ya no tocan el número.
 
 | Parte     | Archivos nuevos                                                                                                                                                                                                                                     |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -213,6 +214,9 @@ Qué hace: con Linear, Jira o Slack conectado, aparece una **campana** en el pie
 | `apps/server/src/issueTrackers/linearApi.ts`          | devuelve también `graphql`                                                              |
 | `apps/server/src/issueTrackers/jiraApi.ts`            | devuelve también `request` y `readJson`                                                 |
 | `apps/web/src/components/sidebar/SidebarChrome.tsx`   | import y `<SidebarIssueNotificationsItem />` tras el botón de Uso                       |
+| `apps/web/src/routes/__root.tsx`                      | import y `<IssueNotificationsBadgeCoordinator />` en `appHosts`                         |
+| `apps/web/src/threadNotifications.ts`                 | `setNotificationBadge` (hilos) queda vacío; el dibujo pasa a `showNotificationBadge`    |
+| `apps/desktop/src/ipc/methods/notificationBadge.ts`   | ya no borra el número al enfocar una ventana (+ test ajustado)                          |
 
 También cambia archivos del fork: `slackApi.ts` añade `identity` y `searchMentions`, `SlackService.ts` usa `slackDisplayName`, y `SlackSettingsSection.tsx` pide el scope `search:read`.
 
