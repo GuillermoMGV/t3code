@@ -21,6 +21,7 @@ import {
   SettingsIcon,
 } from "lucide-react";
 import { useContext, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
 
 import { useOpenLink } from "~/browser/useOpenLink";
 import { isElectron } from "~/env";
@@ -59,6 +60,7 @@ import {
 } from "../ui/combobox";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
+import { RefreshIcon } from "../ui/refresh-icon";
 import {
   Menu,
   MenuCheckboxItem,
@@ -104,6 +106,8 @@ const PASTE_EXAMPLES: Readonly<Record<IssueTrackerKind, string>> = {
 export function IssuesPage() {
   // Credentials live on the server; the primary one is the one Settings configures.
   const environmentId = usePrimaryEnvironmentId();
+  // The list owns the queries, so it portals its refresh button into the header.
+  const [headerActions, setHeaderActions] = useState<HTMLDivElement | null>(null);
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
       <WorkspacePageHeader electron={isElectron} className="bg-background">
@@ -112,13 +116,14 @@ export function IssuesPage() {
             <h1 className="truncate">Issues</h1>
           </WorkspaceBreadcrumbItem>
         </WorkspaceBreadcrumb>
+        <div ref={setHeaderActions} className="ms-auto flex items-center" />
       </WorkspacePageHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <WorkspacePageContainer width="wide" className="gap-3">
           {environmentId === null ? (
             <IssuesUnavailable description="Connect to a T3 Code server to see its issues." />
           ) : (
-            <IssueTrackerTabs environmentId={environmentId} />
+            <IssueTrackerTabs environmentId={environmentId} headerActions={headerActions} />
           )}
         </WorkspacePageContainer>
       </div>
@@ -126,7 +131,13 @@ export function IssuesPage() {
   );
 }
 
-function IssueTrackerTabs({ environmentId }: { environmentId: EnvironmentId }) {
+function IssueTrackerTabs({
+  environmentId,
+  headerActions,
+}: {
+  environmentId: EnvironmentId;
+  headerActions: HTMLElement | null;
+}) {
   const search = useSearch({ from: "/_chat/issues" });
   const navigate = useNavigate({ from: "/issues" });
   const connections = useEnvironmentQuery(
@@ -172,6 +183,7 @@ function IssueTrackerTabs({ environmentId }: { environmentId: EnvironmentId }) {
         key={tracker}
         environmentId={environmentId}
         tracker={tracker}
+        headerActions={headerActions}
         me={connected.find((connection) => connection.tracker === tracker)?.account ?? null}
       />
     </>
@@ -207,10 +219,12 @@ function useThreadsByIssue() {
 function IssueList({
   environmentId,
   tracker,
+  headerActions,
   me,
 }: {
   environmentId: EnvironmentId;
   tracker: IssueTrackerKind;
+  headerActions: HTMLElement | null;
   /** The connected account's name, which is how the tracker names the user as an assignee. */
   me: string | null;
 }) {
@@ -227,17 +241,39 @@ function IssueList({
     issues: found,
     searching,
     error,
+    refresh,
   } = useIssueSearch(environmentId, tracker, draft, "recent", filter);
-  const options = useEnvironmentQuery(
+  const optionsQuery = useEnvironmentQuery(
     issueTrackerEnvironment.filterOptions({ environmentId, input: { tracker } }),
-  ).data;
-  const pullRequestsByKey = useIssuePullRequests();
+  );
+  const options = optionsQuery.data;
+  const pullRequests = useIssuePullRequests();
+  const pullRequestsByKey = pullRequests.byKey;
+  const refreshing = searching || pullRequests.refreshing;
   const issues = filterIssues(found, filter, me);
   const threadsByIssueKey = useThreadsByIssue();
   const projectChoices = useProjectChoices();
   const startThread = useStartIssueThread();
   return (
     <>
+      {headerActions === null
+        ? null
+        : createPortal(
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Refresh issues"
+              disabled={refreshing}
+              onClick={() => {
+                refresh();
+                optionsQuery.refresh();
+                void pullRequests.refresh();
+              }}
+            >
+              <RefreshIcon size="md" refreshing={refreshing} />
+            </Button>,
+            headerActions,
+          )}
       <div className="flex items-center gap-2">
         <InputGroup className="min-w-0 flex-1">
           <InputGroupAddon>

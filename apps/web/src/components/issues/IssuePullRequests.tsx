@@ -1,8 +1,10 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { cn } from "~/lib/utils";
-import { usePullRequestHostList } from "~/state/pullRequests";
+import { pullRequestEnvironment, usePullRequestHostList } from "~/state/pullRequests";
+import { useAtomCommand } from "~/state/use-atom-command";
 import { pullRequestIssueKey } from "../pullRequest/pullRequestIssue.logic";
 import type { EnvironmentPullRequestEntry } from "../pullRequest/pullRequestList.logic";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
@@ -26,18 +28,29 @@ const LIST_LIMIT = 99;
  * One list read per server, the same read the Pull requests page makes for every state, so the
  * Issues page asks the hosts once rather than once per issue.
  */
-export function useIssuePullRequests(): ReadonlyMap<
-  string,
-  ReadonlyArray<EnvironmentPullRequestEntry>
-> {
+export function useIssuePullRequests() {
   const { environmentQueries } = usePullRequestScope(LIST_SCOPE, NO_HOST_READS);
+  const invalidate = useAtomCommand(pullRequestEnvironment.invalidate, { reportFailure: false });
+  const [invalidating, setInvalidating] = useState(false);
   const list = usePullRequestHostList(
     environmentQueries.map(({ environmentId, projectIds }) => ({
       environmentId,
       input: { ...LIST_SCOPE, limit: LIST_LIMIT, ...(projectIds ? { projectIds } : {}) },
     })),
   );
-  return pullRequestsByIssueKey(list.data?.entries ?? [], pullRequestIssueKey);
+  return {
+    byKey: pullRequestsByIssueKey(list.data?.entries ?? [], pullRequestIssueKey),
+    refreshing: invalidating || list.isPending,
+    /** Drops the servers' cached host reads first, as the Pull requests page's refresh does. */
+    refresh: async () => {
+      setInvalidating(true);
+      await Promise.all(
+        environmentQueries.map(({ environmentId }) => invalidate({ environmentId, input: {} })),
+      );
+      setInvalidating(false);
+      list.refresh();
+    },
+  };
 }
 
 /** One quiet line: state, number, checks and review of each pull request naming the issue. */

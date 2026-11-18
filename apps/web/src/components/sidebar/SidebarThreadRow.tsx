@@ -1171,7 +1171,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const metaLineEmpty =
     !checkoutThread.branch &&
     !showsScratchMachine &&
-    issueSummary === null &&
     prBadge === null &&
     diff === null &&
     runningTerminalIds.length === 0;
@@ -1196,7 +1195,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       ) : (
         <span className="flex-1" />
       )}
-      {issueSummary ? <SidebarThreadIssueBadges issue={issueSummary} /> : null}
       {terminalStatusIcon}
       {prBadge}
       {diff ? (
@@ -1217,6 +1215,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       </span>
     </div>
   );
+  const issueLine = issueSummary ? (
+    <div className="mt-0.5 flex min-w-0 items-center text-xs">
+      <SidebarThreadIssueBadges issue={issueSummary} />
+    </div>
+  ) : null;
   const titleLineIcons = metaLineEmpty ? (
     <span aria-hidden className="inline-flex shrink-0 items-center gap-1">
       {remoteMachineIcon}
@@ -1238,6 +1241,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         className={cn(
           "list-none [content-visibility:auto] [contain-intrinsic-size:auto_--spacing(9)]",
           metaLine !== null && multiline && "[contain-intrinsic-size:auto_--spacing(13.5)]",
+          issueLine !== null && multiline && "[contain-intrinsic-size:auto_--spacing(18)]",
           sortable?.isDragging && "relative z-20",
         )}
       >
@@ -1412,6 +1416,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {props.sweepAction !== null ? dragDestination : null}
             </div>
             {multiline ? metaLine : null}
+            {multiline ? issueLine : null}
           </TooltipTrigger>
           {detailsTooltip}
         </Tooltip>
@@ -1429,6 +1434,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       className={cn(
         "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_78px]",
         metaLineEmpty && "[contain-intrinsic-size:auto_60px]",
+        issueLine !== null &&
+          (metaLineEmpty
+            ? "[contain-intrinsic-size:auto_78px]"
+            : "[contain-intrinsic-size:auto_96px]"),
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1456,7 +1465,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           <div
             className={cn(
               "relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)",
-              metaLineEmpty && "h-auto",
+              (metaLineEmpty || issueLine !== null) && "h-auto",
             )}
           >
             <div className="flex h-5 min-w-0 items-center gap-1.5">
@@ -1620,6 +1629,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {titleLineIcons}
             </div>
             {metaLine}
+            {issueLine}
           </div>
         </TooltipTrigger>
         {detailsTooltip}

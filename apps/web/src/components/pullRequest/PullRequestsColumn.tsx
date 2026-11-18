@@ -222,9 +222,9 @@ export function PullRequestsColumn({
                 topbarSearchFocusedRef.current = focused;
               }}
             />
-            <PullRequestRefreshControl compact refreshing={refreshing} onRefresh={onRefresh} />
           </div>
         ) : null}
+        <PullRequestRefreshControl compact refreshing={refreshing} onRefresh={onRefresh} />
         {rightPanelControl}
       </WorkspacePageHeader>
 
@@ -250,9 +250,6 @@ export function PullRequestsColumn({
                 options={hostMenuOptions}
                 onChange={(next) => onHost(next === "" ? undefined : next)}
               />
-              {!condensed ? (
-                <PullRequestRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-              ) : null}
             </div>
             <div ref={markerRef} aria-hidden className="-mt-3 h-px w-full" />
           </div>
