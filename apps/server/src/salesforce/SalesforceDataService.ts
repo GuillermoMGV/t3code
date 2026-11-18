@@ -32,6 +32,7 @@ const OrgDisplay = Schema.Struct({
   apiVersion: Schema.optional(Schema.NullOr(Schema.String)),
 });
 const decodeOrgDisplay = Schema.decodeUnknownOption(OrgDisplay);
+const decodeAccessToken = Schema.decodeUnknownOption(Schema.Struct({ accessToken: Schema.String }));
 
 /** The session fields of `sf org display --json`'s result, or null when any is missing. */
 function parseOrgDisplay(result: unknown): SalesforceSession | null {
@@ -176,12 +177,30 @@ const make = Effect.gen(function* () {
         detail: describeSfFailure(json, `Could not get a session for ${target}.`),
       });
     }
-    const session = parseOrgDisplay(json.result);
+    let session = parseOrgDisplay(json.result);
     if (session === null) {
       return yield* new SalesforceError({
         reason: "command",
         detail: `${target} has no active session. Re-authenticate the org.`,
       });
+    }
+    // Newer CLIs replace the token in `org display` with a "[REDACTED] ..." hint.
+    if (/^\[|\s/.test(session.accessToken)) {
+      const tokenJson = yield* sf.run(cwd, [
+        "org",
+        "auth",
+        "show-access-token",
+        "--target-org",
+        target,
+      ]);
+      const token = Option.getOrNull(decodeAccessToken(tokenJson?.result))?.accessToken;
+      if (tokenJson?.status !== 0 || token === undefined || /^\[|\s/.test(token)) {
+        return yield* new SalesforceError({
+          reason: "command",
+          detail: describeSfFailure(tokenJson, `Could not read the access token for ${target}.`),
+        });
+      }
+      session = { ...session, accessToken: token };
     }
     sessions.set(target, session);
     return session;

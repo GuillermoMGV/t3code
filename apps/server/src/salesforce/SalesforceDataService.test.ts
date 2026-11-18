@@ -9,18 +9,32 @@ import * as SalesforceDataService from "./SalesforceDataService.ts";
 const INSTANCE = "https://acme--qa.sandbox.my.salesforce.com";
 
 /** Runs the service against fake `sf` and HTTP; `respond` answers each request in order. */
-function harness(respond: (request: { method: string; url: URL; token: string }) => Response) {
+function harness(
+  respond: (request: { method: string; url: URL; token: string }) => Response,
+  { hiddenSecrets = false } = {},
+) {
   const tokens = ["token-1", "token-2"];
   let displays = 0;
   const requests: Array<{ method: string; url: URL; token: string }> = [];
   const runner = Layer.mock(ProcessRunner.ProcessRunner)({
     run: (input) => {
-      assert.deepStrictEqual(input.args.slice(0, 4), ["org", "display", "--target-org", "qa"]);
-      const accessToken = tokens[Math.min(displays++, tokens.length - 1)];
+      const showToken = input.args[1] === "auth";
+      assert.deepStrictEqual(
+        input.args.slice(0, -3),
+        showToken ? ["org", "auth", "show-access-token"] : ["org", "display"],
+      );
+      assert.deepStrictEqual(input.args.slice(-3), ["--target-org", "qa", "--json"]);
+      // Newer CLIs hide the token in `org display` and only show it through `org auth`.
+      const accessToken =
+        hiddenSecrets && !showToken
+          ? "[REDACTED] Use 'sf org auth show-access-token' to view"
+          : tokens[Math.min(displays++, tokens.length - 1)];
       return Effect.succeed({
         stdout: JSON.stringify({
           status: 0,
-          result: { accessToken, instanceUrl: INSTANCE, apiVersion: "61.0", clientId: "x" },
+          result: showToken
+            ? { accessToken }
+            : { accessToken, instanceUrl: INSTANCE, apiVersion: "61.0", clientId: "x" },
         }),
         stderr: "",
         code: 0,
@@ -75,6 +89,22 @@ describe("SalesforceDataService", () => {
       assert.strictEqual(requests[0]?.token, "Bearer token-1");
       assert.include(JSON.stringify(result), "/services/data/v61.0/query/01gXX-2000");
       assert.notInclude(JSON.stringify(result), "token-1");
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("reads the token through org auth when org display hides it", () => {
+    const { layer, requests } = harness(
+      () => Response.json({ totalSize: 0, done: true, records: [] }),
+      { hiddenSecrets: true },
+    );
+    return Effect.gen(function* () {
+      const service = yield* SalesforceDataService.SalesforceDataService;
+      yield* service.run({
+        type: "queryMore",
+        ...target,
+        nextRecordsUrl: "/services/data/v61.0/query/01gXX-2000",
+      });
+      assert.strictEqual(requests[0]?.token, "Bearer token-1");
     }).pipe(Effect.provide(layer));
   });
 
