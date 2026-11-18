@@ -25,7 +25,12 @@ import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { ReplyCardAction, ReplyCardFrame } from "./ReplyCardParts";
 import { collectThreadIssueReferences } from "./issueTrackerRows.logic";
-import { IssueAssigneeBadge, IssueStateBadge, IssueTrackerIcon } from "./IssueTrackerParts";
+import {
+  IssueAssigneeBadge,
+  IssueDueDate,
+  IssueStateBadge,
+  IssueTrackerIcon,
+} from "./IssueTrackerParts";
 import {
   detectReplyCardRefs,
   replyCardId,
@@ -225,9 +230,7 @@ function ReplyIssueCard({ issue, threadRef }: { issue: TrackerIssue; threadRef: 
         <>
           <IssueStateBadge state={issue.state} className="min-w-0" />
           <IssueAssigneeBadge assignee={issue.assignee} className="min-w-0" />
-          {issue.priorityLabel === null ? null : (
-            <span className="shrink-0">{issue.priorityLabel}</span>
-          )}
+          <IssueDueDate issue={issue} />
         </>
       }
       actions={

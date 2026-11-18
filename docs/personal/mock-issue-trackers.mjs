@@ -6,12 +6,19 @@ import * as NodeHttp from "node:http";
 const LINEAR_PORT = Number(process.env.MOCK_LINEAR_PORT ?? 4567);
 const JIRA_PORT = Number(process.env.MOCK_JIRA_PORT ?? 4568);
 
+/** `YYYY-MM-DD` `days` from today, so the due-date badges show every urgency. */
+const dueIn = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
 const linearIssues = [
   {
     identifier: "PRO-1234",
     title: "Login fails with SSO for invited users",
     url: "https://linear.app/acme/issue/PRO-1234/login-fails-with-sso",
-    priorityLabel: "High",
+    dueDate: dueIn(1),
     updatedAt: "2026-11-17T09:00:00.000Z",
     state: { name: "In Progress", color: "#f2c94c", type: "started" },
     assignee: { name: "Guillermo Miranda", avatarUrl: null },
@@ -21,7 +28,7 @@ const linearIssues = [
     identifier: "PRO-1240",
     title: "Export threads as Markdown",
     url: "https://linear.app/acme/issue/PRO-1240/export-threads",
-    priorityLabel: "Medium",
+    dueDate: dueIn(12),
     updatedAt: "2026-11-16T09:00:00.000Z",
     state: { name: "Todo", color: "#e2e2e2", type: "unstarted" },
     assignee: null,
@@ -31,7 +38,7 @@ const linearIssues = [
     identifier: "ENG-77",
     title: "Speed up sidebar rendering",
     url: "https://linear.app/acme/issue/ENG-77/speed-up-sidebar",
-    priorityLabel: "Low",
+    dueDate: null,
     updatedAt: "2026-11-15T09:00:00.000Z",
     state: { name: "In Review", color: "#0f783c", type: "started" },
     assignee: { name: "Ada Lovelace", avatarUrl: null },
@@ -50,7 +57,7 @@ const jiraIssues = [
         statusCategory: { key: "indeterminate", colorName: "yellow" },
       },
       assignee: { displayName: "Guillermo Miranda", avatarUrls: {} },
-      priority: { name: "High" },
+      duedate: dueIn(-2),
       project: { key: "OPS", name: "Operations" },
     },
   },
@@ -61,7 +68,7 @@ const jiraIssues = [
       updated: "2026-11-16T08:00:00.000+0000",
       status: { name: "To Do", statusCategory: { key: "new", colorName: "blue-gray" } },
       assignee: null,
-      priority: { name: "Medium" },
+      duedate: dueIn(5),
       project: { key: "OPS", name: "Operations" },
     },
   },
@@ -72,7 +79,7 @@ const jiraIssues = [
       updated: "2026-11-15T08:00:00.000+0000",
       status: { name: "Done", statusCategory: { key: "done", colorName: "green" } },
       assignee: { displayName: "Ada Lovelace", avatarUrls: {} },
-      priority: { name: "Low" },
+      duedate: dueIn(-10),
       project: { key: "SUP", name: "Support" },
     },
   },

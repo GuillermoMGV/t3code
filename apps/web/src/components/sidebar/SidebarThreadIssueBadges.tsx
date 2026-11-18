@@ -1,8 +1,10 @@
 import { ISSUE_TRACKER_LABELS, type ScopedThreadRef, type TrackerIssue } from "@t3tools/contracts";
-import { UserRoundIcon } from "lucide-react";
+import { CalendarIcon, UserRoundIcon } from "lucide-react";
 
+import { useNowMinute } from "~/hooks/useNowMinute";
 import { issueTrackerEnvironment } from "~/state/issueTrackers";
 import { useEnvironmentQuery } from "~/state/query";
+import { issueDueDateView } from "../chat/issueDueDate.logic";
 import { assigneeInitials } from "../chat/issueTrackerRows.logic";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -67,18 +69,33 @@ export function IssueAssigneeChip({ assignee }: { assignee: TrackerIssue["assign
   );
 }
 
+/** The due date as a small badge, red when it is close or past; nothing when there is none. */
+export function IssueDueDateChip({ issue }: { issue: Pick<TrackerIssue, "dueDate" | "state"> }) {
+  const view = issueDueDateView(issue, new Date(`${useNowMinute()}:00Z`));
+  if (view === null) return null;
+  return (
+    <Badge variant={view.urgent ? "error" : "outline"} size="sm" className="shrink-0">
+      <CalendarIcon aria-hidden />
+      {view.label}
+    </Badge>
+  );
+}
+
 export function SidebarThreadIssueBadges({ issue }: { issue: TrackerIssue }) {
   const label = ISSUE_TRACKER_LABELS[issue.tracker];
+  const due = issueDueDateView(issue, new Date(`${useNowMinute()}:00Z`));
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex min-w-0 shrink items-center gap-1" />}>
         {issue.state ? <IssueStateChip state={issue.state} /> : null}
         <IssueAssigneeChip assignee={issue.assignee} />
+        <IssueDueDateChip issue={issue} />
       </TooltipTrigger>
       <TooltipPopup side="top" className="max-w-72">
         {`${label} ${issue.key}: ${issue.title}`}
         <br />
         {`${issue.state?.name ?? "No state"} · ${issue.assignee?.name ?? "Unassigned"}`}
+        {due === null ? null : ` · Due ${due.date}`}
       </TooltipPopup>
     </Tooltip>
   );

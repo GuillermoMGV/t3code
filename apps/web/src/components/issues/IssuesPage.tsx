@@ -36,7 +36,12 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { buildThreadRouteParams } from "~/threadRoutes";
 import { formatRelativeTimeLabel } from "~/timestampFormat";
 import { IssueFieldPicker, useShownIssue } from "../chat/IssueFieldPicker";
-import { IssueAssigneeBadge, IssueStateBadge, IssueTrackerIcon } from "../chat/IssueTrackerParts";
+import {
+  IssueAssigneeBadge,
+  IssueDueDate,
+  IssueStateBadge,
+  IssueTrackerIcon,
+} from "../chat/IssueTrackerParts";
 import { useIssueSearch } from "../chat/useIssueSearch";
 import { useSortedProjectGroups } from "../CommandPaletteLookups";
 import { ProjectFavicon } from "../ProjectFavicon";
@@ -407,7 +412,7 @@ function IssueRow({
             <IssueAssigneeBadge assignee={issue.assignee} />
           </IssueFieldPicker>
           {issue.project ? <IssueProject project={issue.project} /> : null}
-          {issue.priorityLabel ? <span className="shrink-0">{issue.priorityLabel}</span> : null}
+          <IssueDueDate issue={issue} />
           <span className="shrink-0">Updated {formatRelativeTimeLabel(issue.updatedAt)}</span>
         </div>
         {pullRequests.length > 0 ? <IssuePullRequestsLine entries={pullRequests} /> : null}

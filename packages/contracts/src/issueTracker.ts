@@ -50,7 +50,8 @@ export const TrackerIssue = Schema.Struct({
   url: Schema.String,
   state: Schema.NullOr(TrackerIssueState),
   assignee: Schema.NullOr(TrackerIssueAssignee),
-  priorityLabel: Schema.NullOr(Schema.String),
+  /** Calendar day (`YYYY-MM-DD`). Optional: issues cached before it existed lack it. */
+  dueDate: Schema.optional(Schema.NullOr(Schema.String)),
   updatedAt: Schema.String,
   /** The Linear or Jira project. Optional: issues cached or stored before it existed lack it. */
   project: Schema.optional(Schema.NullOr(TrackerIssueProject)),

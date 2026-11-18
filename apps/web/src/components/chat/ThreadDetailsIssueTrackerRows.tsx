@@ -32,7 +32,12 @@ import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { IssueFieldPicker, useShownIssue } from "./IssueFieldPicker";
 import { IssueTrackerLinkDialog } from "./IssueTrackerLinkDialog";
-import { IssueAssigneeBadge, IssueStateBadge, IssueTrackerIcon } from "./IssueTrackerParts";
+import {
+  IssueAssigneeBadge,
+  IssueDueDate,
+  IssueStateBadge,
+  IssueTrackerIcon,
+} from "./IssueTrackerParts";
 import {
   collectThreadIssueReferences,
   resolveIssueTrackerPanelView,
@@ -343,6 +348,7 @@ function IssueFields({
       >
         <IssueAssigneeBadge assignee={issue.assignee} />
       </IssueFieldPicker>
+      <IssueDueDate issue={issue} className="h-5 text-foreground/80" />
     </div>
   );
 }

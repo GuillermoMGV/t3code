@@ -15,7 +15,7 @@ const issue = (state: string | null, assignee: string | null): TrackerIssue => (
   url: "https://linear.app/x/issue/PRO-1",
   state: state === null ? null : { name: state, color: "#000", category: "started" },
   assignee: assignee === null ? null : { name: assignee, avatarUrl: null },
-  priorityLabel: null,
+  dueDate: null,
   updatedAt: "2026-11-17T00:00:00.000Z",
 });
 

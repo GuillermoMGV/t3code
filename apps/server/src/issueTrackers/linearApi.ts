@@ -14,7 +14,7 @@ const RECENT_ISSUES_LIMIT = 50;
 const SEARCH_LIMIT = 25;
 
 // IssueSearchResult is not an Issue, so the selection is spelled out instead of a fragment.
-const ISSUE_FIELDS = `identifier title url priorityLabel updatedAt
+const ISSUE_FIELDS = `identifier title url dueDate updatedAt
   state { name color type }
   assignee { name avatarUrl }
   project { name url }`;
@@ -23,7 +23,7 @@ const LinearIssueNode = Schema.Struct({
   identifier: Schema.String,
   title: Schema.String,
   url: Schema.String,
-  priorityLabel: Schema.optional(Schema.NullOr(Schema.String)),
+  dueDate: Schema.optional(Schema.NullOr(Schema.String)),
   updatedAt: Schema.String,
   state: Schema.optional(
     Schema.NullOr(
@@ -170,7 +170,7 @@ function toTrackerIssue(node: LinearIssueNode): TrackerIssue | null {
     assignee: node.assignee
       ? { name: node.assignee.name, avatarUrl: node.assignee.avatarUrl ?? null }
       : null,
-    priorityLabel: node.priorityLabel ?? null,
+    dueDate: node.dueDate ?? null,
     updatedAt: node.updatedAt,
     project: node.project ? { name: node.project.name, url: node.project.url ?? null } : null,
   };

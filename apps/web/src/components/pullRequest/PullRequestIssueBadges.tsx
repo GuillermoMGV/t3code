@@ -18,7 +18,11 @@ import {
 import { useOpenLink } from "~/browser/useOpenLink";
 import { issueTrackerEnvironment } from "~/state/issueTrackers";
 import { IssueFieldPicker, useShownIssue } from "../chat/IssueFieldPicker";
-import { IssueAssigneeChip, IssueStateChip } from "../sidebar/SidebarThreadIssueBadges";
+import {
+  IssueAssigneeChip,
+  IssueDueDateChip,
+  IssueStateChip,
+} from "../sidebar/SidebarThreadIssueBadges";
 import { Badge } from "../ui/badge";
 import { MiddleTruncate } from "../ui/middle-truncate";
 import { toastManager } from "../ui/toast";
@@ -99,7 +103,7 @@ export function usePullRequestIssue(entry: IssueEntry): TrackerIssue | undefined
 }
 
 /**
- * The linked issue's key, state and assignee. A click on the key opens the issue; the state and
+ * The linked issue's key, state, assignee and due date. A click on the key opens the issue; the state and
  * assignee open pickers that change them in the tracker. None of them opens the row.
  */
 export function PullRequestIssueBadges({ entry }: { entry: IssueEntry }) {
@@ -160,6 +164,7 @@ function IssueBadges({
       <IssueFieldPicker environmentId={environmentId} issue={issue} field="assignee" nested>
         <IssueAssigneeChip assignee={issue.assignee} />
       </IssueFieldPicker>
+      <IssueDueDateChip issue={issue} />
     </span>
   );
 }

@@ -1,7 +1,10 @@
 import type { IssueTrackerKind, TrackerIssue } from "@t3tools/contracts";
-import { SquareKanbanIcon, TicketIcon, UserRoundIcon } from "lucide-react";
+import { CalendarIcon, SquareKanbanIcon, TicketIcon, UserRoundIcon } from "lucide-react";
 
+import { useNowMinute } from "~/hooks/useNowMinute";
 import { cn } from "~/lib/utils";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { issueDueDateView } from "./issueDueDate.logic";
 import { assigneeInitials } from "./issueTrackerRows.logic";
 
 const TRACKER_ICONS = { linear: TicketIcon, jira: SquareKanbanIcon } as const;
@@ -69,5 +72,36 @@ export function IssueAssigneeBadge({
       )}
       <span className="truncate">{assignee === null ? "Unassigned" : assignee.name}</span>
     </span>
+  );
+}
+
+/** The tracker's due date, in red when it is close or past; nothing when the issue has none. */
+export function IssueDueDate({
+  issue,
+  className,
+}: {
+  issue: Pick<TrackerIssue, "dueDate" | "state">;
+  className?: string;
+}) {
+  const view = issueDueDateView(issue, new Date(`${useNowMinute()}:00Z`));
+  if (view === null) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1",
+              className,
+              view.urgent && "font-medium text-destructive",
+            )}
+          />
+        }
+      >
+        <CalendarIcon aria-hidden className="size-3 shrink-0" />
+        {view.label}
+      </TooltipTrigger>
+      <TooltipPopup side="top">{`Due ${view.date}`}</TooltipPopup>
+    </Tooltip>
   );
 }

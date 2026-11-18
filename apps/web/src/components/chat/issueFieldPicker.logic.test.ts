@@ -10,7 +10,7 @@ const issue = (updatedAt: string, state: string): TrackerIssue => ({
   url: "https://acme.atlassian.net/browse/OPS-1",
   state: { name: state, color: "#8590a2", category: "new" },
   assignee: null,
-  priorityLabel: null,
+  dueDate: null,
   updatedAt,
 });
 

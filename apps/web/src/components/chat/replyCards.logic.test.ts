@@ -22,7 +22,7 @@ const trackerIssue = (value: string): TrackerIssue => ({
   url: `https://linear.app/acme/issue/${value}`,
   state: null,
   assignee: null,
-  priorityLabel: null,
+  dueDate: null,
   updatedAt: "2026-11-17T00:00:00.000Z",
 });
 const ALL = { issues: true, pullRequests: true };
