@@ -397,32 +397,6 @@ Qué hace: el icono del calendario con reloj en la parte inferior de la barra la
 | --------------------------------------------------- | ------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarChrome.tsx` | icono `CalendarClockIcon` y el botón «Scheduled tasks» |
 
-## Entorno y arranque
-
-Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
-
-```powershell
-cd 'C:\Users\Guille\Documents\Other Projects\t3code'
-. ./docs/personal/custom-env.ps1
-node --version
-pnpm --version
-vp i --frozen-lockfile
-vp run dev --home-dir .t3 --no-seed
-```
-
-`custom-env.ps1` activa Vite+ y resuelve Node y pnpm desde el manifiesto oficial; no cambia el Node global ni el perfil de PowerShell. En la preparación inicial: Vite+ 1.4.0, Node 26.13.1 y pnpm 12.14.0. Es necesario tener Vite+ instalado según [el runbook oficial](docs/operations/development.md).
-
-Abre la URL de emparejamiento que imprime el runner. Incluye una credencial: no la publiques. Los puertos efectivos aparecen en `[dev-runner]`. Si no ves la URL (por ejemplo, con la salida redirigida a un archivo, `vp run` no muestra la salida de las tareas), genera otra contra el servidor en marcha desde otra terminal:
-
-````powershell
-. ./docs/personal/custom-env.ps1
-cd apps/server
-node src/bin.ts pair --base-dir ../../.t3 --ttl 1h
-cd ../..
-``` Para Electron:
-
-```powershell
-vp run dev:desktop --home-dir .t3 --no-seed
 ### Una cuenta de GitHub por repositorio
 
 Qué hace: si `gh` tiene **varias cuentas en el mismo host** (por ejemplo `Guillermo-Miranda-01` para Properti y `GuillermoMGV` para ASTI, ver `gh auth status`), cada petición a GitHub usa la cuenta que llega a su repositorio, en vez de la cuenta activa para todo. No hay que configurar nada: basta con haber hecho `gh auth login` con cada cuenta.
@@ -449,6 +423,32 @@ Probar: `vp test run packages/source-control-github/src/server/GitHubCredentials
 
 Limitaciones: una cuenta añadida con `gh auth login` mientras el servidor corre no activa el enrutado hasta reiniciar (si antes había una sola). Un token guardado en Ajustes, `GH_TOKEN` o la app «T3 Code for GitHub» siguen teniendo prioridad y no se enrutan. Las imágenes de PR sin repositorio conocido y la lista de repos para clonar usan la cuenta por defecto.
 
+## Entorno y arranque
+
+Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
+
+```powershell
+cd 'C:\Users\Guille\Documents\Other Projects\t3code'
+. ./docs/personal/custom-env.ps1
+node --version
+pnpm --version
+vp i --frozen-lockfile
+vp run dev --home-dir .t3 --no-seed
+```
+
+`custom-env.ps1` activa Vite+ y resuelve Node y pnpm desde el manifiesto oficial; no cambia el Node global ni el perfil de PowerShell. En la preparación inicial: Vite+ 1.4.0, Node 26.13.1 y pnpm 12.14.0. Es necesario tener Vite+ instalado según [el runbook oficial](docs/operations/development.md).
+
+Abre la URL de emparejamiento que imprime el runner. Incluye una credencial: no la publiques. Los puertos efectivos aparecen en `[dev-runner]`. Si no ves la URL (por ejemplo, con la salida redirigida a un archivo, `vp run` no muestra la salida de las tareas), genera otra contra el servidor en marcha desde otra terminal:
+
+````powershell
+. ./docs/personal/custom-env.ps1
+cd apps/server
+node src/bin.ts pair --base-dir ../../.t3 --ttl 1h
+cd ../..
+``` Para Electron:
+
+```powershell
+vp run dev:desktop --home-dir .t3 --no-seed
 ````
 
 La carpeta ignorada `.t3` mantiene los datos de esta copia separados. No arranques desarrollo contra `~/.t3/userdata`, la instalación real. No establezcas `VITE_HTTP_URL` ni `VITE_WS_URL`: Vite ya hace proxy. No hace falta copiar `.env.example` para el uso local; sus variables habilitan servicios cloud opcionales. No se han configurado proveedores de pago ni credenciales de IA. `Replay (dev)` permite probar turnos locales gratuitos en el modo web.
