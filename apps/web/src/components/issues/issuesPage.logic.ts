@@ -108,9 +108,20 @@ export type IssueListFilter = IssueSearchFilter;
 
 export const EMPTY_ISSUE_LIST_FILTER: IssueListFilter = { states: [], assignees: [], projects: [] };
 
+/** The project each tracker opens on until the user picks another (names as the tracker has them). */
+const DEFAULT_ISSUE_PROJECTS: Readonly<Record<IssueTrackerKind, ReadonlyArray<string>>> = {
+  linear: ["Salesforce"],
+  jira: ["Proyecto Salesforce"],
+};
+
+export const defaultIssueListFilter = (tracker: IssueTrackerKind): IssueListFilter => ({
+  ...EMPTY_ISSUE_LIST_FILTER,
+  projects: DEFAULT_ISSUE_PROJECTS[tracker],
+});
+
 /** One remembered filter per tracker, so Linear and Jira states never mix. */
 export const issueListFilterStorageKey = (tracker: IssueTrackerKind) =>
-  `t3code:issues-filter:${tracker}:v1`;
+  `t3code:issues-filter:${tracker}:v2`;
 
 export const issueListFilterCount = (filter: IssueListFilter) =>
   filter.states.length + filter.assignees.length + filter.projects.length;

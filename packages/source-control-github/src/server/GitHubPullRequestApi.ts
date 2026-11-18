@@ -863,6 +863,17 @@ function qualifierValue(value: string): string {
   return `"${value.replaceAll('"', "").trim()}"`;
 }
 
+/**
+ * GraphQL reports an app author's login without `[bot]`, but search only finds it with the
+ * suffix. Repeated `author:` qualifiers OR, and an unknown login matches nothing.
+ */
+function authorQualifiers(author: string, viewer: string): ReadonlyArray<string> {
+  const login = resolvePullRequestAuthorFilter(author, viewer);
+  const logins =
+    login === viewer || login.toLowerCase().endsWith("[bot]") ? [login] : [login, `${login}[bot]`];
+  return logins.map((value) => `author:${qualifierValue(value)}`);
+}
+
 function filterQualifiers(
   filters: PullRequestListFilters | undefined,
   viewer: string,
@@ -874,9 +885,7 @@ function filterQualifiers(
       group.length === 0 ? [] : [`label:${group.map(qualifierValue).join(",")}`],
     ),
     ...(filters.excludedLabels ?? []).map((label) => `-label:${qualifierValue(label)}`),
-    ...(filters.author === undefined
-      ? []
-      : [`author:${qualifierValue(resolvePullRequestAuthorFilter(filters.author, viewer))}`]),
+    ...(filters.author === undefined ? [] : authorQualifiers(filters.author, viewer)),
     ...(filters.draft === undefined ? [] : [`draft:${filters.draft === "only"}`]),
     ...(filters.review === undefined ? [] : [`review:${REVIEW_QUALIFIERS[filters.review]}`]),
     // No `status:` qualifier: GitHub search ignores Actions check runs; rows are filtered after.
