@@ -396,6 +396,15 @@ import {
   SalesforceStateInput,
 } from "./salesforce.ts";
 import {
+  SkillDetail,
+  SkillDetailInput,
+  SkillsError,
+  SkillsInventory,
+  SkillsInventoryInput,
+  SkillsMutation,
+  SkillsMutationResult,
+} from "./skills.ts";
+import {
   StorageCleanupReport,
   DatabaseReclaimError,
   DatabaseStorageStatus,
@@ -599,6 +608,9 @@ export const WS_METHODS = {
   salesforceGetState: "salesforce.getState",
   salesforceMutate: "salesforce.mutate",
   salesforceData: "salesforce.data",
+  skillsList: "skills.list",
+  skillsRead: "skills.read",
+  skillsMutate: "skills.mutate",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
@@ -1159,6 +1171,24 @@ const WsSalesforceDataRpc = Rpc.make(WS_METHODS.salesforceData, {
   payload: SalesforceDataRequest,
   success: SalesforceDataResult,
   error: Schema.Union([SalesforceError, EnvironmentAuthorizationError]),
+});
+
+const WsSkillsListRpc = Rpc.make(WS_METHODS.skillsList, {
+  payload: SkillsInventoryInput,
+  success: SkillsInventory,
+  error: Schema.Union([SkillsError, EnvironmentAuthorizationError]),
+});
+
+const WsSkillsReadRpc = Rpc.make(WS_METHODS.skillsRead, {
+  payload: SkillDetailInput,
+  success: SkillDetail,
+  error: Schema.Union([SkillsError, EnvironmentAuthorizationError]),
+});
+
+const WsSkillsMutateRpc = Rpc.make(WS_METHODS.skillsMutate, {
+  payload: SkillsMutation,
+  success: SkillsMutationResult,
+  error: Schema.Union([SkillsError, EnvironmentAuthorizationError]),
 });
 
 const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
@@ -2322,6 +2352,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsSalesforceGetStateRpc,
   WsSalesforceMutateRpc,
   WsSalesforceDataRpc,
+  WsSkillsListRpc,
+  WsSkillsReadRpc,
+  WsSkillsMutateRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,

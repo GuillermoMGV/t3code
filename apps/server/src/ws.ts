@@ -253,6 +253,7 @@ import * as IssueTrackerNotifications from "./issueTrackers/IssueTrackerNotifica
 import * as SlackService from "./slack/SlackService.ts";
 import * as SalesforceDataService from "./salesforce/SalesforceDataService.ts";
 import * as SalesforceService from "./salesforce/SalesforceService.ts";
+import * as SkillsService from "./skills/SkillsService.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewGuideService.ts";
 import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
@@ -1589,6 +1590,11 @@ export const layerWsRpc = (
       const slack = yield* SlackService.SlackService;
       const salesforce = yield* SalesforceService.SalesforceService;
       const salesforceData = yield* SalesforceDataService.SalesforceDataService;
+      const skills = yield* SkillsService.SkillsService;
+      // Without the project list, the inventory still shows user skills.
+      const skillProjects = projectService
+        .listShells()
+        .pipe(Effect.orElseSucceed((): SkillsService.SkillsProjectShells => []));
       const hostResources = yield* HostResources.HostResources;
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
       const resourceTelemetry = yield* ResourceTelemetry.ResourceTelemetry;
@@ -2731,6 +2737,11 @@ export const layerWsRpc = (
         [WS_METHODS.salesforceGetState]: (input) => salesforce.getState(input),
         [WS_METHODS.salesforceMutate]: (input) => salesforce.mutate(input),
         [WS_METHODS.salesforceData]: (input) => salesforceData.run(input),
+        [WS_METHODS.skillsList]: () => skillProjects.pipe(Effect.flatMap(skills.list)),
+        [WS_METHODS.skillsRead]: (input) =>
+          skillProjects.pipe(Effect.flatMap((shells) => skills.read(input, shells))),
+        [WS_METHODS.skillsMutate]: (input) =>
+          skillProjects.pipe(Effect.flatMap((shells) => skills.mutate(input, shells))),
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
         [WS_METHODS.serverReportClientActivity]: (input, metadata) =>
           Ref.update(rpcClientIds, (clientIds) => {

@@ -396,6 +396,43 @@ Qué hace: el icono del calendario con reloj en la parte inferior de la barra la
 | --------------------------------------------------- | ------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarChrome.tsx` | icono `CalendarClockIcon` y el botón «Scheduled tasks» |
 
+### Inventario de skills en Ajustes
+
+Qué hace: Ajustes → Agents → **Skills** (`/settings/skills`) lista todas las skills (`<carpeta>/SKILL.md`) de la máquina del servidor, separadas en **User skills** y **Project skills**, con la papelera **Recently deleted** cuando tiene algo.
+
+- **Dónde busca.** Usuario: `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills`, `~/.cursor/skills`, `~/.gemini/skills`, `~/.config/opencode/skills`. Gestionadas (solo lectura): las integradas de Codex (`~/.codex/skills/.system`), las sincronizadas desde claude.ai (`~/.claude/skills/synced/<bucket>`) y las de plugins de Claude (misma detección que el composer). Proyecto: `.claude/skills`, `.agents/skills`, `.cursor/skills`, `.gemini/skills` y `.opencode/skills` en la carpeta de cada proyecto no archivado de T3 Code. Las carpetas que empiezan por punto se ignoran.
+- **Para qué agente.** Cada skill lleva el agente según su carpeta (Claude, Codex, Shared (.agents), Cursor, Gemini, OpenCode): es la carpeta la que decide quién la carga. Las de usuario se agrupan por agente; las de proyecto, por proyecto (desplegables), con una insignia del agente.
+- **Repetidas.** Las skills con el mismo nombre (sin mayúsculas ni prefijo de plugin) llevan una insignia «×N»: azul si el contenido es igual, ámbar si difiere. El detalle dice si cada copia es un enlace a la misma carpeta, una copia idéntica o un contenido distinto, y permite saltar a ella.
+- **Problemas.** Avisa de skills sin frontmatter, con YAML inválido, sin `description` o con un `name` distinto de la carpeta.
+- **Resumen y filtros.** Totales, nombres repetidos, skills con problemas y los tokens aproximados (caracteres/4) que cuestan las descripciones de usuario en cada sesión de cada agente. Búsqueda por nombre, descripción o ruta, filtro por agente y vista All / Repeated / Problems. El botón de refrescar vuelve a escanear el disco.
+- **Detalle.** Clic en una skill: ruta (copiable), destino si es un enlace, fecha, archivos de la carpeta con tamaño y el SKILL.md renderizado (frontmatter como bloque YAML). «Open in editor» abre el SKILL.md en el editor preferido.
+- **Borrar y recuperar.** Solo las skills `local` se borran. Borrar mueve la carpeta a `userdata/skills-trash/<id>` (lista en `userdata/skills-trash.json`); si la skill es un enlace simbólico solo se quita el enlace y su destino queda intacto. Desde «Recently deleted» se restaura (falla si ya hay algo en la ruta original) o se borra para siempre.
+- **Superficies.** Web y escritorio. Funciona en remoto (el servidor escanea su propia máquina). Móvil no tiene esta página.
+
+| Parte     | Archivos nuevos                                                                                                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contratos | `packages/contracts/src/skills.ts`                                                                                                                                                |
+| Servidor  | `apps/server/src/skills/skillsDiscovery.ts` (carpetas, frontmatter, escaneo), `SkillsService.ts` (inventario, detalle, papelera) (+ test)                                         |
+| Web       | `apps/web/src/state/skills.ts`, `routes/_chat.settings.skills.tsx`, `components/settings/skills/SkillsSettings.tsx`, `SkillDetailDialog.tsx`, `skillsInventory.logic.ts` (+ test) |
+
+| Toca (archivos oficiales)                                 | Qué añade                                                                                          |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `packages/contracts/src/rpc.ts`                           | import, 3 métodos `skills.*` en `WS_METHODS`, 3 `Rpc.make` y su registro en `WsRpcGroup`           |
+| `packages/contracts/src/index.ts`                         | `export * from "./skills.ts"`                                                                      |
+| `apps/server/src/auth/RpcAuthorization.ts`                | permisos (listar y leer: filesystem read; borrar/restaurar: filesystem write)                      |
+| `apps/server/src/observability/RpcInstrumentation.ts`     | categoría de los 3 métodos                                                                         |
+| `apps/server/src/server.ts`                               | import y capa `SkillsService.layer`                                                                |
+| `apps/server/src/ws.ts`                                   | import, `yield*` del servicio, lista de proyectos (`projectService.listShells()`) y los 3 handlers |
+| `apps/server/src/ws.test.ts`                              | import y `Layer.mock(SkillsService)`                                                               |
+| `apps/web/src/components/settings/settingsSearch.ts`      | ruta `/settings/skills` (tipo, etiqueta, grupo Agents, ámbito) y 4 entradas de búsqueda            |
+| `apps/web/src/components/settings/SettingsSidebarNav.tsx` | icono `LibraryBigIcon`                                                                             |
+| `apps/web/src/routes/_chat.settings.tsx`                  | la página usa un solo entorno                                                                      |
+| `apps/web/src/routeTree.gen.ts`                           | generado por el plugin de TanStack Router                                                          |
+
+Tests: `vp test run apps/server/src/skills/SkillsService.test.ts apps/web/src/components/settings/skills/skillsInventory.logic.test.ts`. Para probar el borrado sin tocar skills reales, crea una de prueba en `~/.agents/skills/<nombre>/SKILL.md`, pulsa refrescar, bórrala, restáurala y bórrala para siempre.
+
+Limitaciones: usa `~/.claude` y `~/.codex` aunque `CLAUDE_CONFIG_DIR`, `CODEX_HOME` o el `homePath` de Claude en T3 apunten a otra carpeta; no busca skills en subcarpetas de un proyecto (monorepos con `.claude/skills` en un paquete) ni en proyectos que no estén en T3 Code; las skills de plugins y sincronizadas no se pueden borrar desde aquí; no se pueden editar (usa «Open in editor»).
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:

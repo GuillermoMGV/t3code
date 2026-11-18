@@ -31,6 +31,7 @@ export type SettingsPath =
   | "/settings/browser"
   | "/settings/devices"
   | "/settings/scheduled-tasks"
+  | "/settings/skills"
   | "/settings/source-control"
   | "/settings/worktrees"
   | "/settings/connections"
@@ -107,6 +108,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/browser": msg("Browser"),
   "/settings/devices": msg("Devices"),
   "/settings/scheduled-tasks": msg("Scheduled tasks"),
+  "/settings/skills": msg("Skills"),
   "/settings/source-control": msg("Source control"),
   "/settings/worktrees": msg("Worktrees"),
   "/settings/connections": msg("Environments"),
@@ -147,6 +149,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
       "/settings/browser",
       "/settings/devices",
       "/settings/scheduled-tasks",
+      "/settings/skills",
     ],
   },
   {
@@ -1404,6 +1407,30 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["slack reviewer remind reminder pull request message token integration"],
   },
   {
+    id: "skills-overview",
+    title: "Skills overview",
+    to: "/settings/skills",
+    searchTerms: ["skills agent skills SKILL.md duplicates repeated problems tokens search"],
+  },
+  {
+    id: "skills-user",
+    title: "User skills",
+    to: "/settings/skills",
+    searchTerms: ["skills user global claude codex agents cursor gemini opencode plugins delete"],
+  },
+  {
+    id: "skills-projects",
+    title: "Project skills",
+    to: "/settings/skills",
+    searchTerms: ["skills project repository .claude .agents folder delete"],
+  },
+  {
+    id: "skills-trash",
+    title: "Recently deleted skills",
+    to: "/settings/skills",
+    searchTerms: ["skills trash restore deleted undo"],
+  },
+  {
     id: "archive",
     title: "Archived threads",
     to: "/settings/archived",
@@ -1436,6 +1463,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/secrets": null,
   "/settings/issue-trackers": null,
   "/settings/scheduled-tasks": null,
+  "/settings/skills": null,
   "/settings/maintenance": null,
   "/settings/labs": null,
   "/settings/about": null,
