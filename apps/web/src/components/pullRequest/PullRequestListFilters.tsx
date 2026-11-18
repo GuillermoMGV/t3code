@@ -20,6 +20,7 @@ import {
   ListFilterIcon,
   SearchIcon,
   TagIcon,
+  TriangleAlertIcon,
   UserRoundIcon,
 } from "lucide-react";
 import { type ElementType, useState } from "react";
@@ -165,6 +166,7 @@ const CHECKS_OPTIONS = [
   { value: UNFILTERED_VALUE, label: "All", Icon: LayersIcon },
   { value: "passing", label: "Passing", Icon: CircleCheckIcon },
   { value: "failing", label: "Failing", Icon: CircleXIcon },
+  { value: "conflicting", label: "Conflicts", Icon: TriangleAlertIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
 
 function PullRequestFilterRadioGroup<Value extends string>({

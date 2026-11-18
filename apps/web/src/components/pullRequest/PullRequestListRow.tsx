@@ -65,6 +65,7 @@ export function PullRequestRowLines({
   meta,
   metaClassName,
   updatedAt,
+  footer,
 }: {
   number: ReactNode;
   title: ReactNode;
@@ -73,6 +74,7 @@ export function PullRequestRowLines({
   meta?: ReactNode;
   metaClassName?: string;
   updatedAt?: string | null | undefined;
+  footer?: ReactNode;
 }) {
   return (
     <span className="min-w-0 flex-1">
@@ -99,6 +101,7 @@ export function PullRequestRowLines({
           </span>
         ) : null}
       </span>
+      {footer}
     </span>
   );
 }

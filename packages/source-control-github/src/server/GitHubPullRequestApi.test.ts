@@ -1870,7 +1870,7 @@ layer("GitHubPullRequestApi.layer", (it) => {
 
       expect(searchOfCall(0)).toBe(
         'is:pr is:open label:"needs design" label:"quote" -label:"wip" author:"octocat" ' +
-          "draft:false review:changes_requested status:failure sort:updated-desc repo:acme/web",
+          "draft:false review:changes_requested sort:updated-desc repo:acme/web",
       );
     }),
   );

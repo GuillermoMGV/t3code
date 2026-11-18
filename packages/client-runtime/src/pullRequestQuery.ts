@@ -13,6 +13,8 @@ const CHECKS_VALUES: Record<string, PullRequestListFilters["checks"]> = {
   passing: "passing",
   failure: "failing",
   failing: "failing",
+  conflicts: "conflicting",
+  conflicting: "conflicting",
 };
 
 const QUERY_TOKEN = /(?:[^\s"]|"[^"]*")+/g;

@@ -433,7 +433,10 @@ export function filterPullRequestList<
     if (filters.review && entry.reviewDecision && entry.reviewDecision !== filters.review)
       return false;
     if (filters.review === "none" && entry.reviewDecision) return false;
-    if (filters.checks && entry.checksState && entry.checksState !== filters.checks) return false;
+    if (filters.checks === "conflicting") {
+      if (entry.mergeability !== "conflicting") return false;
+    } else if (filters.checks && entry.checksState && entry.checksState !== filters.checks)
+      return false;
     const labels = new Set(entry.labels.map((label) => normalize(label.name)));
     if (filters.labels?.some((group) => !group.some((label) => labels.has(normalize(label)))))
       return false;

@@ -4144,6 +4144,7 @@ it.effect("judges review and checks filters only on a host that summarises them"
                   ...changeRequest(2, "2026-07-02T00:00:00Z"),
                   reviewDecision: "approved" as const,
                   checksState: null,
+                  mergeability: "conflicting" as const,
                 },
               ],
               truncated: false,
@@ -4172,6 +4173,12 @@ it.effect("judges review and checks filters only on a host that summarises them"
 
     const passing = yield* service.list({ state: "open", filters: { checks: "passing" } });
     assert.deepStrictEqual(passing.entries.map((entry) => entry.number).toSorted(), [3]);
+
+    const conflicting = yield* service.list({ state: "open", filters: { checks: "conflicting" } });
+    assert.deepStrictEqual(
+      conflicting.entries.map((entry) => entry.number),
+      [2],
+    );
   }),
 );
 

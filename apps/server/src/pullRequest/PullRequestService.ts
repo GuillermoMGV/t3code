@@ -1291,8 +1291,9 @@ export const make = Effect.gen(function* () {
           ? item.reviewDecision === null
           : item.reviewDecision === filters.review)) &&
       (filters.checks === undefined ||
-        item.checksState === undefined ||
-        item.checksState === filters.checks) &&
+        (filters.checks === "conflicting"
+          ? item.mergeability === undefined || item.mergeability === "conflicting"
+          : item.checksState === undefined || item.checksState === filters.checks)) &&
       (filters.labels === undefined || filters.labels.every((group) => group.some(holds))) &&
       (filters.excludedLabels === undefined || !filters.excludedLabels.some(holds)) &&
       (filters.author === undefined ||

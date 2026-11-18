@@ -129,6 +129,16 @@ export function PullRequestIssueBadges({ entry }: { entry: IssueEntry }) {
   );
 }
 
+/** The issue badges on their own row line, or nothing when the pull request names no issue. */
+export function PullRequestIssueLine({ entry }: { entry: IssueEntry }) {
+  if (usePullRequestIssue(entry) === undefined) return null;
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 overflow-hidden pt-0.5 text-2xs text-muted-foreground">
+      <PullRequestIssueBadges entry={entry} />
+    </span>
+  );
+}
+
 const TARGET_BRANCH_VARIANTS = {
   production: "warning",
   integration: "info",

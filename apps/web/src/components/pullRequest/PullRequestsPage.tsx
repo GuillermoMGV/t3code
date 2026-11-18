@@ -1396,7 +1396,7 @@ export function PullRequestsPage() {
       labelOptions={facets.labels}
       targetBranch={search.base}
       targetBranchOptions={pullRequestTargetBranches(groups, search.base)}
-      onTargetBranch={(base) => updateSearch({ base })}
+      onTargetBranch={(base) => updateListScope({ base })}
       optionScope={filterOptionScope}
       host={search.host}
       hostOptions={hostMenuOptions}

@@ -418,6 +418,18 @@ describe("remembered pull request list controls", () => {
     expect(readPullRequestListPreferences(storage)).toEqual({ involvement: "all", state: "open" });
   });
 
+  it("restores the filters it saved, including conflicts and the target branch", () => {
+    const storage = makeStorage();
+    const saved = {
+      involvement: "authored",
+      state: "open",
+      checks: "conflicting",
+      base: "develop",
+    } as const;
+    writePullRequestListPreferences(saved, storage);
+    expect(readPullRequestListPreferences(storage)).toEqual(saved);
+  });
+
   it("falls back when browser policy denies storage", () => {
     const denied = {
       getItem: () => {

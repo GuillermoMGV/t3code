@@ -21,7 +21,12 @@ const REVIEWS = {
   "review-required": "Review required",
   none: "No reviews",
 } as const;
-const CHECKS = { all: "All checks", passing: "Passing", failing: "Failing" } as const;
+const CHECKS = {
+  all: "All checks",
+  passing: "Passing",
+  failing: "Failing",
+  conflicting: "Conflicts",
+} as const;
 const SORTS = {
   updated: "Recently updated",
   created: "Newest created",

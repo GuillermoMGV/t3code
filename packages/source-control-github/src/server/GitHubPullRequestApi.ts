@@ -879,9 +879,7 @@ function filterQualifiers(
       : [`author:${qualifierValue(resolvePullRequestAuthorFilter(filters.author, viewer))}`]),
     ...(filters.draft === undefined ? [] : [`draft:${filters.draft === "only"}`]),
     ...(filters.review === undefined ? [] : [`review:${REVIEW_QUALIFIERS[filters.review]}`]),
-    ...(filters.checks === undefined
-      ? []
-      : [`status:${filters.checks === "passing" ? "success" : "failure"}`]),
+    // No `status:` qualifier: GitHub search ignores Actions check runs; rows are filtered after.
   ];
 }
 
@@ -899,7 +897,10 @@ function matchesFilters(
       (filters.review === "none"
         ? item.reviewDecision === null
         : item.reviewDecision === filters.review)) &&
-    (filters.checks === undefined || item.checksState === filters.checks) &&
+    (filters.checks === undefined ||
+      (filters.checks === "conflicting"
+        ? item.mergeability === "conflicting"
+        : item.checksState === filters.checks)) &&
     (filters.labels === undefined || filters.labels.every((group) => group.some(holds))) &&
     (filters.excludedLabels === undefined || !filters.excludedLabels.some(holds)) &&
     (filters.author === undefined ||

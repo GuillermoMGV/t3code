@@ -24,7 +24,7 @@ import {
   PullRequestRowGlyph,
   PullRequestRowLines,
 } from "./PullRequestListRow";
-import { PullRequestIssueBadges, PullRequestTargetBranches } from "./PullRequestIssueBadges";
+import { PullRequestIssueLine, PullRequestTargetBranches } from "./PullRequestIssueBadges";
 import { PullRequestReviewActions } from "./PullRequestReviewActions";
 import { PullRequestLabelChip, PullRequestReviewDecisionGlyph } from "./pullRequestPresentation";
 
@@ -244,7 +244,6 @@ function PullRequestRowImpl({
               <span className="flex min-w-0 max-w-80">
                 <PullRequestTargetBranches head={entry.headBranch} base={entry.baseBranch} />
               </span>
-              <PullRequestIssueBadges entry={entry} />
               {environmentLabel ? (
                 <span className="min-w-0 max-w-32 truncate">{environmentLabel}</span>
               ) : null}
@@ -252,6 +251,7 @@ function PullRequestRowImpl({
             </>
           }
           updatedAt={entry.updatedAt}
+          footer={<PullRequestIssueLine entry={entry} />}
         />
       </button>
       <PullRequestReviewActions entry={entry} />

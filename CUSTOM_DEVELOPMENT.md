@@ -291,10 +291,10 @@ Tests: `vp test run apps/web/src/components/chat/replyCards.logic.test.ts`. Para
 
 ### Ramas y ticket en la lista de pull requests
 
-Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → rama destino` y, a su derecha, el **ticket** de Linear o Jira de la PR: clave, estado (con su color) y asignado.
+Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → rama destino` en la segunda línea y, en una tercera línea propia, el **ticket** de Linear o Jira de la PR: clave, estado (con su color) y asignado. Si la PR no tiene ticket, la fila mantiene dos líneas.
 
 - La rama destino es una insignia con color según el tipo (`targetBranchKind`): ámbar para `master`/`main`, azul para `develop`, gris para el resto. La rama origen va en texto atenuado y recortada por el medio.
-- Clic (o Enter) en las insignias del ticket lo abre en el navegador sin seleccionar la PR. Las insignias del ticket no se recortan; ceden espacio el autor, el repositorio y la rama origen.
+- Clic (o Enter) en las insignias del ticket lo abre en el navegador sin seleccionar la PR.
 
 - **Cómo se relaciona la PR con el ticket:** por la clave que aparece en el **título** (en mayúsculas, como `fix(PRO-2238): …` o `PRO-3853 …`) o, si no hay, en la **rama origen** (`feat/pro-2239-…` también vale). Es la convención que ya usan los títulos y ramas de Properti. No hace falta vincular nada a mano ni que Linear o Jira estén enlazados con GitHub.
 - El servidor busca todas las claves de la lista en una sola petición (`issueTrackers.getIssues`): primero en Linear y, si no existe, en Jira; solo con los gestores conectados en Ajustes. Los aciertos se guardan un minuto (como en el listado de hilos) y las claves que no son tickets (`UTF-8`, `issue-123` en ramas de otros repos) 30 minutos, para no gastar el límite de peticiones de Linear. El botón de refrescar de la barra lateral vacía las dos cachés.
@@ -303,20 +303,29 @@ Qué hace: cada fila de la pantalla «Pull requests» muestra `rama origen → r
 
 **Filtro por rama destino.** En «Filters» hay un submenú **Target branch** con las ramas destino de las PR cargadas; al elegir una solo quedan las PR que van a esa rama (cuenta en el número de filtros y queda en la URL como `?base=develop`).
 
-El filtro se aplica en el cliente sobre las PR ya cargadas, sin tocar la consulta al host ni su caché (que son oficiales y cambian a menudo). Si una rama tiene PR más allá de la primera página, aparecen con «Load more». No se guarda entre sesiones (los demás filtros sí) y no existe el calificador `base:` en el buscador.
+El filtro se aplica en el cliente sobre las PR ya cargadas, sin tocar la consulta al host ni su caché (que son oficiales y cambian a menudo). Si una rama tiene PR más allá de la primera página, aparecen con «Load more». Se guarda entre sesiones junto a los demás filtros y no existe el calificador `base:` en el buscador.
+
+**Filtro Checks → Failing / Conflicts.** El filtro oficial enviaba `status:failure` a la búsqueda de GitHub, que ignora los checks de GitHub Actions, así que «Failing» nunca devolvía nada. Ahora no se envía ese calificador y el servidor filtra cada fila por su `checksState`. Además hay una opción **Conflicts** (`checks: "conflicting"`, también `checks:conflicts` en el buscador) que deja solo las PR con conflictos de merge. Como el filtro ya no reduce la búsqueda en GitHub, una página puede traer menos filas; «Load more» trae el resto.
 
 | Parte    | Archivos nuevos                                                                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Web      | `apps/web/src/components/pullRequest/pullRequestTargetBranch.logic.ts` (+ test), `pullRequestIssue.logic.ts` (+ test), `PullRequestIssueBadges.tsx` |
 | Servidor | `getIssues` en `IssueTrackerService.ts` y el método `issueTrackers.getIssues` (ver la tabla de Linear y Jira)                                       |
 
-| Toca (archivos oficiales)                                        | Qué añade                                                                                                                 |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/components/pullRequest/PullRequestRow.tsx`         | imports, `PullRequestRowBranches` (ya existía) y `PullRequestIssueBadges` en la línea de metadatos                        |
-| `apps/web/src/components/pullRequest/PullRequestListFilters.tsx` | icono, constante `ANY_TARGET_BRANCH`, 3 props opcionales, contador y submenú                                              |
-| `apps/web/src/components/pullRequest/PullRequestsPage.tsx`       | imports, `base` en `updateSearch`, filtrado de grupos, props del menú y `PullRequestIssuesProvider` alrededor de la lista |
-| `apps/web/src/components/pullRequest/usePullRequestListView.ts`  | campo `base` en `PullRequestsSearch`                                                                                      |
-| `apps/web/src/routes/_chat.pull-requests.tsx`                    | lectura del parámetro `base` de la URL                                                                                    |
+| Toca (archivos oficiales)                                           | Qué añade                                                                                                                 |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/pullRequest/PullRequestRow.tsx`            | imports, `PullRequestTargetBranches` en la línea de metadatos y `PullRequestIssueLine` como `footer`                      |
+| `apps/web/src/components/pullRequest/PullRequestListRow.tsx`        | prop opcional `footer` en `PullRequestRowLines` (tercera línea)                                                           |
+| `packages/contracts/src/pullRequest.ts`                             | valor `conflicting` en `PullRequestListFilters.checks`                                                                    |
+| `packages/source-control-github/src/server/GitHubPullRequestApi.ts` | sin calificador `status:`; `conflicting` compara `mergeability`                                                           |
+| `apps/server/src/pullRequest/PullRequestService.ts`                 | `matchesRowFilters`: `conflicting` compara `mergeability`                                                                 |
+| `packages/client-runtime/src/pullRequestQuery.ts`                   | `checks:conflicts` en el buscador                                                                                         |
+| `apps/mobile/src/features/pull-requests/*`                          | opción «Conflicts» y su filtro local                                                                                      |
+| `apps/web/src/components/pullRequest/PullRequestListFilters.tsx`    | icono, constante `ANY_TARGET_BRANCH`, 3 props opcionales, contador y submenú                                              |
+| `apps/web/src/components/pullRequest/PullRequestsPage.tsx`          | imports, `base` en `updateSearch`, filtrado de grupos, props del menú y `PullRequestIssuesProvider` alrededor de la lista |
+| `apps/web/src/components/pullRequest/pullRequestListPreferences.ts` | campo `base` guardado con las demás preferencias                                                                          |
+| `apps/web/src/components/pullRequest/usePullRequestListView.ts`     | campo `base` en `PullRequestsSearch`                                                                                      |
+| `apps/web/src/routes/_chat.pull-requests.tsx`                       | lectura del parámetro `base` de la URL                                                                                    |
 
 ### Atajos de revisión en la lista de pull requests
 

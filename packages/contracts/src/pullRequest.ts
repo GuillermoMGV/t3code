@@ -40,7 +40,8 @@ export const PullRequestListFilters = Schema.Struct({
   review: Schema.optional(
     Schema.Literals(["approved", "changes-requested", "review-required", "none"]),
   ),
-  checks: Schema.optional(Schema.Literals(["passing", "failing"])),
+  /** `conflicting` matches merge conflicts rather than a check state. */
+  checks: Schema.optional(Schema.Literals(["passing", "failing", "conflicting"])),
   /** GitHub label qualifiers: every group must match; any name within a group suffices. */
   labels: Schema.optional(Schema.Array(PullRequestQualifierValues).check(Schema.isMaxLength(10))),
   excludedLabels: Schema.optional(PullRequestQualifierValues),
