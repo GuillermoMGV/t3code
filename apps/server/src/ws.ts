@@ -2717,6 +2717,8 @@ export const layerWsRpc = (
         [WS_METHODS.serverPrepareTriage]: (input) => triage.prepare(input),
         [WS_METHODS.issueTrackersGetThreadIssues]: (input) => issueTrackers.getThreadIssues(input),
         [WS_METHODS.issueTrackersSearch]: (input) => issueTrackers.search(input),
+        [WS_METHODS.issueTrackersGetFilterOptions]: (input) =>
+          issueTrackers.getFilterOptions(input.tracker),
         [WS_METHODS.issueTrackersGetConnections]: (_input) => issueTrackers.getConnections,
         [WS_METHODS.issueTrackersGetThreadSummaries]: (_input) => issueTrackers.getThreadSummaries,
         [WS_METHODS.issueTrackersGetIssues]: (input) => issueTrackers.getIssues(input),

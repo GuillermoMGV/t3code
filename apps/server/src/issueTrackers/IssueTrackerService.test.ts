@@ -168,6 +168,52 @@ describe("makeLinearApi", () => {
     }),
   );
 
+  it.effect("asks Linear to filter recent issues and lists its filter options", () =>
+    Effect.gen(function* () {
+      const { requests, http } = httpAnswering(() => ({
+        status: 200,
+        body: {
+          data: {
+            issues: { nodes: [LINEAR_NODE] },
+            workflowStates: {
+              nodes: [
+                { name: "Done", type: "completed", position: 0 },
+                { name: "Todo", type: "unstarted", position: 1 },
+                { name: "Backlog", type: "backlog", position: 0 },
+                { name: "Todo", type: "unstarted", position: 0 },
+              ],
+            },
+            projects: { nodes: [{ name: "Payments" }, { name: "Login revamp" }] },
+          },
+        },
+      }));
+      const api = yield* makeLinearApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
+      yield* api.recentIssues("lin_api_key");
+      expect(JSON.parse(requests[0]!.body).variables).toEqual({ filter: null });
+      yield* api.recentIssues("lin_api_key", {
+        states: ["Todo"],
+        assignees: ["me", "others", "unassigned"],
+        projects: [],
+      });
+      expect(JSON.parse(requests[1]!.body).variables.filter).toEqual({
+        and: [
+          { state: { name: { in: ["Todo"] } } },
+          {
+            or: [
+              { assignee: { isMe: { eq: true } } },
+              { assignee: { isMe: { eq: false } } },
+              { assignee: { null: true } },
+            ],
+          },
+        ],
+      });
+      expect(yield* api.filterOptions("lin_api_key")).toEqual({
+        states: ["Backlog", "Todo", "Done"],
+        projects: ["Login revamp", "Payments"],
+      });
+    }),
+  );
+
   it.effect("reads an unknown identifier as no issue", () =>
     Effect.gen(function* () {
       const { http } = httpAnswering(() => ({
@@ -284,8 +330,17 @@ describe("makeJiraApi", () => {
       yield* api.recentIssues(JIRA_CREDENTIALS);
       expect(JSON.parse(requests[1]!.body)).toMatchObject({
         jql: "updated >= -90d ORDER BY updated DESC",
-        maxResults: 30,
+        maxResults: 50,
       });
+      // A filter bounds the JQL itself, so it replaces the 90 day window.
+      yield* api.recentIssues(JIRA_CREDENTIALS, {
+        states: ["To Do", 'Say "hi"'],
+        assignees: ["me", "unassigned"],
+        projects: ["Operations"],
+      });
+      expect(JSON.parse(requests[2]!.body).jql).toBe(
+        'status in ("To Do", "Say \\"hi\\"") AND (assignee = currentUser() OR assignee is EMPTY) AND project in ("Operations") ORDER BY updated DESC',
+      );
       const error = yield* api.myself(JIRA_CREDENTIALS).pipe(Effect.flip);
       expect(error.reason).toBe("unauthorized");
     }),

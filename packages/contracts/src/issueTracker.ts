@@ -104,17 +104,37 @@ export type IssueTrackerIssuesInput = typeof IssueTrackerIssuesInput.Type;
 export const IssueTrackerIssuesResult = Schema.Struct({ issues: Schema.Array(TrackerIssue) });
 export type IssueTrackerIssuesResult = typeof IssueTrackerIssuesResult.Type;
 
+/** Several values of one kind add up; different kinds narrow each other. Empty lists match all. */
+export const IssueSearchFilter = Schema.Struct({
+  /** State names, which Linear repeats per team and Jira shares across projects. */
+  states: Schema.Array(Schema.String).check(Schema.isMaxLength(50)),
+  assignees: Schema.Array(Schema.Literals(["me", "others", "unassigned"])),
+  /** Project names. */
+  projects: Schema.Array(Schema.String).check(Schema.isMaxLength(50)),
+});
+export type IssueSearchFilter = typeof IssueSearchFilter.Type;
+
 export const IssueTrackerSearchInput = Schema.Struct({
   tracker: IssueTrackerKind,
   /** An issue URL, a key, or words from the title. Empty lists issues by `scope`. */
   query: Schema.String.check(Schema.isMaxLength(500)),
   /** What an empty query lists: your open issues (default), or recently updated ones. */
   scope: Schema.optional(Schema.Literals(["mine", "recent"])),
+  /** Applied by the tracker to recent issues and title searches, so the limit counts matches. */
+  filter: Schema.optional(IssueSearchFilter),
 });
 export type IssueTrackerSearchInput = typeof IssueTrackerSearchInput.Type;
 
 export const IssueTrackerSearchResult = Schema.Struct({ issues: Schema.Array(TrackerIssue) });
 export type IssueTrackerSearchResult = typeof IssueTrackerSearchResult.Type;
+
+export const IssueTrackerFilterOptionsInput = Schema.Struct({ tracker: IssueTrackerKind });
+/** What the tracker can filter by, in its own order. */
+export const IssueTrackerFilterOptionsResult = Schema.Struct({
+  states: Schema.Array(Schema.String),
+  projects: Schema.Array(Schema.String),
+});
+export type IssueTrackerFilterOptionsResult = typeof IssueTrackerFilterOptionsResult.Type;
 
 export const IssueTrackerConnection = Schema.Struct({
   tracker: IssueTrackerKind,

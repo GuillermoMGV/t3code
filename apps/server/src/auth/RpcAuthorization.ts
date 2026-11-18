@@ -118,6 +118,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.serverReportClientActivity]: AuthOrchestrationReadScope,
   [WS_METHODS.issueTrackersGetThreadIssues]: AuthOrchestrationReadScope,
   [WS_METHODS.issueTrackersSearch]: AuthOrchestrationReadScope,
+  [WS_METHODS.issueTrackersGetFilterOptions]: AuthOrchestrationReadScope,
   [WS_METHODS.issueTrackersGetConnections]: AuthOrchestrationReadScope,
   [WS_METHODS.issueTrackersGetThreadSummaries]: AuthOrchestrationReadScope,
   [WS_METHODS.issueTrackersGetIssues]: AuthOrchestrationReadScope,

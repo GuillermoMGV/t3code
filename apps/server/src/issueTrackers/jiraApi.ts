@@ -1,4 +1,9 @@
-import { IssueTrackerError, type IssueKey, type TrackerIssue } from "@t3tools/contracts";
+import {
+  IssueTrackerError,
+  type IssueKey,
+  type IssueSearchFilter,
+  type TrackerIssue,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Base64 from "effect/encoding/Base64";
 import * as Schema from "effect/Schema";
@@ -57,6 +62,19 @@ const decodeIssue = Schema.decodeUnknownEffect(JiraIssue);
 const decodeSearch = Schema.decodeUnknownEffect(
   Schema.Struct({ issues: Schema.optional(Schema.Array(JiraIssue)) }),
 );
+const decodeStatuses = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      statusCategory: Schema.optional(
+        Schema.NullOr(Schema.Struct({ key: Schema.optional(Schema.String) })),
+      ),
+    }),
+  ),
+);
+const decodeProjects = Schema.decodeUnknownEffect(
+  Schema.Struct({ values: Schema.optional(Schema.Array(Schema.Struct({ name: Schema.String }))) }),
+);
 const decodeMyself = Schema.decodeUnknownEffect(Schema.Struct({ displayName: Schema.String }));
 
 // Jira names a status category's color; these follow Atlassian's design tokens.
@@ -98,6 +116,35 @@ export function normalizeJiraSiteUrl(value: string): string | null {
 export function jqlString(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
+
+/** The JQL clauses for the chosen values, or null when nothing narrows the list. */
+function jiraFilterJql(filter: IssueSearchFilter | undefined): string | null {
+  if (filter === undefined) return null;
+  const clauses: Array<string> = [];
+  if (filter.states.length > 0) {
+    clauses.push(`status in (${filter.states.map(jqlString).join(", ")})`);
+  }
+  if (filter.assignees.length > 0) {
+    const groups = filter.assignees.map((group) =>
+      group === "me"
+        ? "assignee = currentUser()"
+        : group === "others"
+          ? "assignee != currentUser()"
+          : "assignee is EMPTY",
+    );
+    clauses.push(`(${groups.join(" OR ")})`);
+  }
+  if (filter.projects.length > 0) {
+    clauses.push(`project in (${filter.projects.map(jqlString).join(", ")})`);
+  }
+  return clauses.length === 0 ? null : clauses.join(" AND ");
+}
+
+const STATUS_CATEGORY_ORDER = ["new", "indeterminate", "done"];
+const statusCategoryRank = (key: string | undefined) => {
+  const rank = STATUS_CATEGORY_ORDER.indexOf(key ?? "");
+  return rank === -1 ? STATUS_CATEGORY_ORDER.length : rank;
+};
 
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]*-[1-9]\d*$/;
 
@@ -216,12 +263,46 @@ export const makeJiraApi = Effect.gen(function* () {
     return (issues ?? []).flatMap((item) => toTrackerIssue(credentials.siteUrl, item) ?? []);
   });
 
-  const search = (credentials: JiraCredentials, term: string) =>
-    searchJql(credentials, `text ~ ${jqlString(term)} ORDER BY updated DESC`);
+  const search = (credentials: JiraCredentials, term: string, filter?: IssueSearchFilter) => {
+    const narrow = jiraFilterJql(filter);
+    const text = `text ~ ${jqlString(term)}`;
+    return searchJql(
+      credentials,
+      `${narrow === null ? text : `${text} AND ${narrow}`} ORDER BY updated DESC`,
+      25,
+    );
+  };
 
-  // The search endpoint rejects unbounded JQL, so "recent" means updated in the last 90 days.
-  const recentIssues = (credentials: JiraCredentials) =>
-    searchJql(credentials, "updated >= -90d ORDER BY updated DESC", 30);
+  // The search endpoint rejects unbounded JQL, so unfiltered "recent" means the last 90 days.
+  const recentIssues = (credentials: JiraCredentials, filter?: IssueSearchFilter) =>
+    searchJql(
+      credentials,
+      `${jiraFilterJql(filter) ?? "updated >= -90d"} ORDER BY updated DESC`,
+      50,
+    );
+
+  /** Status names once each, to do first; project names A to Z. */
+  const filterOptions = Effect.fn("JiraApi.filterOptions")(function* (
+    credentials: JiraCredentials,
+  ) {
+    const statuses = yield* decodeStatuses(
+      yield* readJson(yield* request(credentials, "/rest/api/3/status")),
+    ).pipe(Effect.mapError(invalidResponse));
+    const projects = yield* decodeProjects(
+      yield* readJson(
+        yield* request(credentials, "/rest/api/3/project/search?maxResults=100&orderBy=name"),
+      ),
+    ).pipe(Effect.mapError(invalidResponse));
+    const sorted = statuses.toSorted(
+      (left, right) =>
+        statusCategoryRank(left.statusCategory?.key) -
+        statusCategoryRank(right.statusCategory?.key),
+    );
+    return {
+      states: [...new Set(sorted.map((status) => status.name))],
+      projects: [...new Set((projects.values ?? []).map((project) => project.name))],
+    };
+  });
 
   const assignedOpenIssues = (credentials: JiraCredentials) =>
     searchJql(
@@ -230,7 +311,16 @@ export const makeJiraApi = Effect.gen(function* () {
     );
 
   // request, readJson: used by the notifications bell (IssueTrackerNotifications.ts).
-  return { myself, issue, search, assignedOpenIssues, recentIssues, request, readJson };
+  return {
+    myself,
+    issue,
+    search,
+    assignedOpenIssues,
+    recentIssues,
+    filterOptions,
+    request,
+    readJson,
+  };
 });
 
 export type JiraApi = Effect.Success<typeof makeJiraApi>;

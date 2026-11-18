@@ -190,15 +190,21 @@ describe("filterIssues", () => {
   });
 
   it("offers the listed states and projects, keeping chosen ones a new search dropped", () => {
-    expect(issueStateOptions(issues, filter({ states: ["Done"] }))).toEqual([
+    expect(issueStateOptions([], issues, filter({ states: ["Done"] }))).toEqual([
       "In Progress",
       "Todo",
       "Done",
     ]);
-    expect(issueProjectOptions(issues, filter({ projects: ["Ops"] }))).toEqual([
+    expect(issueProjectOptions([], issues, filter({ projects: ["Ops"] }))).toEqual([
       "Login",
       "Billing",
       "Ops",
+    ]);
+    // The tracker's own list leads, so a filtered result never hides the other choices.
+    expect(issueStateOptions(["Backlog", "Todo"], issues, filter({}))).toEqual([
+      "Backlog",
+      "Todo",
+      "In Progress",
     ]);
   });
 });

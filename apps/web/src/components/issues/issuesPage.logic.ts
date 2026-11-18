@@ -1,5 +1,9 @@
-import type { IssueTrackerConnection, IssueTrackerKind, TrackerIssue } from "@t3tools/contracts";
-import * as Schema from "effect/Schema";
+import {
+  IssueSearchFilter,
+  type IssueTrackerConnection,
+  type IssueTrackerKind,
+  type TrackerIssue,
+} from "@t3tools/contracts";
 
 // Fork-only Issues page (start a thread from a Linear or Jira issue); see CUSTOM_DEVELOPMENT.md.
 
@@ -99,12 +103,8 @@ export const ISSUE_ASSIGNEE_GROUPS: ReadonlyArray<{
   { value: "unassigned", label: "Unassigned" },
 ];
 
-export const IssueListFilter = Schema.Struct({
-  states: Schema.Array(Schema.String),
-  assignees: Schema.Array(Schema.Literals(["me", "others", "unassigned"])),
-  projects: Schema.Array(Schema.String),
-});
-export type IssueListFilter = typeof IssueListFilter.Type;
+export const IssueListFilter = IssueSearchFilter;
+export type IssueListFilter = IssueSearchFilter;
 
 export const EMPTY_ISSUE_LIST_FILTER: IssueListFilter = { states: [], assignees: [], projects: [] };
 
@@ -130,7 +130,10 @@ export function issueAssigneeGroup(
   return me !== null && sameName(issue.assignee.name, me) ? "me" : "others";
 }
 
-/** Several values of one kind add up; different kinds narrow each other. */
+/**
+ * The tracker filters the list; this repeats it for a pasted key, which bypasses the filter.
+ * Several values of one kind add up; different kinds narrow each other.
+ */
 export function filterIssues<Issue extends Pick<TrackerIssue, "state" | "assignee" | "project">>(
   issues: ReadonlyArray<Issue>,
   filter: IssueListFilter,
@@ -147,22 +150,27 @@ export function filterIssues<Issue extends Pick<TrackerIssue, "state" | "assigne
   );
 }
 
-/** The states in the results, in order of appearance, plus chosen ones a new search left out. */
+/**
+ * The tracker's states, then any in the results it did not list (all of them while its list
+ * loads), then chosen ones neither has.
+ */
 export function issueStateOptions(
+  known: ReadonlyArray<string>,
   issues: ReadonlyArray<Pick<TrackerIssue, "state">>,
   filter: IssueListFilter,
 ): ReadonlyArray<string> {
   const states = issues.flatMap((issue) => (issue.state === null ? [] : [issue.state.name]));
-  return [...new Set([...states, ...filter.states])];
+  return [...new Set([...known, ...states, ...filter.states])];
 }
 
-/** The projects in the results, in order of appearance, plus chosen ones a new search left out. */
+/** The tracker's projects, then any in the results it did not list, then chosen ones. */
 export function issueProjectOptions(
+  known: ReadonlyArray<string>,
   issues: ReadonlyArray<Pick<TrackerIssue, "project">>,
   filter: IssueListFilter,
 ): ReadonlyArray<string> {
   const projects = issues.flatMap((issue) => (issue.project == null ? [] : [issue.project.name]));
-  return [...new Set([...projects, ...filter.projects])];
+  return [...new Set([...known, ...projects, ...filter.projects])];
 }
 
 const MAX_PULL_REQUESTS_PER_ISSUE = 3;

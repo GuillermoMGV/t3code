@@ -1,4 +1,4 @@
-import type { EnvironmentId, IssueTrackerKind } from "@t3tools/contracts";
+import type { EnvironmentId, IssueSearchFilter, IssueTrackerKind } from "@t3tools/contracts";
 
 import { issueTrackerEnvironment } from "~/state/issueTrackers";
 import { useEnvironmentQuery } from "~/state/query";
@@ -17,7 +17,13 @@ export function useIssueSearch(
   draft: string,
   /** What an empty draft lists; left out, the server lists the user's open issues. */
   scope?: "mine" | "recent",
+  /** Applied by the tracker, so its result limit counts only matching issues. */
+  filter?: IssueSearchFilter,
 ) {
+  // Left out when empty, so an unfiltered list shares its cache entry.
+  const narrows =
+    filter !== undefined &&
+    filter.states.length + filter.assignees.length + filter.projects.length > 0;
   const query = issueSearchQuery(useDebouncedValue(draft, ISSUE_SEARCH_DEBOUNCE_MS));
   const typing = issueSearchQuery(draft) !== query;
   const search = useEnvironmentQuery(
@@ -25,7 +31,12 @@ export function useIssueSearch(
       ? null
       : issueTrackerEnvironment.search({
           environmentId,
-          input: { tracker, query, ...(scope === undefined ? {} : { scope }) },
+          input: {
+            tracker,
+            query,
+            ...(scope === undefined ? {} : { scope }),
+            ...(narrows ? { filter } : {}),
+          },
         }),
   );
   return {

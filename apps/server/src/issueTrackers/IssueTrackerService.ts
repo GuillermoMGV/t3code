@@ -3,6 +3,7 @@ import {
   IssueTrackerError,
   type IssueTrackerConnection,
   type IssueTrackerConnectionsResult,
+  type IssueTrackerFilterOptionsResult,
   type IssueTrackerKind,
   type IssueTrackerLinkSource,
   type IssueTrackerMutation,
@@ -139,6 +140,9 @@ export class IssueTrackerService extends Context.Service<
     readonly search: (
       input: IssueTrackerSearchInput,
     ) => Effect.Effect<IssueTrackerSearchResult, IssueTrackerError>;
+    readonly getFilterOptions: (
+      tracker: IssueTrackerKind,
+    ) => Effect.Effect<IssueTrackerFilterOptionsResult, IssueTrackerError>;
     readonly getConnections: Effect.Effect<IssueTrackerConnectionsResult, IssueTrackerError>;
     readonly getThreadSummaries: Effect.Effect<IssueTrackerSummariesResult, IssueTrackerError>;
     readonly getIssues: (
@@ -429,7 +433,7 @@ const make = Effect.gen(function* () {
       if (query.length === 0) {
         return {
           issues: yield* recent
-            ? linear.recentIssues(apiKey.value)
+            ? linear.recentIssues(apiKey.value, input.filter)
             : linear.assignedOpenIssues(apiKey.value),
         };
       }
@@ -437,14 +441,14 @@ const make = Effect.gen(function* () {
         const issue = yield* linear.issue(apiKey.value, key);
         return { issues: issue === null ? [] : [issue] };
       }
-      return { issues: yield* linear.search(apiKey.value, query) };
+      return { issues: yield* linear.search(apiKey.value, query, input.filter) };
     }
     const credentials = yield* readJiraCredentials;
     if (Option.isNone(credentials)) return yield* notConnected("jira");
     if (query.length === 0) {
       return {
         issues: yield* recent
-          ? jira.recentIssues(credentials.value)
+          ? jira.recentIssues(credentials.value, input.filter)
           : jira.assignedOpenIssues(credentials.value),
       };
     }
@@ -452,7 +456,20 @@ const make = Effect.gen(function* () {
       const issue = yield* jira.issue(credentials.value, key);
       return { issues: issue === null ? [] : [issue] };
     }
-    return { issues: yield* jira.search(credentials.value, query) };
+    return { issues: yield* jira.search(credentials.value, query, input.filter) };
+  });
+
+  const getFilterOptions = Effect.fn("IssueTrackerService.getFilterOptions")(function* (
+    tracker: IssueTrackerKind,
+  ) {
+    if (tracker === "linear") {
+      const apiKey = yield* readLinearKey;
+      if (Option.isNone(apiKey)) return yield* notConnected("linear");
+      return yield* linear.filterOptions(apiKey.value);
+    }
+    const credentials = yield* readJiraCredentials;
+    if (Option.isNone(credentials)) return yield* notConnected("jira");
+    return yield* jira.filterOptions(credentials.value);
   });
 
   const connection = Effect.fn("IssueTrackerService.connection")(function* (
@@ -547,6 +564,7 @@ const make = Effect.gen(function* () {
   return IssueTrackerService.of({
     getThreadIssues,
     search,
+    getFilterOptions,
     getConnections,
     getThreadSummaries,
     getIssues,

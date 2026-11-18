@@ -361,6 +361,8 @@ import {
   IssueTrackerConnectionsInput,
   IssueTrackerConnectionsResult,
   IssueTrackerError,
+  IssueTrackerFilterOptionsInput,
+  IssueTrackerFilterOptionsResult,
   IssueTrackerMutation,
   IssueTrackerMutationResult,
   IssueTrackerSearchInput,
@@ -585,6 +587,7 @@ export const WS_METHODS = {
   serverPrepareTriage: "server.prepareTriage",
   issueTrackersGetThreadIssues: "issueTrackers.getThreadIssues",
   issueTrackersSearch: "issueTrackers.search",
+  issueTrackersGetFilterOptions: "issueTrackers.getFilterOptions",
   issueTrackersGetConnections: "issueTrackers.getConnections",
   issueTrackersGetThreadSummaries: "issueTrackers.getThreadSummaries",
   issueTrackersGetIssues: "issueTrackers.getIssues",
@@ -1080,6 +1083,12 @@ const WsIssueTrackersGetThreadIssuesRpc = Rpc.make(WS_METHODS.issueTrackersGetTh
 const WsIssueTrackersSearchRpc = Rpc.make(WS_METHODS.issueTrackersSearch, {
   payload: IssueTrackerSearchInput,
   success: IssueTrackerSearchResult,
+  error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
+});
+
+const WsIssueTrackersGetFilterOptionsRpc = Rpc.make(WS_METHODS.issueTrackersGetFilterOptions, {
+  payload: IssueTrackerFilterOptionsInput,
+  success: IssueTrackerFilterOptionsResult,
   error: Schema.Union([IssueTrackerError, EnvironmentAuthorizationError]),
 });
 
@@ -2301,6 +2310,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerPrepareTriageRpc,
   WsIssueTrackersGetThreadIssuesRpc,
   WsIssueTrackersSearchRpc,
+  WsIssueTrackersGetFilterOptionsRpc,
   WsIssueTrackersGetConnectionsRpc,
   WsIssueTrackersGetThreadSummariesRpc,
   WsIssueTrackersGetIssuesRpc,

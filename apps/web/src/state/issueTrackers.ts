@@ -48,6 +48,12 @@ export const issueTrackerEnvironment = {
     tag: WS_METHODS.issueTrackersSearch,
     staleTimeMs: 15_000,
   }),
+  /** What the Issues page's filter menu offers; states and projects rarely change. */
+  filterOptions: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
+    label: "issue-trackers:filter-options",
+    tag: WS_METHODS.issueTrackersGetFilterOptions,
+    staleTimeMs: 5 * 60_000,
+  }),
   connections: createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
     label: "issue-trackers:connections",
     tag: WS_METHODS.issueTrackersGetConnections,

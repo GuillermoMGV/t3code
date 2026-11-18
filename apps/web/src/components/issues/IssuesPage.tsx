@@ -222,7 +222,10 @@ function IssueList({
     issues: found,
     searching,
     error,
-  } = useIssueSearch(environmentId, tracker, draft, "recent");
+  } = useIssueSearch(environmentId, tracker, draft, "recent", filter);
+  const options = useEnvironmentQuery(
+    issueTrackerEnvironment.filterOptions({ environmentId, input: { tracker } }),
+  ).data;
   const pullRequestsByKey = useIssuePullRequests();
   const issues = filterIssues(found, filter, me);
   const threadsByIssueKey = useThreadsByIssue();
@@ -247,8 +250,8 @@ function IssueList({
         <IssueFiltersMenu
           filter={filter}
           onFilter={setFilter}
-          stateOptions={issueStateOptions(found, filter)}
-          projectOptions={issueProjectOptions(found, filter)}
+          stateOptions={issueStateOptions(options?.states ?? [], found, filter)}
+          projectOptions={issueProjectOptions(options?.projects ?? [], found, filter)}
         />
       </div>
       <p className="text-muted-foreground text-xs">

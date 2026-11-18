@@ -1,11 +1,17 @@
-import { IssueTrackerError, type IssueKey, type TrackerIssue } from "@t3tools/contracts";
+import {
+  IssueTrackerError,
+  type IssueKey,
+  type IssueSearchFilter,
+  type TrackerIssue,
+} from "@t3tools/contracts";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
 const LINEAR_API_URL = "https://api.linear.app/graphql";
-const RECENT_ISSUES_LIMIT = 30;
+const RECENT_ISSUES_LIMIT = 50;
+const SEARCH_LIMIT = 25;
 
 // IssueSearchResult is not an Issue, so the selection is spelled out instead of a fragment.
 const ISSUE_FIELDS = `identifier title url priorityLabel updatedAt
@@ -66,11 +72,44 @@ const SearchData = Schema.Struct({
 const RecentData = Schema.Struct({
   issues: Schema.Struct({ nodes: Schema.Array(LinearIssueNode) }),
 });
+const FilterOptionsData = Schema.Struct({
+  workflowStates: Schema.Struct({
+    nodes: Schema.Array(
+      Schema.Struct({ name: Schema.String, type: Schema.String, position: Schema.Number }),
+    ),
+  }),
+  projects: Schema.Struct({ nodes: Schema.Array(Schema.Struct({ name: Schema.String })) }),
+});
 const AssignedData = Schema.Struct({
   viewer: Schema.Struct({
     assignedIssues: Schema.Struct({ nodes: Schema.Array(LinearIssueNode) }),
   }),
 });
+
+/** Linear's `IssueFilter` for the chosen values, or null when nothing narrows the list. */
+function linearIssueFilter(filter: IssueSearchFilter | undefined): object | null {
+  if (filter === undefined) return null;
+  const and: Array<object> = [];
+  if (filter.states.length > 0) and.push({ state: { name: { in: filter.states } } });
+  if (filter.assignees.length > 0) {
+    and.push({
+      or: filter.assignees.map((group) =>
+        group === "unassigned"
+          ? { assignee: { null: true } }
+          : { assignee: { isMe: { eq: group === "me" } } },
+      ),
+    });
+  }
+  if (filter.projects.length > 0) and.push({ project: { name: { in: filter.projects } } });
+  return and.length === 0 ? null : { and };
+}
+
+// Workflow types in the order Linear's own board shows them.
+const STATE_TYPE_ORDER = ["triage", "backlog", "unstarted", "started", "completed", "canceled"];
+const stateTypeRank = (type: string) => {
+  const rank = STATE_TYPE_ORDER.indexOf(type);
+  return rank === -1 ? STATE_TYPE_ORDER.length : rank;
+};
 
 const linearError = (reason: IssueTrackerError["reason"], detail: string, cause?: unknown) =>
   new IssueTrackerError({ tracker: "linear", reason, detail, cause });
@@ -190,11 +229,17 @@ export const makeLinearApi = Effect.gen(function* () {
     return node === null ? null : toTrackerIssue(node);
   });
 
-  const search = Effect.fn("LinearApi.search")(function* (apiKey: string, term: string) {
+  const search = Effect.fn("LinearApi.search")(function* (
+    apiKey: string,
+    term: string,
+    filter?: IssueSearchFilter,
+  ) {
     const result = yield* graphql(
       apiKey,
-      `query Search($term: String!) { searchIssues(term: $term, first: 10) { nodes { ${ISSUE_FIELDS} } } }`,
-      { term },
+      `query Search($term: String!, $filter: IssueFilter) {
+        searchIssues(term: $term, first: ${SEARCH_LIMIT}, filter: $filter) { nodes { ${ISSUE_FIELDS} } }
+      }`,
+      { term, filter: linearIssueFilter(filter) },
     );
     return toTrackerIssues((yield* expectData(SearchData, result)).searchIssues.nodes);
   });
@@ -216,17 +261,65 @@ export const makeLinearApi = Effect.gen(function* () {
     return toTrackerIssues((yield* expectData(AssignedData, result)).viewer.assignedIssues.nodes);
   });
 
-  const recentIssues = Effect.fn("LinearApi.recentIssues")(function* (apiKey: string) {
+  const recentIssues = Effect.fn("LinearApi.recentIssues")(function* (
+    apiKey: string,
+    filter?: IssueSearchFilter,
+  ) {
     const result = yield* graphql(
       apiKey,
-      `query Recent { issues(first: ${RECENT_ISSUES_LIMIT}, orderBy: updatedAt) { nodes { ${ISSUE_FIELDS} } } }`,
-      {},
+      `query Recent($filter: IssueFilter) {
+        issues(first: ${RECENT_ISSUES_LIMIT}, orderBy: updatedAt, filter: $filter) { nodes { ${ISSUE_FIELDS} } }
+      }`,
+      { filter: linearIssueFilter(filter) },
     );
     return toTrackerIssues((yield* expectData(RecentData, result)).issues.nodes);
   });
 
+  /** State names once each (every team repeats "Todo"), in board order; project names A to Z. */
+  const filterOptions = Effect.fn("LinearApi.filterOptions")(function* (apiKey: string) {
+    const result = yield* graphql(
+      apiKey,
+      `
+        query FilterOptions {
+          workflowStates(first: 250) {
+            nodes {
+              name
+              type
+              position
+            }
+          }
+          projects(first: 250) {
+            nodes {
+              name
+            }
+          }
+        }
+      `,
+      {},
+    );
+    const data = yield* expectData(FilterOptionsData, result);
+    const states = data.workflowStates.nodes.toSorted(
+      (left, right) =>
+        stateTypeRank(left.type) - stateTypeRank(right.type) || left.position - right.position,
+    );
+    return {
+      states: [...new Set(states.map((state) => state.name))],
+      projects: [...new Set(data.projects.nodes.map((project) => project.name))].toSorted(
+        (left, right) => left.localeCompare(right),
+      ),
+    };
+  });
+
   // graphql: used by the notifications bell (IssueTrackerNotifications.ts).
-  return { viewerName, issue, search, assignedOpenIssues, recentIssues, graphql };
+  return {
+    viewerName,
+    issue,
+    search,
+    assignedOpenIssues,
+    recentIssues,
+    filterOptions,
+    graphql,
+  };
 });
 
 export type LinearApi = Effect.Success<typeof makeLinearApi>;

@@ -95,6 +95,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.serverPrepareTriage]: "server",
   [WS_METHODS.issueTrackersGetThreadIssues]: "server",
   [WS_METHODS.issueTrackersSearch]: "server",
+  [WS_METHODS.issueTrackersGetFilterOptions]: "server",
   [WS_METHODS.issueTrackersGetConnections]: "server",
   [WS_METHODS.issueTrackersGetThreadSummaries]: "server",
   [WS_METHODS.issueTrackersGetIssues]: "server",
