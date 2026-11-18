@@ -1372,6 +1372,19 @@ export const make = Effect.gen(function* () {
     for (const result of viewerResults) {
       if (result.viewer !== null) viewers[result.host] = result.viewer;
     }
+    // Fork: a repository its host routes to another account names that viewer as "host owner/name".
+    yield* Effect.forEach(
+      projects.filter(({ host }) => viewers[host] !== undefined && projectCounts.get(host)! > 1),
+      (project) =>
+        project.api.getViewer({ cwd: project.project.workspaceRoot, host: project.host }).pipe(
+          Effect.map((viewer) => {
+            if (viewer.toLowerCase() === viewers[project.host]!.toLowerCase()) return;
+            viewers[`${project.host} ${project.repository.toLowerCase()}`] = viewer;
+          }),
+          Effect.ignore,
+        ),
+      { concurrency: REPOSITORY_CONCURRENCY, discard: true },
+    );
 
     const providers: ReadonlyArray<PullRequestProviderSummary> = [
       ...viewerResults.map((result) => {
@@ -1446,7 +1459,8 @@ export const make = Effect.gen(function* () {
       cursor: ListCursor | undefined,
     ): Effect.Effect<RepositoryBatch> => {
       {
-        const viewer = viewers[project.host]!;
+        const viewer =
+          viewers[`${project.host} ${project.repository.toLowerCase()}`] ?? viewers[project.host]!;
         const key = project.cursorKey;
         return project.api
           .listChangeRequests({

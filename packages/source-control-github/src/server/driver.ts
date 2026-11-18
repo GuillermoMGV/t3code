@@ -10,6 +10,7 @@ import { HttpClient } from "effect/http";
 
 import { definition } from "../shared/definition.ts";
 
+import * as GitHubAccountRoutedInstance from "./GitHubAccountRoutedInstance.ts";
 import * as GitHubAppAccess from "./GitHubAppAccess.ts";
 import * as GitHubAppSignIn from "./GitHubAppSignIn.ts";
 import * as GitHubMediaFetch from "./gitHubMediaFetch.ts";
@@ -112,7 +113,8 @@ const makeInstance = Effect.gen(function* () {
       starRepository: makeStarRepository,
     }),
     services,
-  );
+    // Fork: one gh account per repository; see GitHubAccountRoutedInstance.ts.
+  ).pipe(Effect.flatMap(GitHubAccountRoutedInstance.withAccountRouting));
 });
 
 export const driver = defineSourceControlDriver({

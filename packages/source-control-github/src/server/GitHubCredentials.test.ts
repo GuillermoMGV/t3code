@@ -10,6 +10,7 @@ import { DEFAULT_SERVER_SETTINGS, SecretProviderId, SecretProviderKind } from "@
 import type * as SourceControlHost from "@t3tools/source-control-core/server/SourceControlHost";
 import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 import * as TestSourceControlHost from "@t3tools/source-control-testing/TestSourceControlHost";
+import * as GitHubAccountRouting from "./GitHubAccountRouting.ts";
 import * as GitHubCredentials from "./GitHubCredentials.ts";
 
 const TOKEN_VARIABLES = [
@@ -30,11 +31,43 @@ function harness(
   hosts: Record<string, { readonly account?: string; readonly enabled?: boolean }> = {},
   signedOut: ReadonlyArray<string> = [],
   tokens: Record<string, string> = {},
+  // Fork: gh accounts, and what `gh api repos/<repository> --jq .permissions.push` prints per
+  // `login repository` (absent means GitHub answered 404 for that account).
+  routing: {
+    readonly accounts: ReadonlyArray<{ readonly login: string; readonly active: boolean }>;
+    readonly push?: Record<string, "true" | "false">;
+  } = { accounts: [] },
 ) {
   const calls: Array<ReadonlyArray<string>> = [];
   const run: SourceControlHost.SourceControlHost["Service"]["process"]["run"] = (input) =>
     Effect.sync(() => {
       calls.push(input.args);
+      const answer = (exitCode: number, stdout: string) => ({
+        exitCode: ChildProcessSpawner.ExitCode(exitCode),
+        stdout,
+        stderr: "",
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      });
+      if (input.args[0] === "auth" && input.args[1] === "status") {
+        return answer(
+          0,
+          `{"hosts":{"github.com":${JSON.stringify(
+            routing.accounts.map((account) => ({ ...account, state: "success", token: "secret" })),
+          )}}}`,
+        );
+      }
+      if (input.args[0] === "api") {
+        const login = input.env?.GH_TOKEN?.replace("token-for-", "");
+        const pushed = routing.push?.[`${login} ${input.args[1]!.replace("repos/", "")}`];
+        return pushed === undefined
+          ? answer(1, "")
+          : answer(
+              0,
+              `${pushed}
+`,
+            );
+      }
       const user = input.args[input.args.indexOf("--user") + 1];
       if (input.args.includes("--user") && user !== undefined && signedOut.includes(user)) {
         return {
@@ -188,6 +221,75 @@ describe("GitHubCredentials", () => {
         expect((yield* Effect.flip(credentials.get(host)))._tag).toBe("GitHubNotSignedInError");
       }
       expect(calls).toEqual([]);
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("uses the gh account named like a personal repository's owner", () => {
+    const { layer, calls } = harness(
+      {},
+      [],
+      {},
+      {
+        accounts: [
+          { login: "work", active: true },
+          { login: "me", active: false },
+        ],
+      },
+    );
+    return Effect.gen(function* () {
+      const credentials = yield* GitHubCredentials.GitHubCredentials;
+      const credential = yield* credentials
+        .get("github.com")
+        .pipe(Effect.provideService(GitHubAccountRouting.GitHubRequestRepository, "Me/side"));
+      expect(Redacted.value(credential.token)).toBe("token-for-me");
+      expect(Redacted.value((yield* credentials.get("github.com")).token)).toBe("active-token");
+      expect(calls.some((args) => args[0] === "api")).toBe(false);
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("routes an organization repository to the account that can push, once", () => {
+    const { layer, calls } = harness(
+      {},
+      [],
+      {},
+      {
+        accounts: [
+          { login: "work", active: true },
+          { login: "me", active: false },
+        ],
+        push: { "work acme/app": "false", "me acme/app": "true", "work other/lib": "true" },
+      },
+    );
+    return Effect.gen(function* () {
+      const credentials = yield* GitHubCredentials.GitHubCredentials;
+      const tokenFor = (repository: string) =>
+        credentials.get("github.com").pipe(
+          Effect.provideService(GitHubAccountRouting.GitHubRequestRepository, repository),
+          Effect.map((credential) => Redacted.value(credential.token)),
+        );
+      expect(yield* tokenFor("acme/app")).toBe("token-for-me");
+      expect(yield* tokenFor("acme/app")).toBe("token-for-me");
+      expect(yield* tokenFor("other/lib")).toBe("token-for-work");
+      expect(yield* tokenFor("nobody/sees-it")).toBe("active-token");
+      expect(calls.filter((args) => args[0] === "api")).toEqual([
+        ["api", "repos/acme/app", "--hostname", "github.com", "--jq", ".permissions.push"],
+        ["api", "repos/acme/app", "--hostname", "github.com", "--jq", ".permissions.push"],
+        ["api", "repos/other/lib", "--hostname", "github.com", "--jq", ".permissions.push"],
+        ["api", "repos/nobody/sees-it", "--hostname", "github.com", "--jq", ".permissions.push"],
+        ["api", "repos/nobody/sees-it", "--hostname", "github.com", "--jq", ".permissions.push"],
+      ]);
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("never probes when gh holds a single account for the host", () => {
+    const { layer, calls } = harness({}, [], {}, { accounts: [{ login: "work", active: true }] });
+    return Effect.gen(function* () {
+      const credentials = yield* GitHubCredentials.GitHubCredentials;
+      const credential = yield* credentials
+        .get("github.com")
+        .pipe(Effect.provideService(GitHubAccountRouting.GitHubRequestRepository, "acme/app"));
+      expect(Redacted.value(credential.token)).toBe("active-token");
+      expect(calls.some((args) => args[0] === "api")).toBe(false);
     }).pipe(Effect.provide(layer));
   });
 });

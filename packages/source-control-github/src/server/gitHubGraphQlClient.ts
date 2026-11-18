@@ -12,6 +12,7 @@ import { GraphQLClientError, GraphQLMiddleware, GraphQLProtocol } from "effect/g
 import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
 import { collectUint8StreamText } from "@t3tools/provider-core/server/collectStreamText";
 
+import * as GitHubAccountRouting from "./GitHubAccountRouting.ts";
 import * as GitHubCredentials from "./GitHubCredentials.ts";
 import * as GitHubRequestPolicy from "./GitHubRequestPolicy.ts";
 
@@ -241,6 +242,8 @@ export const batchKey = (context: Context.Context<GitHubGraphQlTarget>) =>
     Context.getOrElse(context, GitHubRequestPolicy.PinnedGitHubCredential, () => null)
       ?.credentialFingerprint ?? null,
     Context.getOrElse(context, SourceControlRateLimit.CredentialScope, () => ""),
+    // Fork: repositories routed to different gh accounts never share a batch.
+    Context.getOrElse(context, GitHubAccountRouting.GitHubRequestRepository, () => null),
   ]);
 
 const fromClientError = (

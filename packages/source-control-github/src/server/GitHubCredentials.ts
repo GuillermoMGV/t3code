@@ -23,6 +23,7 @@ import {
 } from "@t3tools/contracts";
 
 import * as GitHubClient from "../shared/definition.ts";
+import * as GitHubAccountRouting from "./GitHubAccountRouting.ts";
 
 /**
  * Every gh run on the server shares this. A burst of them (a status poll across many checkouts)
@@ -245,6 +246,50 @@ export const make = Effect.gen(function* () {
           : MISSING_TTL,
   });
 
+  // Fork: a host with several gh accounts uses the one that reaches the request's repository.
+  const ghEnv = { GH_DEBUG: "", GH_PROMPT_DISABLED: "1" };
+  const routeAccount = yield* GitHubAccountRouting.makeAccountRouter({
+    accounts: (host) =>
+      process
+        .run({
+          operation: "GitHubCredentials.accounts",
+          command: "gh",
+          args: ["auth", "status", "--hostname", host, "--json", "hosts"],
+          cwd: workingDirectory,
+          env: ghEnv,
+          allowNonZeroExit: true,
+          timeoutMs: 10_000,
+          concurrency: GH_PROCESS_CONCURRENCY,
+        })
+        .pipe(
+          Effect.map((output) => GitHubAccountRouting.parseGhAccounts(output.stdout)[host] ?? []),
+        ),
+    access: (host, login, repository) =>
+      Cache.get(cache, cacheKey(host, login)).pipe(
+        Effect.flatMap((credential) => {
+          const token = Redacted.value(credential.token);
+          return process.run({
+            operation: "GitHubCredentials.repositoryAccess",
+            command: "gh",
+            args: ["api", `repos/${repository}`, "--hostname", host, "--jq", ".permissions.push"],
+            cwd: workingDirectory,
+            env: { ...ghEnv, GH_HOST: host, GH_TOKEN: token, GH_ENTERPRISE_TOKEN: token },
+            allowNonZeroExit: true,
+            timeoutMs: 10_000,
+            concurrency: GH_PROCESS_CONCURRENCY,
+          });
+        }),
+        Effect.map((output): GitHubAccountRouting.RepositoryAccess =>
+          output.exitCode !== 0 ? "none" : output.stdout.trim() === "true" ? "push" : "read",
+        ),
+      ),
+  });
+  const accountFor = Effect.fn("GitHubCredentials.accountFor")(function* (host: string) {
+    const repository = yield* GitHubAccountRouting.GitHubRequestRepository;
+    const routed = repository === null ? undefined : yield* routeAccount(host, repository);
+    return routed ?? (yield* hostChoice(host))?.account;
+  });
+
   const saved = Effect.fn("GitHubCredentials.saved")(function* (rawHost: string) {
     const host = normalizeHost(rawHost);
     if (!isGitHubHost(host)) return yield* new GitHubNotSignedInError({ host });
@@ -266,14 +311,14 @@ export const make = Effect.gen(function* () {
       const host = normalizeHost(rawHost);
       const fromSettings = yield* saved(host);
       if (Option.isSome(fromSettings)) return fromSettings.value;
-      return yield* Cache.get(cache, cacheKey(host, (yield* hostChoice(host))?.account));
+      return yield* Cache.get(cache, cacheKey(host, yield* accountFor(host)));
     }),
     saved,
     fingerprint: fingerprintOf,
     invalidate: Effect.fn("GitHubCredentials.invalidate")(function (rawHost) {
       const host = normalizeHost(rawHost);
-      return hostChoice(host).pipe(
-        Effect.flatMap((choice) => Cache.invalidate(cache, cacheKey(host, choice?.account))),
+      return accountFor(host).pipe(
+        Effect.flatMap((account) => Cache.invalidate(cache, cacheKey(host, account))),
       );
     }),
   });

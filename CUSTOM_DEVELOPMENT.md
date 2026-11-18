@@ -396,6 +396,32 @@ Qué hace: el icono del calendario con reloj en la parte inferior de la barra la
 | --------------------------------------------------- | ------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarChrome.tsx` | icono `CalendarClockIcon` y el botón «Scheduled tasks» |
 
+### Una cuenta de GitHub por repositorio
+
+Qué hace: si `gh` tiene **varias cuentas en el mismo host** (por ejemplo `Guillermo-Miranda-01` para Properti y `GuillermoMGV` para ASTI, ver `gh auth status`), cada petición a GitHub usa la cuenta que llega a su repositorio, en vez de la cuenta activa para todo. No hay que configurar nada: basta con haber hecho `gh auth login` con cada cuenta.
+
+- **Cómo elige la cuenta:** si el owner del repositorio se llama como una de las cuentas (repo personal, `GuillermoMGV/ASTI`), usa esa. Si no, prueba cada cuenta, la activa primero, con `gh api repos/<owner>/<repo> --jq .permissions.push` y se queda con la primera que puede hacer push; si ninguna, con la primera que puede leerlo; si ninguna lo ve, con la cuenta por defecto (la activa o la elegida en Ajustes → Source Control). El resultado se guarda una hora (un fallo, un minuto) y la lista de cuentas, 5 minutos.
+- **De dónde sale el repositorio:** del `repository` (`owner/nombre`) de la llamada o, si no viene, de los remotos git del proyecto (`cwd`), con la misma regla que usa el proveedor de GitHub. Viaja a `GitHubCredentials` como la referencia `GitHubRequestRepository`, que también separa los lotes de GraphQL para no mezclar cuentas.
+- **Página de pull requests:** las búsquedas «mías» de cada repositorio usan el login de su cuenta, y el servidor añade a `viewers` una entrada `"<host> <owner/nombre>"` cuando un repositorio va con otra cuenta que la de su host, para que sus PR salgan en «Authored». Con varias cuentas no se usa la búsqueda combinada de varios repositorios (`listChangeRequestsAcross`): cada repositorio se lee aparte.
+- **Sin efecto con una sola cuenta por host:** al arrancar, el driver de GitHub mira `gh auth status --json hosts`; si ningún host tiene más de una cuenta, devuelve la instancia original y todo funciona como en el oficial.
+
+| Parte    | Archivos nuevos                                                                                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Servidor | `packages/source-control-github/src/server/GitHubAccountRouting.ts` (elección de cuenta), `GitHubAccountRoutedInstance.ts` (envuelve los métodos del driver) (+ test) |
+
+| Toca (archivos oficiales)                                             | Qué añade                                                                             |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `packages/source-control-github/src/server/GitHubCredentials.ts`      | `routeAccount` y `accountFor`: la cuenta enrutada antes que la elegida en Ajustes     |
+| `packages/source-control-github/src/server/GitHubCredentials.test.ts` | parámetro `routing` en el arnés y tres casos                                          |
+| `packages/source-control-github/src/server/gitHubGraphQlClient.ts`    | `GitHubRequestRepository` en `batchKey`                                               |
+| `packages/source-control-github/src/server/driver.ts`                 | import y `withAccountRouting` sobre la instancia                                      |
+| `apps/server/src/pullRequest/PullRequestService.ts`                   | viewers por repositorio en `listUncached` y su uso en `readSlice`                     |
+| `apps/web/src/components/pullRequest/pullRequestList.logic.ts`        | `pullRequestEntryViewer` mira primero la clave por repositorio (+ un caso en su test) |
+
+Probar: `vp test run packages/source-control-github/src/server/GitHubCredentials.test.ts packages/source-control-github/src/server/GitHubAccountRoutedInstance.test.ts apps/web/src/components/pullRequest/pullRequestList.logic.test.ts`. Probado en dev con los repos reales: antes, `GET /repos/guillermomgv/asti/pulls` devolvía 404 con la cuenta activa; con el cambio devuelve 200 con `GuillermoMGV`, la PR #23 de ASTI sale en «Authored» y las de `Properti-AG/salesforce` siguen saliendo con `Guillermo-Miranda-01`.
+
+Limitaciones: una cuenta añadida con `gh auth login` mientras el servidor corre no activa el enrutado hasta reiniciar (si antes había una sola). Un token guardado en Ajustes, `GH_TOKEN` o la app «T3 Code for GitHub» siguen teniendo prioridad y no se enrutan. Las imágenes de PR sin repositorio conocido y la lista de repos para clonar usan la cuenta por defecto.
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:

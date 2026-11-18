@@ -207,7 +207,12 @@ export function pullRequestEntryViewer(
   entry: ScopedEntry,
   viewers: PullRequestViewers,
 ): string | null {
-  return normalize(viewers[pullRequestViewerKey(entry)] ?? viewers[entry.host]);
+  return normalize(
+    // Fork: a repository read with another account than its host's names its own viewer.
+    viewers[`${pullRequestViewerKey(entry)} ${entry.repository.toLowerCase()}`] ??
+      viewers[pullRequestViewerKey(entry)] ??
+      viewers[entry.host],
+  );
 }
 
 function isAuthoredByViewer(entry: ScopedEntry, viewers: PullRequestViewers): boolean {

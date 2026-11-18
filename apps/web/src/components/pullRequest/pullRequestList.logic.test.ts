@@ -635,6 +635,24 @@ describe('who "I" am, per server', () => {
       ),
     ).toEqual([1]);
   });
+
+  it("lets a repository read with another account name its own author", () => {
+    const byMe = { login: "Me", name: null, avatarUrl: null };
+    const merged = mergePullRequestLists([
+      [
+        ENV_1,
+        answer({ "github.com": "Work", "github.com me/side": "Me" }, [
+          entry({ number: 1, repository: "Me/side", author: byMe }),
+          entry({ number: 2, repository: "acme/app", author: byMe }),
+        ]),
+      ],
+    ])!;
+
+    const groups = groupPullRequestsByInvolvement(merged.entries, merged.viewers);
+    expect(
+      groups.find((group) => group.key === "authored")?.entries.map((row) => row.number),
+    ).toEqual([1]);
+  });
 });
 
 describe("the project an id names", () => {
