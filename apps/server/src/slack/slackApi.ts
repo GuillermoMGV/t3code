@@ -71,6 +71,13 @@ function slackFailure(error: string, needed: string | undefined): SlackError {
       "Slack rejected the token. Connect Slack again in Settings → Issue trackers.",
     );
   }
+  // Apps with token rotation issue user tokens that last 12 hours; T3 Code cannot refresh them.
+  if (error === "token_expired") {
+    return slackError(
+      "unauthorized",
+      "The Slack token expired because the Slack app has token rotation on. Use an app without token rotation and connect Slack again in Settings → Issue trackers.",
+    );
+  }
   if (error === "missing_scope") {
     return slackError(
       "rejected",
