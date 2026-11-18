@@ -19,6 +19,7 @@ import {
   DEFAULT_SERVER_SETTINGS,
   EnvironmentId,
   GitCommandError,
+  IssueKey,
   MessageId,
   ProjectId,
   ProviderDriverKind,
@@ -45,6 +46,7 @@ import * as Stream from "effect/Stream";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as TestClock from "effect/testing/TestClock";
+import { HttpClient, HttpClientResponse } from "effect/http";
 
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -58,6 +60,8 @@ import * as ScheduledTasks from "../scheduledTasks/ScheduledTaskService.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
+import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
+import * as IssueTrackerService from "../issueTrackers/IssueTrackerService.ts";
 import { ClaudeProviderCapabilitiesV2 } from "./Adapters/ClaudeAdapterV2.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
@@ -2433,6 +2437,95 @@ it.effect("creates a strong provider-thread mapping for an imported native sessi
       launched.projection.providerThreads[0]?.id,
     );
   }).pipe(Effect.provide(harness.layer));
+});
+
+it.effect("uses the linked Linear or Jira ticket title when starting or renaming a thread", () => {
+  const harness = makeHarness();
+  const layerFiles = ServerConfig.layerTest(process.cwd(), { prefix: "t3-issue-title-" }).pipe(
+    Layer.provideMerge(DocumentText.layer.pipe(Layer.provide(NodeServices.layer))),
+    Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+  );
+  const layerSecrets = ServerSecretStore.layer.pipe(Layer.provide(layerFiles));
+  const http = HttpClient.make((request) =>
+    Effect.succeed(
+      HttpClientResponse.fromWeb(
+        request,
+        Response.json(
+          request.url.includes("/graphql")
+            ? {
+                data: {
+                  issue: {
+                    identifier: "PRO-123",
+                    title: "Fix SSO login",
+                    url: "https://linear.app/acme/issue/PRO-123",
+                    updatedAt: "2026-11-17T10:00:00.000Z",
+                    state: null,
+                    assignee: null,
+                  },
+                },
+              }
+            : { key: "CRM-42", fields: { summary: "Show account history" } },
+        ),
+      ),
+    ),
+  );
+  const services = IssueTrackerService.layer.pipe(
+    Layer.provide(Layer.succeed(HttpClient.HttpClient, http)),
+    Layer.provideMerge(layerSecrets),
+    Layer.provideMerge(layerFiles),
+    Layer.provideMerge(harness.layer),
+  );
+
+  return Effect.gen(function* () {
+    const issues = yield* IssueTrackerService.IssueTrackerService;
+    const secrets = yield* ServerSecretStore.ServerSecretStore;
+    const threads = yield* ThreadManagement.ThreadManagementService;
+    const titleRegeneration = yield* ThreadTitleRegeneration.ThreadTitleRegenerationService;
+    const encoder = new TextEncoder();
+    yield* secrets.set("linear-api-key", encoder.encode("test-key"));
+    yield* secrets.set(
+      "jira-credentials",
+      encoder.encode(
+        '{"siteUrl":"https://acme.atlassian.net","email":"dev@example.com","apiToken":"test-token"}',
+      ),
+    );
+    const input = {
+      ...launchInput({ command: "issue-launch", thread: "issue-draft", message: "Fix the bug" }),
+      generateTitle: true,
+    };
+    const linkLinear = {
+      type: "link" as const,
+      tracker: "linear" as const,
+      key: IssueKey.make("PRO-123"),
+    };
+    yield* issues.mutate({ ...linkLinear, threadId: input.threadId });
+    assert.isNull(yield* threads.getThreadShell(input.threadId));
+    const launched = yield* ThreadMessageIntake.launchThread(input);
+    assert.equal(launched.projection.thread.title, "PRO-123 — Fix SSO login");
+    assert.isUndefined(launched.projection.thread.titleRegeneration);
+
+    const normal = {
+      ...input,
+      commandId: CommandId.make("issue-link-existing"),
+      threadId: ThreadId.make("existing-issue-thread"),
+    };
+    const existing = yield* ThreadMessageIntake.launchThread(normal);
+    assert.equal(existing.projection.thread.titleRegeneration?.requestId, normal.commandId);
+    yield* issues.mutate({
+      type: "link",
+      tracker: "jira",
+      key: IssueKey.make("CRM-42"),
+      threadId: normal.threadId,
+    });
+    yield* titleRegeneration.execute({
+      threadId: normal.threadId,
+      requestId: normal.commandId,
+      kind: { type: "initial", messageId: MessageId.make("Fix the bug:id") },
+    });
+    const renamed = yield* threads.getThreadShell(normal.threadId);
+    assert.equal(renamed?.title, "CRM-42 — Show account history");
+    assert.isNull(renamed?.titleRegeneration);
+  }).pipe(Effect.provide(services));
 });
 
 it.effect("shared intake preserves durable attachment bytes after a lost launch result", () => {

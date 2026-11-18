@@ -18,11 +18,14 @@ import {
   type IssueTrackerIssuesInput,
   type IssueTrackerIssuesResult,
   type IssueTrackerThreadRow,
+  type ThreadId,
   type TrackerIssue,
   parseIssueReference,
 } from "@t3tools/contracts";
+import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -33,6 +36,8 @@ import * as Semaphore from "effect/Semaphore";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
+import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
+import { issueThreadTitle, renameLinkedThread } from "./issueThreadTitle.ts";
 import { type JiraCredentials, makeJiraApi, normalizeJiraSiteUrl } from "./jiraApi.ts";
 import { makeLinearApi } from "./linearApi.ts";
 
@@ -47,6 +52,7 @@ const LEGACY_LINEAR_LINKS_FILE = "linear-links.json";
 
 const ThreadLinkEntry = Schema.Struct({
   key: Schema.optional(IssueKey),
+  title: Schema.optional(Schema.String),
   dismissed: Schema.optional(Schema.Array(IssueKey)),
   /** The issue last detected in the thread's messages, so the thread list can show it. */
   detected: Schema.optional(IssueKey),
@@ -56,6 +62,7 @@ type ThreadLinkEntry = typeof ThreadLinkEntry.Type;
 const ThreadLinks = Schema.Struct({
   linear: Schema.optional(ThreadLinkEntry),
   jira: Schema.optional(ThreadLinkEntry),
+  titleTracker: Schema.optional(Schema.Literals(TRACKERS)),
 });
 type ThreadLinks = typeof ThreadLinks.Type;
 
@@ -156,6 +163,10 @@ export class IssueTrackerService extends Context.Service<
     readonly mutate: (
       input: IssueTrackerMutation,
     ) => Effect.Effect<IssueTrackerMutationResult, IssueTrackerError>;
+    readonly withLinkedIssueTitle: <A, E, R>(
+      threadId: ThreadId,
+      launch: (title: string | undefined) => Effect.Effect<A, E, R>,
+    ) => Effect.Effect<A, E, R>;
   }
 >()("t3/issueTrackers/IssueTrackerService") {}
 
@@ -163,12 +174,15 @@ const make = Effect.gen(function* () {
   const linear = yield* makeLinearApi;
   const jira = yield* makeJiraApi;
   const secrets = yield* ServerSecretStore.ServerSecretStore;
+  const threads = yield* ThreadManagement.ThreadManagementService;
+  const random = yield* SecureRandom.SecureRandom;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const { stateDir } = yield* ServerConfig.ServerConfig;
   const linksPath = path.join(stateDir, LINKS_FILE);
   const legacyLinksPath = path.join(stateDir, LEGACY_LINEAR_LINKS_FILE);
   const writeLock = yield* Semaphore.make(1);
+  const threadLocks = yield* KeyedLock.make<ThreadId>();
 
   const readSecret = (tracker: IssueTrackerKind, name: string) =>
     secrets
@@ -270,6 +284,46 @@ const make = Effect.gen(function* () {
               : undefined,
           ),
         ),
+      ),
+    );
+
+  const fetchTitle = Effect.fn("IssueTrackerService.fetchTitle")(function* (
+    tracker: IssueTrackerKind,
+    key: IssueKey,
+  ) {
+    const issue = Option.getOrNull(yield* fetchAndCache(tracker, key));
+    return issue === null ? undefined : issueThreadTitle(issue);
+  });
+
+  const readLinkedTitle = Effect.fn("IssueTrackerService.readLinkedTitle")(function* (
+    threadId: ThreadId,
+  ) {
+    const links = (yield* readLinks).threads[threadId];
+    const tracker =
+      links?.titleTracker ?? TRACKERS.find((kind) => links?.[kind]?.key !== undefined);
+    if (tracker === undefined) return undefined;
+    const entry = links?.[tracker];
+    if (entry?.key === undefined) return undefined;
+    if (entry.title !== undefined) return entry.title;
+    return yield* fetchTitle(tracker, entry.key);
+  });
+
+  const withLinkedIssueTitle: IssueTrackerService["Service"]["withLinkedIssueTitle"] = (
+    threadId,
+    launch,
+  ) =>
+    threadLocks.withLock(
+      threadId,
+      readLinkedTitle(threadId).pipe(
+        Effect.catchTags({
+          IssueTrackerError: (error) =>
+            Effect.logWarning("Could not resolve linked issue title at launch", {
+              threadId,
+              tracker: error.tracker,
+              reason: error.reason,
+            }).pipe(Effect.as(undefined)),
+        }),
+        Effect.flatMap(launch),
       ),
     );
 
@@ -544,6 +598,52 @@ const make = Effect.gen(function* () {
     Effect.withSpan("IssueTrackerService.getConnections"),
   );
 
+  const mutateThreadLink = Effect.fn("IssueTrackerService.mutateThreadLink")(function* (
+    input: Extract<IssueTrackerMutation, { type: "link" | "unlink" }>,
+  ) {
+    const title = input.type === "link" ? yield* fetchTitle(input.tracker, input.key) : undefined;
+    if (input.type === "link" && title === undefined) {
+      return yield* new IssueTrackerError({
+        tracker: input.tracker,
+        reason: "invalidInput",
+        detail: `Could not find ticket ${input.key}.`,
+      });
+    }
+    yield* threadLocks.withLock(
+      input.threadId,
+      writeLock.withPermit(
+        Effect.gen(function* () {
+          const links = yield* readLinks;
+          const { [input.threadId]: previous = {}, ...others } = links.threads;
+          const { [input.tracker]: entry, titleTracker, ...otherTrackers } = previous;
+          const next = applyThreadLinkMutation(entry, input);
+          const threadLinks: ThreadLinks = {
+            ...otherTrackers,
+            ...(next === undefined ? {} : { [input.tracker]: { ...next, title } }),
+            ...(title !== undefined
+              ? { titleTracker: input.tracker }
+              : titleTracker !== undefined && titleTracker !== input.tracker
+                ? { titleTracker }
+                : {}),
+          };
+          yield* writeLinks({
+            threads:
+              Object.keys(threadLinks).length === 0
+                ? others
+                : { ...others, [input.threadId]: threadLinks },
+          });
+          if (title !== undefined) {
+            yield* renameLinkedThread(threads, input.threadId, title).pipe(
+              Effect.provideService(SecureRandom.SecureRandom, random),
+              Effect.mapError(storageError(input.tracker, "Could not rename the linked thread.")),
+              Effect.onError(() => writeLinks(links).pipe(Effect.ignore({ log: true }))),
+            );
+          }
+        }).pipe(Effect.uninterruptible),
+      ),
+    );
+  });
+
   const mutate = Effect.fn("IssueTrackerService.mutate")(function* (input: IssueTrackerMutation) {
     switch (input.type) {
       case "connectLinear": {
@@ -587,22 +687,7 @@ const make = Effect.gen(function* () {
         return yield* updateIssue(input);
       case "link":
       case "unlink":
-        yield* writeLock.withPermits(1)(
-          Effect.gen(function* () {
-            const links = yield* readLinks;
-            const { [input.threadId]: previous = {}, ...others } = links.threads;
-            const { [input.tracker]: entry, ...otherTrackers } = previous;
-            const next = applyThreadLinkMutation(entry, input);
-            const threadLinks: ThreadLinks =
-              next === undefined ? otherTrackers : { ...otherTrackers, [input.tracker]: next };
-            yield* writeLinks({
-              threads:
-                Object.keys(threadLinks).length === 0
-                  ? others
-                  : { ...others, [input.threadId]: threadLinks },
-            });
-          }),
-        );
+        yield* mutateThreadLink(input);
         return {};
     }
   });
@@ -616,6 +701,7 @@ const make = Effect.gen(function* () {
     getThreadSummaries,
     getIssues,
     mutate,
+    withLinkedIssueTitle,
   });
 });
 

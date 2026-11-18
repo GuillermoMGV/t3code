@@ -3,9 +3,11 @@ import { appendUserInputAttachmentPaths } from "../provider/userInputAttachments
 import type { ChatAttachment, OrchestrationV2Command } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { resolveAttachmentPath } from "../attachmentStore.ts";
 import * as ServerConfig from "../config.ts";
+import * as IssueTracker from "../issueTrackers/IssueTrackerService.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 
 import * as AttachmentClaims from "./AttachmentClaims.ts";
@@ -228,7 +230,7 @@ export const sendToThread = Effect.fn("ThreadMessageIntake.sendToThread")(functi
   );
 });
 
-export const launchThread = Effect.fn("ThreadMessageIntake.launchThread")(function* (
+const launchWithAttachments = Effect.fn("ThreadMessageIntake.launchWithAttachments")(function* (
   input: ThreadLaunch.ThreadLaunchInput,
 ) {
   const launches = yield* ThreadLaunch.ThreadLaunchService;
@@ -288,4 +290,20 @@ export const launchThread = Effect.fn("ThreadMessageIntake.launchThread")(functi
           : Effect.void;
       }),
     );
+});
+
+export const launchThread = Effect.fn("ThreadMessageIntake.launchThread")(function* (
+  input: ThreadLaunch.ThreadLaunchInput,
+) {
+  if (input.threadId !== undefined && !input.reuseExistingThread) {
+    const issueTrackers = yield* Effect.serviceOption(IssueTracker.IssueTrackerService);
+    if (Option.isSome(issueTrackers)) {
+      return yield* issueTrackers.value.withLinkedIssueTitle(input.threadId, (title) =>
+        launchWithAttachments(
+          title === undefined ? input : { ...input, title, generateTitle: false },
+        ),
+      );
+    }
+  }
+  return yield* launchWithAttachments(input);
 });

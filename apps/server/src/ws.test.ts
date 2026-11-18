@@ -821,7 +821,9 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(WorkspacePaths.WorkspacePaths)({}),
   Layer.mock(TraceDiagnostics.TraceDiagnostics)({}),
   Layer.mock(TriageService.TriageService)({}),
-  Layer.mock(IssueTrackerService.IssueTrackerService)({}),
+  Layer.mock(IssueTrackerService.IssueTrackerService)({
+    withLinkedIssueTitle: (_threadId, launch) => launch(undefined),
+  }),
   Layer.mock(IssueTrackerNotifications.IssueTrackerNotifications)({}),
   Layer.mock(SlackService.SlackService)({}),
   Layer.mock(SalesforceService.SalesforceService)({}),

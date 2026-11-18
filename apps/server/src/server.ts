@@ -800,13 +800,12 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
   ),
 );
 
-const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
+const layerRuntimeDependenciesBase = layerRuntimeCoreDependencies.pipe(
   Layer.provideMerge(layerUsage),
   Layer.provideMerge(layerBackground),
   Layer.provideMerge(layerResourceDiagnostics),
   Layer.provideMerge(TraceDiagnostics.layer),
   Layer.provideMerge(TriageService.layer.pipe(Layer.provide(GitVcsDriver.layer))),
-  Layer.provideMerge(IssueTrackerService.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(IssueTrackerNotifications.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(SlackService.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(SalesforceService.layer),
@@ -822,6 +821,10 @@ const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
   // fetch interval goes in context here, before the first build captures it.
   Layer.provideMerge(VcsAutomaticFetchInterval.layer.pipe(Layer.provide(layerServerSettings))),
   Layer.provide(NetService.layer),
+);
+
+const layerRuntimeDependencies = IssueTrackerService.layer.pipe(
+  Layer.provideMerge(layerRuntimeDependenciesBase),
 );
 
 const layerCommandReadiness = HttpRouter.middleware(

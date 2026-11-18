@@ -140,6 +140,25 @@ vp run dev --home-dir .t3 --no-seed
 
 Tests: `vp test run packages/contracts/src/issueTracker.test.ts apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueTrackerRows.logic.test.ts`. Las consultas de Linear se comprobaron contra su esquema GraphQL oficial; las de Jira, contra la documentación de autenticación y el changelog de Atlassian (la forma de la respuesta se decodifica de forma tolerante). Ambas se han ejecutado solo contra los mocks.
 
+### Títulos de hilo a partir de un ticket
+
+Al enviar un borrador abierto desde **Issues** o vincular un ticket de Linear o Jira desde el panel de detalles, el hilo toma el título `PRO-123 — Título del ticket`. Si vinculas otro ticket, el último que vincules da nombre al hilo. Puedes editar el título después. Desvincular un ticket conserva el título que tenga el hilo en ese momento.
+
+El servidor guarda el título del ticket en `userdata/issue-tracker-links.json` cuando lo vincula. Así, un borrador puede usarlo al enviarse sin volver a consultar el gestor. Para vincular un ticket, la cuenta conectada debe poder leerlo.
+
+| Parte    | Archivo del fork                                                               |
+| -------- | ------------------------------------------------------------------------------ |
+| Servidor | `apps/server/src/issueTrackers/issueThreadTitle.ts` y `IssueTrackerService.ts` |
+
+| Toca (archivos oficiales)                                      | Qué añade                                              |
+| -------------------------------------------------------------- | ------------------------------------------------------ |
+| `apps/server/src/orchestration-v2/ThreadMessageIntake.ts`      | Aplica el título vinculado al crear el hilo            |
+| `apps/server/src/orchestration-v2/ThreadLaunchService.test.ts` | Prueba la creación y el renombrado con Linear y Jira   |
+| `apps/server/src/server.ts`                                    | Conecta el servicio de tickets con la gestión de hilos |
+| `apps/server/src/ws.ts`, `apps/server/src/ws.test.ts`          | Proporcionan la integración al flujo de creación       |
+
+Prueba de integración con gestores simulados en `ThreadLaunchService.test.ts`, caso `uses the linked Linear or Jira ticket title when starting or renaming a thread`.
+
 ### Cambiar estado y asignado de un ticket
 
 Qué hace: el estado y el asignado de un ticket se cambian con un clic en tres sitios: el panel del hilo (donde ahora van en líneas separadas: clave, estado y asignado), la página de tickets y la línea del ticket en la lista de pull requests. Se abre un desplegable con buscador (escribe para filtrar; ↑/↓ y Enter, o clic) y el cambio se hace en Linear o Jira.
