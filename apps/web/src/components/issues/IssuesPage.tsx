@@ -72,11 +72,10 @@ import { WorkspaceBreadcrumb, WorkspaceBreadcrumbItem } from "../WorkspaceBreadc
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import {
-  EMPTY_ISSUE_LIST_FILTER,
+  defaultIssueListFilter,
   filterIssues,
   ISSUE_ASSIGNEE_GROUPS,
   IssueListFilter,
-  issueListFilterCount,
   issueListFilterStorageKey,
   issueProjectOptions,
   issueStateOptions,
@@ -214,7 +213,7 @@ function IssueList({
   // Remembered per tracker in this browser, like the Pull requests page's filters.
   const [filter, setFilter] = useLocalStorage(
     issueListFilterStorageKey(tracker),
-    EMPTY_ISSUE_LIST_FILTER,
+    defaultIssueListFilter(tracker),
     IssueListFilter,
   );
   const {
@@ -247,11 +246,15 @@ function IssueList({
             aria-label={`Search ${label} issues`}
           />
         </InputGroup>
+        <IssueProjectMenu
+          filter={filter}
+          onFilter={setFilter}
+          projectOptions={issueProjectOptions(options?.projects ?? [], found, filter)}
+        />
         <IssueFiltersMenu
           filter={filter}
           onFilter={setFilter}
           stateOptions={issueStateOptions(options?.states ?? [], found, filter)}
-          projectOptions={issueProjectOptions(options?.projects ?? [], found, filter)}
         />
       </div>
       <p className="text-muted-foreground text-xs">
@@ -505,18 +508,67 @@ function StartThreadPicker({
   );
 }
 
-function IssueFiltersMenu({
+function IssueProjectMenu({
   filter,
   onFilter,
-  stateOptions,
   projectOptions,
 }: {
   filter: IssueListFilter;
   onFilter: (filter: IssueListFilter) => void;
-  stateOptions: ReadonlyArray<string>;
   projectOptions: ReadonlyArray<string>;
 }) {
-  const count = issueListFilterCount(filter);
+  const chosen = filter.projects;
+  const label =
+    chosen.length === 0
+      ? "All projects"
+      : chosen.length === 1
+        ? chosen[0]!
+        : `${chosen.length} projects`;
+  return (
+    <Menu>
+      <MenuTrigger
+        render={<Button size="sm" variant="outline" className="max-w-56 shrink-0" />}
+        aria-label={`Project filter: ${label}`}
+      >
+        <FolderIcon aria-hidden />
+        <span className="min-w-0 truncate">{label}</span>
+        <ChevronDownIcon aria-hidden />
+      </MenuTrigger>
+      <MenuPopup align="end" className="max-h-96 w-64 overflow-y-auto">
+        <MenuCheckboxItem
+          checked={chosen.length === 0}
+          onCheckedChange={() => onFilter({ ...filter, projects: [] })}
+        >
+          All projects
+        </MenuCheckboxItem>
+        {projectOptions.length > 0 ? <MenuSeparator /> : null}
+        {projectOptions.map((project) => (
+          <MenuCheckboxItem
+            key={project}
+            checked={chosen.includes(project)}
+            onCheckedChange={() =>
+              onFilter({ ...filter, projects: toggleFilterValue(chosen, project) })
+            }
+          >
+            {project}
+          </MenuCheckboxItem>
+        ))}
+      </MenuPopup>
+    </Menu>
+  );
+}
+
+/** Assignee and state; the project has its own menu beside it. */
+function IssueFiltersMenu({
+  filter,
+  onFilter,
+  stateOptions,
+}: {
+  filter: IssueListFilter;
+  onFilter: (filter: IssueListFilter) => void;
+  stateOptions: ReadonlyArray<string>;
+}) {
+  const count = filter.states.length + filter.assignees.length;
   return (
     <Menu>
       <MenuTrigger
@@ -557,26 +609,12 @@ function IssueFiltersMenu({
             ))}
           </MenuGroup>
         ) : null}
-        {projectOptions.length > 0 ? (
-          <MenuGroup>
-            <MenuGroupLabel>Project</MenuGroupLabel>
-            {projectOptions.map((project) => (
-              <MenuCheckboxItem
-                key={project}
-                checked={filter.projects.includes(project)}
-                onCheckedChange={() =>
-                  onFilter({ ...filter, projects: toggleFilterValue(filter.projects, project) })
-                }
-              >
-                {project}
-              </MenuCheckboxItem>
-            ))}
-          </MenuGroup>
-        ) : null}
         {count > 0 ? (
           <>
             <MenuSeparator />
-            <MenuItem onClick={() => onFilter(EMPTY_ISSUE_LIST_FILTER)}>Clear filters</MenuItem>
+            <MenuItem onClick={() => onFilter({ ...filter, states: [], assignees: [] })}>
+              Clear filters
+            </MenuItem>
           </>
         ) : null}
       </MenuPopup>

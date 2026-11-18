@@ -123,7 +123,7 @@ export const defaultIssueListFilter = (tracker: IssueTrackerKind): IssueListFilt
 export const issueListFilterStorageKey = (tracker: IssueTrackerKind) =>
   `t3code:issues-filter:${tracker}:v2`;
 
-export const issueListFilterCount = (filter: IssueListFilter) =>
+const issueListFilterCount = (filter: IssueListFilter) =>
   filter.states.length + filter.assignees.length + filter.projects.length;
 
 const sameName = (left: string, right: string) =>
