@@ -203,9 +203,9 @@ Probar: el mock de gestores sirve estados, transiciones y personas y aplica los 
 
 ### Comentarios del ticket en el panel del hilo
 
-Qué hace: si el ticket de Linear o Jira del hilo tiene comentarios, su fila del panel muestra un **bocadillo** a la derecha del estado. Al pulsarlo aparece una tarjeta flotante abajo a la derecha, en la misma columna y con el mismo ancho que el panel del hilo (si el panel se muestra como popover por falta de sitio, encima de la caja de texto), con todos los comentarios del más nuevo al más antiguo: autor, fecha y texto. El bocadillo (o la X de la tarjeta) la oculta. La tarjeta sigue abierta aunque el panel se cierre y se oculta al cambiar de hilo.
+Qué hace: si el ticket de Linear o Jira del hilo tiene comentarios, su fila del panel muestra un **bocadillo** a la derecha del estado. Al pulsarlo se abre un **modal** en el centro de la pantalla, con el fondo difuminado (el `Dialog` de la app, como en Ajustes), con todos los comentarios del más nuevo al más antiguo: autor, fecha y texto. Se cierra pulsando fuera, con Esc o con la X.
 
-- **Check in thread:** cada comentario lleva este botón. Usa el mismo hook que el botón de la campana (`useCheckCommentInThread`), apuntando al hilo abierto: añade al final de la caja de texto `Check this comment on ticket <clave> (<título>), posted by <autor> on <fecha>:`, el comentario citado y la URL del ticket, **sin enviar**, sin repetirlo si ya está, y deja el foco en la caja.
+- **Check in thread:** cada comentario lleva este botón. Usa el mismo hook que el botón de la campana (`useCheckCommentInThread`), apuntando al hilo abierto: añade al final de la caja de texto `Check this comment on ticket <clave> (<título>), posted by <autor> on <fecha>:`, el comentario citado y la URL del ticket, **sin enviar**, sin repetirlo si ya está, cierra el modal y deja el foco en la caja.
 - **Datos:** los comentarios llegan con la misma consulta del panel (`issueTrackers.getThreadIssues`, campo opcional `comments` de cada fila), así que no hay RPC nueva y se refrescan cada minuto con el resto del ticket. Linear: `issue(id) { comments(first: 100) }` con el cuerpo en markdown. Jira: `GET /rest/api/3/issue/{clave}/comment?orderBy=-created&maxResults=100`, con el cuerpo ADF pasado a texto (una línea por bloque). Si los comentarios fallan, el ticket se muestra igual sin bocadillo y el servidor deja un aviso en el log.
 - **Límites:** hasta 100 comentarios por ticket. Los comentarios de integraciones (sin usuario) salen como «Unknown author». El texto se muestra plano, sin formato markdown. No está en la app móvil.
 
@@ -220,7 +220,7 @@ Archivos del fork que cambian: `issueTracker.ts` (contrato: `TrackerIssueComment
 | -------------------------------------- | ----------------------------------------------------------------------------- |
 | `apps/web/src/components/ChatView.tsx` | import y `<ThreadIssueComments>` junto al panel del hilo (pasa `composerRef`) |
 
-Probar: con los mocks (sección de Linear y Jira), vincula PRO-1234 a un hilo; el bocadillo dice «Show 3 comments». Tests: `vp test run apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueComments.logic.test.ts apps/web/src/components/chat/issueTrackerRows.logic.test.ts`. Comprobado en dev contra los mocks (abrir, cerrar, alineación con el panel, «Check in thread» sin duplicar); Jira solo con tests y el mock, y ninguno contra los gestores reales.
+Probar: con los mocks (sección de Linear y Jira), vincula PRO-1234 a un hilo; el bocadillo dice «Show 3 comments». Tests: `vp test run apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueComments.logic.test.ts apps/web/src/components/chat/issueTrackerRows.logic.test.ts`. Comprobado en dev contra los mocks (abrir el modal, cerrarlo pulsando fuera, «Check in thread» sin duplicar); Jira solo con tests y el mock, y ninguno contra los gestores reales.
 
 ### Campana de notificaciones de Linear, Jira y Slack
 
@@ -607,6 +607,28 @@ Qué hace: Ajustes → Agents → **Skills** (`/settings/skills`) lista todas la
 Tests: `vp test run apps/server/src/skills/SkillsService.test.ts apps/web/src/components/settings/skills/skillsInventory.logic.test.ts`. Para probar el borrado sin tocar skills reales, crea una de prueba en `~/.agents/skills/<nombre>/SKILL.md`, pulsa refrescar, bórrala, restáurala y bórrala para siempre.
 
 Limitaciones: usa `~/.claude` y `~/.codex` aunque `CLAUDE_CONFIG_DIR`, `CODEX_HOME` o el `homePath` de Claude en T3 apunten a otra carpeta; no busca skills en subcarpetas de un proyecto (monorepos con `.claude/skills` en un paquete) ni en proyectos que no estén en T3 Code; las skills de plugins y sincronizadas no se pueden borrar desde aquí; no se pueden editar (usa «Open in editor»).
+
+### Panel de inicio: lo que está en tu tejado
+
+Qué hace: al pulsar «T3 Code» arriba a la izquierda (o abrir un hilo nuevo), debajo de la caja de texto aparecen cuatro tarjetas con lo que espera algo de ti. Cada una enseña 4 filas y «+N more» para ver el resto.
+
+- **Needs you (hilos):** hilos que no están settled, ni pospuestos (snooze) ni archivados, que no son subagentes y cuyo agente no está trabajando. Orden: «Needs approval», «Asks you», «Guest message», «Plan ready», «Failed», «New reply» (terminó y no lo has abierto) y «Your turn» (terminó, lo leíste y no lo has cerrado). Usa la misma lógica de estado que la barra lateral (`resolveThreadStatusPill`), así que un hilo pospuesto o settled desaparece al momento. La cabecera dice cuántos están trabajando. Clic abre el hilo.
+- **My issues (Linear y Jira):** los tickets abiertos asignados a ti (la misma consulta que el diálogo de vincular). Como en tu flujo el ticket se reasigna a quien debe actuar, quedan fuera solo los aparcados o en espera de otros: categoría backlog, y estados cuyo nombre contiene `block`, `hold`, `waiting` o `review` (Blocked, Code Review, Business Review…). Orden: vencidos o que vencen en 3 días, luego empezados y luego por actualización. Cada fila muestra estado y vencimiento, abre el ticket al pulsar el título y lleva «Start thread» / «Go to thread», los mismos botones de la página Issues (ahora en `IssueThreadActions.tsx`).
+- **Pull requests:** tus PR abiertas que están en tu lado (conflictos, checks fallando, cambios pedidos o aprobada lista para mergear) y las que te piden revisar. Las que esperan revisión o checks, y los drafts, no salen. Dos lecturas por servidor (`involvement` «authored» y «reviewing», `state: "open"`, 50), cacheadas como el resto de la página de PR. Clic abre la PR en la página de pull requests.
+- **Scheduled tasks:** todas las tareas programadas de los servidores conectados (activas primero), con un **interruptor para pausarlas o reanudarlas** (`setScheduledTaskEnabled`, el mismo que Ajustes, con su permiso) y la próxima ejecución. Clic en el nombre abre su hilo si tiene uno; «Manage» lleva a Ajustes → Scheduled tasks.
+- Una tarjeta sin gestor conectado (tickets), sin servidor capaz (PR) o sin tareas no aparece. El panel cuelga bajo la caja de texto sin moverla, ocupa como mucho la mitad inferior de la pantalla con scroll propio y se oculta en ventanas de menos de 40rem de alto.
+
+| Parte | Archivos nuevos                                                                                                                                                                     |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web   | `apps/web/src/components/home/HomeDashboard.tsx`, `HomeDashboardSlot.tsx`, `homeDashboard.logic.ts` (+ test) (criterios de «en tu tejado»), `components/issues/IssueThreadActions.tsx` |
+
+También cambia un archivo del fork: `IssuesPage.tsx` importa de `IssueThreadActions.tsx` los botones y hooks que antes tenía dentro.
+
+| Toca (archivos oficiales)              | Qué añade                                                         |
+| -------------------------------------- | ----------------------------------------------------------------- |
+| `apps/web/src/components/ChatView.tsx` | import y `<HomeDashboardSlot />` tras el titular del hilo borrador |
+
+Tests: `vp test run apps/web/src/components/home/homeDashboard.logic.test.ts`. Limitaciones: no hay ajuste para ocultarlo; no está en la app móvil; los criterios de estado de ticket van por nombre, así que un estado de espera con otro nombre (por ejemplo «QA») sí aparece.
 
 ## Entorno y arranque
 
