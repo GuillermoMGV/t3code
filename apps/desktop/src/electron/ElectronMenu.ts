@@ -8,6 +8,8 @@ import * as Schema from "effect/Schema";
 
 import * as Electron from "electron";
 
+import { forkMenuIcon } from "./forkMenuIcons.ts";
+
 export interface ElectronMenuPosition {
   readonly x: number;
   readonly y: number;
@@ -183,6 +185,9 @@ export const make = Effect.gen(function* () {
           itemOption.icon = destructiveIcon.value;
         }
       }
+      const forkIcon = forkMenuIcon(item.icon);
+      if (itemOption.icon === undefined && Option.isSome(forkIcon))
+        itemOption.icon = forkIcon.value;
 
       template.push(itemOption);
     }

@@ -480,16 +480,27 @@ Qué hace: cada fila del desplegable de ramas lleva a la derecha un botón peque
 | ------------------------------------------ | ------------------------------------------------------ |
 | `apps/web/src/components/BranchPicker.tsx` | import y `<BranchCopyButton>` en `BranchPickerRefItem` |
 
-### Ir al ticket desde el menú del hilo
+### Ir al ticket y a las PR desde el menú del hilo
 
-Qué hace: si el hilo tiene un ticket de Linear o Jira vinculado, el menú contextual del hilo (clic derecho en la barra lateral, o el menú de la cabecera del chat) muestra «Go to ticket» justo encima de «Rename thread». Abre el ticket en el navegador externo. Usa el primer ticket de los resúmenes que ya carga la lista de hilos (el mismo que pintan sus insignias), así que no hace peticiones nuevas; si los resúmenes aún no han cargado, la opción no aparece.
+Qué hace: el menú contextual del hilo (clic derecho en la barra lateral, o el menú de la cabecera del chat) muestra, justo encima de «Rename thread»:
 
-| Toca (archivos oficiales)                           | Qué añade                                                                |
-| --------------------------------------------------- | ------------------------------------------------------------------------ |
-| `apps/web/src/components/threadActionMenu.logic.ts` | id `open-ticket`, campo `ticketUrl` y la entrada antes de `rename`       |
-| `apps/web/src/components/Sidebar.tsx`               | import, `ticketUrl` con `readThreadIssueSummary` y el caso `open-ticket` |
-| `apps/web/src/hooks/useThreadActionMenu.ts`         | imports, `ticketUrl` y el caso `open-ticket`                             |
-| `apps/web/src/contextMenuFallback.ts`               | icono `external-link` del menú web                                       |
+- «Go to ticket» si el hilo tiene un ticket de Linear o Jira vinculado. Usa el primer ticket de los resúmenes que ya carga la lista de hilos (el mismo que pintan sus insignias), así que no hace peticiones nuevas; si los resúmenes aún no han cargado, la opción no aparece.
+- «Open PR» si el hilo tiene una PR vinculada, u «Open PRs» con un submenú si tiene varias. Cada entrada del submenú se llama por su rama destino («PR to master», «PR to develop») y lleva el número solo si dos PR van a la misma rama, o «PR #123» si aún no se conoce la rama. Usa `thread.pullRequests` sin las PR descartadas de un stack.
+
+Todo se abre en el navegador externo. En la app de escritorio el menú es nativo y solo pintaba el icono de borrar en macOS; `forkMenuIcons.ts` añade PNG para los iconos `git-pull-request` y `external-link`, así que estas entradas llevan icono también en Windows.
+
+| Archivo nuevo                                              | Qué contiene                                                         |
+| ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| `apps/web/src/components/threadLinksMenu.logic.ts` (+test) | nombres de las PR, entradas «Open PR(s)» y URL de la entrada pulsada |
+| `apps/desktop/src/electron/forkMenuIcons.ts`               | PNG en base64 de los iconos del menú nativo                          |
+
+| Toca (archivos oficiales)                           | Qué añade                                                                                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `apps/web/src/components/threadActionMenu.logic.ts` | import, ids `open-ticket` y `open-pr*`, campos `ticketUrl` y `pullRequests`, sus entradas |
+| `apps/web/src/components/Sidebar.tsx`               | imports, `ticketUrl`, `pullRequestTargets` y la apertura de ticket y PR                   |
+| `apps/web/src/hooks/useThreadActionMenu.ts`         | lo mismo para el menú de la cabecera                                                      |
+| `apps/web/src/contextMenuFallback.ts`               | iconos `external-link` y `git-pull-request` del menú web                                  |
+| `apps/desktop/src/electron/ElectronMenu.ts`         | import y `forkMenuIcon(item.icon)` en `buildTemplate`                                     |
 
 `readThreadIssueSummary` vive en el archivo del fork `apps/web/src/state/issueTrackers.ts`.
 

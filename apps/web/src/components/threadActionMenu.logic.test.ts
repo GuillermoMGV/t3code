@@ -36,6 +36,10 @@ describe("buildThreadActionMenuItems", () => {
         isSettled: reversed,
         isSnoozed: reversed,
         ticketUrl: "https://linear.app/acme/issue/PRO-1",
+        pullRequests: [
+          { url: "https://github.com/acme/app/pull/1", label: "PR to master" },
+          { url: "https://github.com/acme/app/pull/2", label: "PR to develop" },
+        ],
       });
       const expected = reversed
         ? [

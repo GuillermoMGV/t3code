@@ -38,6 +38,7 @@ import { usePrimaryEnvironmentId } from "../state/environments";
 import { readLocalApi } from "../localApi";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { readThreadIssueSummary } from "../state/issueTrackers";
+import { pullRequestMenuTargets, pullRequestMenuUrl } from "../components/threadLinksMenu.logic";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import {
   deriveLogicalProjectKeyFromSettings,
@@ -131,8 +132,10 @@ export function useThreadActionMenu(input: {
       const isRegeneratingTitle = thread.titleRegeneration != null;
       const snoozePresets = resolveSnoozePresets(now, timestampFormat, threadRef.environmentId);
       const ticketUrl = readThreadIssueSummary(appAtomRegistry, threadRef)?.url ?? null;
+      const pullRequestTargets = pullRequestMenuTargets(thread.pullRequests);
       const items = buildThreadActionMenuItems({
         ticketUrl,
+        pullRequests: pullRequestTargets,
         canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
         canFind: onFind !== undefined,
         branch: thread.branch ?? null,
@@ -152,6 +155,11 @@ export function useThreadActionMenu(input: {
       const clicked = await settlePromise(() => api.contextMenu.show(items, position));
       if (clicked._tag === "Failure" || clicked.value === null) return;
       const action: ThreadActionMenuId = clicked.value;
+      const pullRequestUrl = pullRequestMenuUrl(pullRequestTargets, action);
+      if (pullRequestUrl) {
+        void api.shell.openExternal(pullRequestUrl);
+        return;
+      }
       if (
         threadActionRequiresOperate(action) &&
         !readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)

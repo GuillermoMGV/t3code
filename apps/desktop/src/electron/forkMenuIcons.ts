@@ -1,0 +1,29 @@
+import * as Electron from "electron";
+import * as Option from "effect/Option";
+
+// Fork-only icons for native context menu entries; see CUSTOM_DEVELOPMENT.md.
+// Native menus take bitmaps, not the web menu's SVG paths: 32px gray PNGs drawn at 2x.
+const ICON_PNGS: Record<string, string> = {
+  "git-pull-request":
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEWElEQVR42s1XQYgcVRCtqt89MzvDBhMv2UXiRRB3ReNpCYJKMDHx3uPFWw6DILnNJctQ/2cNZsFbRA14VXAGr0JA4kVJAiEHZWET9mIIeAlZsxN2Zvf/X+XBbuhMdrNDmKzWqZvurnpV9X7Va4D/uaGq4r5HVVXsdrumuM+yzDAz7Vvw4pqZ68z8wk7PJmXJaHBEVGaeTZLEqeoJVZ26cOHCteFw+Dki3mBmcs5JuTpzc3M4Pz+vZV8rKytafm/XHo9mt7i4eLhWq12v1WpHQghARKCqoKpha2vrtHPu5263a5rNZsy/1z04BIioewIonDLzt41G48xgMFARWQOA+8aYY8YY8N6vquqb1lpvrUXnnHQ6nRNpmr7hvb9FRAgAUq/XcXNz8y/n3OpYFShK3263pxuNxmqlUpkJIdyOMb7tnHvgnPshTdMshACqeoyZb+QceT1Jkt+TJMEQAiAi5BmDiHgA+MUY8/G5c+fuA8COlXiMA8aYBAAquYN159yDHOBdREQi0hhjfdQJEUGappAHAREB730yPT198tGjR983m81Tc3NzulO7sEymXq8n1tqfqtXqqRCCiMiPInKXiM4SEcUY1weDwSvLy8sbzIzOOWHm45VK5Z3t7W0hItJ/y/kiAHyKiBEAJMY475xbGyXwYxUoEKpqJ8b4ASJSmqaZMQaGwyHU63Xo9/t2eXn5YZmEzrmrAHB1NDNr7Z9JknxBRBBjfA8A1gCAAGBnAM45yblws9PpnK5UKt+EEF7y3osx5mG/31+y1n7FzJQHBwDQ4hgWfg4dOmRmZmbCnTt3fiv4gIgvjzUHEFEvX76ctlqtK8y8WK1WvyMi2Nzc/Pr8+fOXmDlxzoXyN71eL5bvu92uNpvN6JxrGGOKI+53A/DEeD148KBkWWYA4J6IFOSM5dE8pkkpMRwbQJFVkiRJeUiVyj5R23XBiIjux+4h+I/tuQHIx/J/AyBfbOXTQrvpiYkDWF9fJ0RU7/0MERWABs45mZ2dxecKQFWx1Wr5drs9m6bpJyISvfc+SZKPOp3OQqvV8qOVoEkrKWY+fODAgWvGmHdFxBBRiohHp6amfmXm951zUp4pEwPQ6/UoX7efVavVIyEEEJE17/11EQFVTRDxEjNXsiyTiQIoBlW73Z5GxNMhBAWAVVVdsNYeU9UuIioRvUpEbyGiFlWYKAfG0BMAAPVdl9GznONiiWVZZi5evPi3tfYmAJwyxiwwcxcA7iLi2RBCzPXELQDAog3JU0bxVmmb7TmWy3pCRE4SEVWr1YyIYHt7G+r1OmxsbLhCT+Ri5ckWrKysYA5gHhGjqkZErO4FoNATzrmbw+HwQ1X9I4QA3nsgonv9fv+sc+7LET3xJIBC3yNirNVqplKpGFW9XX72tFYwMy0tLV3x3h8logUROe69f81aeylXUDL2P6G19oy19kw+PMbmRK4nYESoGNhnwyzLTB742X7pmDlh5uR5ovwHuNhzLMs2meYAAAAASUVORK5CYII=",
+  "external-link":
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAFBUlEQVR42s1XTYscVRQ993109VRPOhAEmYC6EIOZxg90ExEEiRgFV0L3KiCCSdSFCLMLQ796swiDWYqoCQpicNH1D1SIuJmFKGhSQXGjERkFBc10V3d1vXrXhVXDTKenk46z8EJDQ/HuOffj3PseYR/NGKMAoNVq8bTvSZIQAFhrHf4vRvvlh5kRRdHLAJQQ4kfnnBBCMAB470kp5b33D0gp3ZUrVz6K49gDYLUfabfWuiiKXjl48ODFNE0BAFLKf5kRgYi2/9frdRw9erQA8JExRqk9nIpWqzUzO0mS0LVr13bVmpkhpdwGFEJgNBrBOeeFEAAwllJqIcQRANjc3CSacEDlYb7dDFRnmBnW2pNa6/vH47EnIs3MWwBOaq0fyvO8ICIOw1D1+/1obW3Nnj59Wu/KABFxmYEHwzBcStOUhRC7SHrvyXvPWuvH8jz/jog+K0kwgI8nMvliEAT35XnuhBCKmV2Js+1TVVEAwLlz5+4qiuISgKfzPNdKKdDuJEFKCWZG+Y2NMQ8T0dVeryeTJKFms6lXVlaGxpjXG43GO2maslKKnHN/A1iYzKAAgCiKCACyLPskDMNni6LQUkrUajUopW76aa1R1nSXHT58mFZWVobdbvdUvV5/J03TbGFhgZxzl4noJSmlYt5dXWWMEdZaXxTF0SAInkrT1Akh/Hg8fp+Z/yQi4olTzMy1Wk0457601l41xggAOHPmTB5F0akgCC5kWZYFQRBkWfYNM7/AzI8qpcRNBKpul1LeI4SolZ37trX2jduUoQCATqdTWGsjpZSpwJ1zX6Vp+vz6+npqrdXe+6qEvKsHSsnkzFzp9vderyc3NjZqzWYzn0Wg1WpxCX6h0Wic2trayhqNRpBl2VeDweDE+vr6X+WgOiKEKJgZQojaTQS891QND2bWnU6nMMbke81tZqY4jkUFvrCwcKrf76dhGIZZln1448aNN8+fP79ljKlZa8cAfL1elwAwGo1+AIClpaXpk7CS4yztT4IPBoNho9EIh8PhRWPM6R3LyZUq+9BaW7m4BICstW7uUTwDfKEC7/V6Mo7j7a1nraVyuH0wVYbzgHc6nZng7XZbJknCcRwXq6urrbW1tVYpHDLGqGpl3wkBiqKI4jieGfny8jJZa7219kS9Xv9WCPGttfY4EXGr1eLJnhJzbD2y1nK32303DMOp4O122+9o6keklFIpJb33x3deSOYm0Ov1ZBnVscXFxVcHg0G2uLh4E3gVZSnrDeccl7Uf7eX7tgiUkZGU8vpoNPopDMNgOBy+V9W8Ap9YWrpcOkSTC2VeApXz1dXVX4uieMI5d6zb7b5WKsJPk211G7qVzSNDLrX7G4Dfdqzg/2Ri/jHA1G635X6A75mB6n4woxzFPMFNbtOpBHbWjIjydrstDx06JHu93ryRyna7DSnlYIc/fUsC3nutlAIzg5nvjuO4iOO4uIOsFuWWfFJrXfn7eU8CSZIwABRF8Yv3fuycE1rrM8aY60KIr8tU+jl6ynvvH5dSvuWcc0TkAXxRxTn1YWKMEVEUsTHm02az+Uy/30fF/o5eKUQYj8d84MAB6vf7nydJ8tzy8jJba6cTmHYp1VrrGfPjVlJBnuc5gMtSypNnz579Y681T3vM/QeDIHjCe3+vc26mKiYVopSCEOJ6lmUb1trv5971+/herN6MNPfjtLxois3NzTsis7S0xAD8tJpP2j+e4PhL45IwoQAAAABJRU5ErkJggg==",
+};
+
+const cache = new Map<string, Option.Option<Electron.NativeImage>>();
+
+export function forkMenuIcon(name: string | undefined): Option.Option<Electron.NativeImage> {
+  if (name === undefined) return Option.none();
+  const cached = cache.get(name);
+  if (cached !== undefined) return cached;
+  const image = Option.fromNullishOr(ICON_PNGS[name]).pipe(
+    Option.map((png) => {
+      const icon = Electron.nativeImage.createEmpty();
+      icon.addRepresentation({ scaleFactor: 2, dataURL: `data:image/png;base64,${png}` });
+      return icon;
+    }),
+    Option.filter((icon) => !icon.isEmpty()),
+  );
+  cache.set(name, image);
+  return image;
+}

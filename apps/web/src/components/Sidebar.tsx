@@ -161,6 +161,7 @@ import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { readThreadIssueSummary } from "../state/issueTrackers";
+import { pullRequestMenuTargets, pullRequestMenuUrl } from "./threadLinksMenu.logic";
 import { canShareWithGuestAtom } from "./chat/guestShareAvailability";
 import { openGuestShareDialog } from "./chat/guestShareDialogState";
 import {
@@ -2634,10 +2635,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             ),
           ) ?? null;
         const ticketUrl = readThreadIssueSummary(appAtomRegistry, threadRef)?.url ?? null;
+        const pullRequestTargets = pullRequestMenuTargets(thread.pullRequests);
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             buildThreadActionMenuItems({
               ticketUrl,
+              pullRequests: pullRequestTargets,
               canOperate: readEnvironmentScope(
                 threadRef.environmentId,
                 AuthOrchestrationOperateScope,
@@ -2676,6 +2679,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ),
         );
         if (clicked._tag === "Failure" || clicked.value === null) return;
+        const pullRequestUrl = pullRequestMenuUrl(pullRequestTargets, clicked.value);
+        if (pullRequestUrl) {
+          void api.shell.openExternal(pullRequestUrl);
+          return;
+        }
         if (threadActionRequiresOperate(clicked.value) && !checkThreadOperations([thread])) return;
         if (clicked.value?.startsWith("snooze:")) {
           const preset =

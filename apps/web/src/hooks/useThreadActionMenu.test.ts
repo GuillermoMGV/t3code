@@ -56,6 +56,7 @@ vi.mock("../state/entities", () => ({
     title: "Thread",
     branch: "main",
     worktreePath: null,
+    pullRequests: [],
     runtime: null,
     latestRun: null,
   }),

@@ -124,6 +124,12 @@ const ICON_PATHS: Record<string, ReadonlyArray<{ tag: string; attrs: Record<stri
     { tag: "line", attrs: { x1: "19", x2: "19", y1: "8", y2: "14" } },
     { tag: "line", attrs: { x1: "22", x2: "16", y1: "11", y2: "11" } },
   ],
+  "git-pull-request": [
+    { tag: "circle", attrs: { cx: "18", cy: "18", r: "3" } },
+    { tag: "circle", attrs: { cx: "6", cy: "6", r: "3" } },
+    { tag: "path", attrs: { d: "M13 6h3a2 2 0 0 1 2 2v7" } },
+    { tag: "line", attrs: { x1: "6", x2: "6", y1: "9", y2: "21" } },
+  ],
   "external-link": [
     { tag: "path", attrs: { d: "M15 3h6v6" } },
     { tag: "path", attrs: { d: "M10 14 21 3" } },

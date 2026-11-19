@@ -1,6 +1,12 @@
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 
+import {
+  buildPullRequestMenuItems,
+  type PullRequestMenuId,
+  type PullRequestMenuTarget,
+} from "./threadLinksMenu.logic";
+
 export type ThreadActionMenuId =
   | "find"
   | "new-thread-on-branch"
@@ -18,6 +24,7 @@ export type ThreadActionMenuId =
   | `snooze:${string}`
   | "unsnooze"
   | "open-ticket"
+  | PullRequestMenuId
   | "rename"
   | "regenerate-title"
   | "mark-unread"
@@ -98,10 +105,13 @@ export interface ThreadActionMenuState {
   readonly canTurnIntoProject?: boolean;
   /** Fork-only: the linked Linear or Jira issue's URL, opened in the external browser. */
   readonly ticketUrl?: string | null;
+  /** Fork-only: the thread's linked pull requests, opened in the external browser. */
+  readonly pullRequests?: ReadonlyArray<PullRequestMenuTarget>;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
 export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean {
+  if (action.startsWith("open-pr")) return false;
   return ![
     "find",
     "open-ticket",
@@ -181,11 +191,14 @@ export function buildThreadActionMenuItems(
           },
         ]
       : []),
+    ...buildPullRequestMenuItems(state.pullRequests ?? []).map((item, index) =>
+      index === 0 && !state.ticketUrl ? { ...item, separatorBefore: true } : item,
+    ),
     {
       id: "rename",
       label: "Rename thread",
       icon: "pencil",
-      separatorBefore: !state.ticketUrl,
+      separatorBefore: !state.ticketUrl && (state.pullRequests ?? []).length === 0,
     },
     ...(state.supports.titleRegeneration
       ? [
