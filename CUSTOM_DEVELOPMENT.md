@@ -618,14 +618,14 @@ Qué hace: al pulsar «T3 Code» arriba a la izquierda (o abrir un hilo nuevo), 
 - **Scheduled tasks:** todas las tareas programadas de los servidores conectados (activas primero), con un **interruptor para pausarlas o reanudarlas** (`setScheduledTaskEnabled`, el mismo que Ajustes, con su permiso) y la próxima ejecución. Clic en el nombre abre su hilo si tiene uno; «Manage» lleva a Ajustes → Scheduled tasks.
 - Una tarjeta sin gestor conectado (tickets), sin servidor capaz (PR) o sin tareas no aparece. El panel cuelga bajo la caja de texto sin moverla, ocupa como mucho la mitad inferior de la pantalla con scroll propio y se oculta en ventanas de menos de 40rem de alto.
 
-| Parte | Archivos nuevos                                                                                                                                                                     |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parte | Archivos nuevos                                                                                                                                                                        |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Web   | `apps/web/src/components/home/HomeDashboard.tsx`, `HomeDashboardSlot.tsx`, `homeDashboard.logic.ts` (+ test) (criterios de «en tu tejado»), `components/issues/IssueThreadActions.tsx` |
 
 También cambia un archivo del fork: `IssuesPage.tsx` importa de `IssueThreadActions.tsx` los botones y hooks que antes tenía dentro.
 
-| Toca (archivos oficiales)              | Qué añade                                                         |
-| -------------------------------------- | ----------------------------------------------------------------- |
+| Toca (archivos oficiales)              | Qué añade                                                          |
+| -------------------------------------- | ------------------------------------------------------------------ |
 | `apps/web/src/components/ChatView.tsx` | import y `<HomeDashboardSlot />` tras el titular del hilo borrador |
 
 Tests: `vp test run apps/web/src/components/home/homeDashboard.logic.test.ts`. Limitaciones: no hay ajuste para ocultarlo; no está en la app móvil; los criterios de estado de ticket van por nombre, así que un estado de espera con otro nombre (por ejemplo «QA») sí aparece.
