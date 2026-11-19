@@ -262,7 +262,7 @@ function NotificationList({
   onRun: (input: IssueTrackerNotificationsMutation) => void;
   onLeave: () => void;
 }) {
-  const checkInThread = useCheckCommentInThread();
+  const { checkInThread, hasThread } = useCheckCommentInThread();
   return (
     <ul className="-mx-2 min-h-0 flex-1 overflow-y-auto">
       {notifications.map((notification) => (
@@ -276,12 +276,20 @@ function NotificationList({
               ids: [notification.id],
             })
           }
-          onCheckInThread={
+          checkInThread={
             canCheckCommentInThread(notification)
-              ? () => {
-                  if (!notification.read) onRun({ type: "markRead", ids: [notification.id] });
-                  onLeave();
-                  void checkInThread({ issue: notification.issue, tracker: notification.tracker });
+              ? {
+                  label: hasThread(notification.tracker, notification.issue.key)
+                    ? "Check in thread"
+                    : "Check in new thread",
+                  run: () => {
+                    if (!notification.read) onRun({ type: "markRead", ids: [notification.id] });
+                    onLeave();
+                    void checkInThread({
+                      issue: notification.issue,
+                      tracker: notification.tracker,
+                    });
+                  },
                 }
               : null
           }
@@ -295,13 +303,13 @@ function NotificationRow({
   notification,
   onOpen,
   onToggleRead,
-  onCheckInThread,
+  checkInThread,
 }: {
   notification: TrackerNotification;
   onOpen: (event: ReactMouseEvent<HTMLElement>) => void;
   onToggleRead: () => void;
   /** Null for notifications that are not comments. */
-  onCheckInThread: (() => void) | null;
+  checkInThread: { label: string; run: () => void } | null;
 }) {
   const { issue, read } = notification;
   const toggleLabel = read ? "Mark as unread" : "Mark as read";
@@ -351,10 +359,10 @@ function NotificationRow({
             </span>
           ) : null}
         </button>
-        {onCheckInThread === null ? null : (
-          <Button variant="outline" size="xs" onClick={onCheckInThread}>
+        {checkInThread === null ? null : (
+          <Button variant="outline" size="xs" onClick={checkInThread.run}>
             <MessageSquareTextIcon aria-hidden />
-            Check comment in thread
+            {checkInThread.label}
           </Button>
         )}
       </div>

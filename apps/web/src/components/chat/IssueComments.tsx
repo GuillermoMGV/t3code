@@ -1,3 +1,4 @@
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useAtom, useAtomValue } from "@effect/atom-react";
 import {
   ISSUE_TRACKER_LABELS,
@@ -7,19 +8,21 @@ import {
   type TrackerIssueComment,
 } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { MessageSquareIcon, MessageSquareQuoteIcon, XIcon } from "lucide-react";
+import { MessageSquareIcon, MessageSquareTextIcon, XIcon } from "lucide-react";
 
 import type { ComposerHandleRef } from "~/composerHandleContext";
 import { useNowMinute } from "~/hooks/useNowMinute";
 import { useQuietThreadVisibleTurnItems } from "~/state/entities";
 import { issueTrackerEnvironment } from "~/state/issueTrackers";
 import { useEnvironmentQuery } from "~/state/query";
+import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
-import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { formatCommentDate, issueCommentPrompt } from "./issueComments.logic";
 import { IssueAssigneeBadge, IssueTrackerIcon } from "./IssueTrackerParts";
 import { collectThreadIssueReferences } from "./issueTrackerRows.logic";
+import { useCheckCommentInThread } from "../sidebar/useCheckCommentInThread";
+import { useChatCanvas } from "./ChatCanvasContext";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 
 // Fork-only ticket comments popover; see CUSTOM_DEVELOPMENT.md.
@@ -118,25 +121,29 @@ function CommentsCard({
   const row = query.data?.rows.find((candidate) => candidate.tracker === tracker);
   const issue = row?.issue ?? null;
   const comments = row?.comments ?? [];
+  // Share the inline details card's column so the two stack instead of overlapping.
+  const column = useChatCanvas()?.detailsCardPlacement ?? null;
+  const { checkInThread: check } = useCheckCommentInThread();
   if (issue === null) return null;
 
-  const checkInChat = (comment: TrackerIssueComment) => {
-    const composer = composerRef.current;
-    if (
-      !composer?.insertTextAtEnd(issueCommentPrompt(issue, comment), {
-        ensureLeadingBoundary: true,
-      })
-    ) {
-      toastManager.add({ type: "error", title: "The chat isn't ready to accept input right now" });
-      return;
-    }
-    composer.focusAtEnd();
-  };
+  const checkInThread = (comment: TrackerIssueComment) =>
+    void check({
+      issue,
+      tracker,
+      prompt: issueCommentPrompt(issue, comment),
+      thread: scopeThreadRef(environmentId, threadId),
+    }).then(() => composerRef.current?.focusAtEnd());
 
   return (
     <section
       aria-label={`${issue.key} comments`}
-      className="absolute right-4 bottom-36 left-4 z-30 flex max-h-2/5 flex-col sm:left-auto sm:w-80 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg"
+      className={cn(
+        "absolute z-30 flex max-h-2/5 flex-col overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg",
+        !column && "right-4 bottom-36 left-4 sm:left-auto sm:w-80",
+      )}
+      style={
+        column ? { right: column.right, bottom: column.right, width: column.width } : undefined
+      }
     >
       <header className="flex items-center gap-2 border-b px-3 py-2">
         <IssueTrackerIcon tracker={tracker} className="size-3.5 shrink-0 text-muted-foreground" />
@@ -161,7 +168,11 @@ function CommentsCard({
       ) : (
         <ol className="min-h-0 flex-1 divide-y overflow-y-auto">
           {comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} onCheck={() => checkInChat(comment)} />
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              onCheck={() => checkInThread(comment)}
+            />
           ))}
         </ol>
       )}
@@ -187,8 +198,8 @@ function CommentItem({ comment, onCheck }: { comment: TrackerIssueComment; onChe
       <p className="text-sm break-words whitespace-pre-wrap">{comment.body}</p>
       <div className="flex justify-end">
         <Button size="xs" variant="outline" onClick={onCheck}>
-          <MessageSquareQuoteIcon aria-hidden />
-          Check in chat
+          <MessageSquareTextIcon aria-hidden />
+          Check in thread
         </Button>
       </div>
     </li>

@@ -1,6 +1,6 @@
 import { RegistryContext } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import type { IssueTrackerKind, TrackerNotification } from "@t3tools/contracts";
+import type { IssueTrackerKind, ScopedThreadRef, TrackerNotification } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { useContext } from "react";
 
@@ -17,10 +17,19 @@ import { checkCommentPrompt, withCheckCommentPrompt } from "./SidebarIssueNotifi
 
 // Fork-only "Check comment in thread" for the notifications bell; see CUSTOM_DEVELOPMENT.md.
 
+export interface CheckCommentInThreadInput {
+  readonly issue: Pick<TrackerNotification["issue"], "key" | "title" | "url">;
+  readonly tracker: IssueTrackerKind;
+  /** Defaults to asking about the issue's last comment. */
+  readonly prompt?: string;
+  /** Skips the lookup, for callers already showing the issue's thread. */
+  readonly thread?: ScopedThreadRef;
+}
+
 /**
- * Puts a "check the last comment" prompt in the composer of the issue's most recent thread and
- * opens it, unsent. Without one, opens a new-thread draft with that prompt and links the issue,
- * as the Issues page's "Start thread" does, so the next comment finds this thread.
+ * Puts a "check the comment" prompt in the composer of the issue's most recent thread and opens
+ * it, unsent. Without one, opens a new-thread draft with that prompt and links the issue, as the
+ * Issues page's "Start thread" does, so the next comment finds this thread.
  */
 export function useCheckCommentInThread() {
   const threadsByIssueKey = useThreadsByIssue();
@@ -29,14 +38,19 @@ export function useCheckCommentInThread() {
   const mutate = useAtomCommand(issueTrackerEnvironment.mutate, { reportFailure: false });
   const registry = useContext(RegistryContext);
 
-  return async (
-    notification: Pick<TrackerNotification, "issue"> & { tracker: IssueTrackerKind },
-  ) => {
-    const { issue, tracker } = notification;
-    const prompt = checkCommentPrompt(issue);
-    const [latest] = threadsForIssue(threadsByIssueKey, { tracker, key: issue.key });
-    if (latest !== undefined) {
-      const target = scopeThreadRef(latest.environmentId, latest.id);
+  const latestThread = (tracker: IssueTrackerKind, key: string) => {
+    const [latest] = threadsForIssue(threadsByIssueKey, { tracker, key });
+    return latest === undefined ? undefined : scopeThreadRef(latest.environmentId, latest.id);
+  };
+
+  const checkInThread = async ({
+    issue,
+    tracker,
+    prompt = checkCommentPrompt(issue),
+    thread,
+  }: CheckCommentInThreadInput) => {
+    const target = thread ?? latestThread(tracker, issue.key);
+    if (target !== undefined) {
       const store = useComposerDraftStore.getState();
       store.setPrompt(
         target,
@@ -68,5 +82,10 @@ export function useCheckCommentInThread() {
     if (result._tag === "Success") {
       registry.refresh(issueTrackerEnvironment.threadSummaries({ environmentId, input: {} }));
     }
+  };
+
+  return {
+    checkInThread,
+    hasThread: (tracker: IssueTrackerKind, key: string) => latestThread(tracker, key) !== undefined,
   };
 }
