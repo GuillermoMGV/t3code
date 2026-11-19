@@ -203,6 +203,30 @@ const jiraActivity = {
   },
 };
 
+// Ticket comments for the thread panel's comments popover (PRO-1234 has some, the others none).
+const LINEAR_COMMENTS = {
+  "PRO-1234": [
+    {
+      id: "lc-1",
+      body: "Tested on QA2 with the invited user flow.\n\nSSO works, but the redirect after login lands on /home instead of the original page.",
+      createdAt: minutesAgo(90),
+      user: { name: "ada@example.com", displayName: "ada", avatarUrl: null },
+    },
+    {
+      id: "lc-2",
+      body: "Thanks! I'll look at the redirect. Is it OK to release the SSO part today?",
+      createdAt: minutesAgo(30),
+      user: { name: "Guillermo Miranda", displayName: "guillermo", avatarUrl: null },
+    },
+    {
+      id: "lc-3",
+      body: "Yes, go ahead with PROD.",
+      createdAt: minutesAgo(5),
+      user: null,
+    },
+  ],
+};
+
 const readBody = (req) =>
   new Promise((resolve) => {
     let raw = "";
@@ -275,6 +299,10 @@ NodeHttp.createServer(async (req, res) => {
     }
     issue.updatedAt = new Date().toISOString();
     return sendJson(res, 200, { data: { issueUpdate: { success: true } } });
+  }
+  if (query.includes("query IssueComments")) {
+    const comments = LINEAR_COMMENTS[variables.id] ?? [];
+    return sendJson(res, 200, { data: { issue: { comments: { nodes: comments } } } });
   }
   if (query.includes("issue(id")) {
     // MOCK_LINEAR_ANY_KEY=1 answers every `PRO-` key, to test pull request badges on real lists.
@@ -353,6 +381,13 @@ NodeHttp.createServer(async (req, res) => {
   }
   if (url.pathname === "/rest/api/3/user/assignable/search") {
     return sendJson(res, 200, JIRA_USERS);
+  }
+  const commentsMatch = /^\/rest\/api\/3\/issue\/([^/]+)\/comment$/.exec(url.pathname);
+  if (commentsMatch) {
+    const comments = jiraActivity[decodeURIComponent(commentsMatch[1])]?.comments ?? [];
+    return sendJson(res, 200, {
+      comments: comments.toSorted((a, b) => Date.parse(b.created) - Date.parse(a.created)),
+    });
   }
   const issueMatch = /^\/rest\/api\/3\/issue\/([^/]+)$/.exec(url.pathname);
   if (issueMatch) {

@@ -41,6 +41,7 @@ export type IssueTrackerRowView =
       readonly tracker: IssueTrackerKind;
       readonly issue: TrackerIssue;
       readonly source: IssueTrackerLinkSource;
+      readonly commentCount: number;
     };
 
 export type IssueTrackerPanelView =
@@ -69,7 +70,15 @@ export function resolveIssueTrackerPanelView(input: {
     if (link === null) return [{ kind: "empty", tracker }];
     return row.issue === null
       ? [{ kind: "missing", tracker, key: link.key, source: link.source }]
-      : [{ kind: "issue", tracker, issue: row.issue, source: link.source }];
+      : [
+          {
+            kind: "issue",
+            tracker,
+            issue: row.issue,
+            source: link.source,
+            commentCount: row.comments?.length ?? 0,
+          },
+        ];
   });
   return rows.length === 0 ? { kind: "setup" } : { kind: "rows", rows };
 }

@@ -68,6 +68,16 @@ export type IssueTrackerThreadInput = typeof IssueTrackerThreadInput.Type;
 export const IssueTrackerLinkSource = Schema.Literals(["manual", "detected"]);
 export type IssueTrackerLinkSource = typeof IssueTrackerLinkSource.Type;
 
+export const TrackerIssueComment = Schema.Struct({
+  id: Schema.String,
+  /** Null for comments from integrations or deleted accounts. */
+  author: Schema.NullOr(TrackerIssueAssignee),
+  createdAt: Schema.String,
+  /** Linear: markdown. Jira: plain text taken from the rich text body. */
+  body: Schema.String,
+});
+export type TrackerIssueComment = typeof TrackerIssueComment.Type;
+
 export const IssueTrackerThreadRow = Schema.Struct({
   tracker: IssueTrackerKind,
   connected: Schema.Boolean,
@@ -76,6 +86,8 @@ export const IssueTrackerThreadRow = Schema.Struct({
   issue: Schema.NullOr(TrackerIssue),
   /** Why the tracker could not be read; the other tracker's row still loads. */
   error: Schema.NullOr(Schema.String),
+  /** The issue's comments, newest first; absent when they could not be read. */
+  comments: Schema.optional(Schema.Array(TrackerIssueComment)),
 });
 export type IssueTrackerThreadRow = typeof IssueTrackerThreadRow.Type;
 
