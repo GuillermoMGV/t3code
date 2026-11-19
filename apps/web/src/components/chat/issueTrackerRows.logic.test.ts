@@ -62,8 +62,20 @@ describe("resolveIssueTrackerPanelView", () => {
             {
               ...row({ link: { key: key("PRO-1"), source: "manual" }, issue }),
               comments: [
-                { id: "c1", author: null, createdAt: "2026-11-18T10:00:00Z", body: "Done" },
-                { id: "c2", author: null, createdAt: "2026-11-17T10:00:00Z", body: "Testing" },
+                {
+                  id: "c1",
+                  author: null,
+                  createdAt: "2026-11-18T10:00:00Z",
+                  body: "Done",
+                  url: null,
+                },
+                {
+                  id: "c2",
+                  author: null,
+                  createdAt: "2026-11-17T10:00:00Z",
+                  body: "Testing",
+                  url: null,
+                },
               ],
             },
             row({

@@ -4,14 +4,17 @@ import {
   ISSUE_TRACKER_LABELS,
   type EnvironmentId,
   type IssueTrackerKind,
+  type ScopedThreadRef,
   type ThreadId,
   type TrackerIssueComment,
 } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { MessageSquareIcon, MessageSquareTextIcon } from "lucide-react";
+import { EyeIcon, MessageSquareIcon, MessageSquareTextIcon } from "lucide-react";
 
 import type { ComposerHandleRef } from "~/composerHandleContext";
 import { useNowMinute } from "~/hooks/useNowMinute";
+import { ensureLocalApi } from "~/localApi";
+import ChatMarkdown from "../ChatMarkdown";
 import { useQuietThreadVisibleTurnItems } from "~/state/entities";
 import { issueTrackerEnvironment } from "~/state/issueTrackers";
 import { useEnvironmentQuery } from "~/state/query";
@@ -130,13 +133,14 @@ function CommentsCard({
   const { checkInThread: check } = useCheckCommentInThread();
   if (issue === null) return null;
 
+  const threadRef = scopeThreadRef(environmentId, threadId);
   const checkInThread = (comment: TrackerIssueComment) => {
     setOpen(null);
     void check({
       issue,
       tracker,
       prompt: issueCommentPrompt(issue, comment),
-      thread: scopeThreadRef(environmentId, threadId),
+      thread: threadRef,
     }).then(() => composerRef.current?.focusAtEnd());
   };
 
@@ -165,6 +169,8 @@ function CommentsCard({
                 <CommentItem
                   key={comment.id}
                   comment={comment}
+                  trackerLabel={ISSUE_TRACKER_LABELS[tracker]}
+                  threadRef={threadRef}
                   onCheck={() => checkInThread(comment)}
                 />
               ))}
@@ -176,8 +182,19 @@ function CommentsCard({
   );
 }
 
-function CommentItem({ comment, onCheck }: { comment: TrackerIssueComment; onCheck: () => void }) {
+function CommentItem({
+  comment,
+  trackerLabel,
+  threadRef,
+  onCheck,
+}: {
+  comment: TrackerIssueComment;
+  trackerLabel: string;
+  threadRef: ScopedThreadRef;
+  onCheck: () => void;
+}) {
   const now = new Date(`${useNowMinute()}:00Z`);
+  const url = comment.url;
   return (
     <li className="flex flex-col gap-1.5 py-3">
       <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
@@ -190,8 +207,25 @@ function CommentItem({ comment, onCheck }: { comment: TrackerIssueComment; onChe
         <time dateTime={comment.createdAt} className="shrink-0 tabular-nums">
           {formatCommentDate(comment.createdAt, now)}
         </time>
+        {url === null ? null : (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label={`Open comment in ${trackerLabel}`}
+                  onClick={() => void ensureLocalApi().shell.openExternal(url)}
+                />
+              }
+            >
+              <EyeIcon aria-hidden />
+            </TooltipTrigger>
+            <TooltipPopup side="top">Open in {trackerLabel}</TooltipPopup>
+          </Tooltip>
+        )}
       </div>
-      <p className="text-sm break-words whitespace-pre-wrap">{comment.body}</p>
+      <ChatMarkdown text={comment.body} cwd={undefined} threadRef={threadRef} lineBreaks />
       <div className="flex justify-end">
         <Button size="xs" variant="outline" onClick={onCheck}>
           <MessageSquareTextIcon aria-hidden />

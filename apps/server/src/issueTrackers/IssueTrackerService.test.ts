@@ -528,6 +528,7 @@ describe("issue comments", () => {
                     id: "c1",
                     body: "First ",
                     createdAt: "2026-11-17T10:00:00.000Z",
+                    url: "https://linear.app/acme/issue/PRO-1#comment-c1",
                     user: { name: "ada@example.com", displayName: "ada", avatarUrl: null },
                   },
                   { id: "c2", body: "Bot note", createdAt: "2026-11-18T10:00:00.000Z", user: null },
@@ -539,12 +540,19 @@ describe("issue comments", () => {
       }));
       const api = yield* makeLinearApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
       expect(yield* linearIssueComments(api, "lin_api_key", key("PRO-1"))).toEqual([
-        { id: "c2", author: null, createdAt: "2026-11-18T10:00:00.000Z", body: "Bot note" },
+        {
+          id: "c2",
+          author: null,
+          createdAt: "2026-11-18T10:00:00.000Z",
+          body: "Bot note",
+          url: null,
+        },
         {
           id: "c1",
           author: { name: "ada", avatarUrl: null },
           createdAt: "2026-11-17T10:00:00.000Z",
           body: "First",
+          url: "https://linear.app/acme/issue/PRO-1#comment-c1",
         },
       ]);
     }),
@@ -584,6 +592,7 @@ describe("issue comments", () => {
           author: { name: "Ada Lovelace", avatarUrl: "https://a/48" },
           createdAt: "2026-11-17T10:00:00.000+0000",
           body: "@Grace tested in QA2\nAll good",
+          url: "https://acme.atlassian.net/browse/OPS-7?focusedCommentId=10",
         },
       ]);
       expect(requests[0]?.url.pathname).toBe("/rest/api/3/issue/OPS-7/comment");

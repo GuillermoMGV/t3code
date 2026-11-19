@@ -75,6 +75,8 @@ export const TrackerIssueComment = Schema.Struct({
   createdAt: Schema.String,
   /** Linear: markdown. Jira: plain text taken from the rich text body. */
   body: Schema.String,
+  /** Opens the tracker focused on this comment. */
+  url: Schema.NullOr(Schema.String),
 });
 export type TrackerIssueComment = typeof TrackerIssueComment.Type;
 

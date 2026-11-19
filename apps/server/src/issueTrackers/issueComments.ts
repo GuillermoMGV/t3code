@@ -18,6 +18,7 @@ const LinearCommentsData = Schema.Struct({
             id: Schema.String,
             body: Schema.String,
             createdAt: Schema.String,
+            url: Schema.optional(Schema.String),
             user: Schema.optional(
               Schema.NullOr(
                 Schema.Struct({
@@ -114,7 +115,7 @@ export const linearIssueComments = Effect.fn("IssueComments.linear")(function* (
     `query IssueComments($id: String!) {
       issue(id: $id) {
         comments(first: ${COMMENT_LIMIT}) {
-          nodes { id body createdAt user { name displayName avatarUrl } }
+          nodes { id body createdAt url user { name displayName avatarUrl } }
         }
       }
     }`,
@@ -132,6 +133,7 @@ export const linearIssueComments = Effect.fn("IssueComments.linear")(function* (
         : null,
       createdAt: node.createdAt,
       body: node.body.trim(),
+      url: node.url ?? null,
     })),
   );
 });
@@ -160,6 +162,7 @@ export const jiraIssueComments = Effect.fn("IssueComments.jira")(function* (
         : null,
       createdAt: comment.created,
       body: adfToMultilineText(comment.body),
+      url: `${credentials.siteUrl}/browse/${encodeURIComponent(key)}?focusedCommentId=${encodeURIComponent(comment.id)}`,
     })),
   );
 });

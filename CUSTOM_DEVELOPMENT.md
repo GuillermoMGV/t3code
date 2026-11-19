@@ -207,7 +207,9 @@ Qué hace: si el ticket de Linear o Jira del hilo tiene comentarios, su fila del
 
 - **Check in thread:** cada comentario lleva este botón. Usa el mismo hook que el botón de la campana (`useCheckCommentInThread`), apuntando al hilo abierto: añade al final de la caja de texto `Check this comment on ticket <clave> (<título>), posted by <autor> on <fecha>:`, el comentario citado y la URL del ticket, **sin enviar**, sin repetirlo si ya está, cierra el modal y deja el foco en la caja.
 - **Datos:** los comentarios llegan con la misma consulta del panel (`issueTrackers.getThreadIssues`, campo opcional `comments` de cada fila), así que no hay RPC nueva y se refrescan cada minuto con el resto del ticket. Linear: `issue(id) { comments(first: 100) }` con el cuerpo en markdown. Jira: `GET /rest/api/3/issue/{clave}/comment?orderBy=-created&maxResults=100`, con el cuerpo ADF pasado a texto (una línea por bloque). Si los comentarios fallan, el ticket se muestra igual sin bocadillo y el servidor deja un aviso en el log.
-- **Límites:** hasta 100 comentarios por ticket. Los comentarios de integraciones (sin usuario) salen como «Unknown author». El texto se muestra plano, sin formato markdown. No está en la app móvil.
+- **Límites:** hasta 100 comentarios por ticket. Los comentarios de integraciones (sin usuario) salen como «Unknown author». No está en la app móvil.
+- **Formato y enlaces:** el texto se pinta con el mismo markdown del chat (`ChatMarkdown`), así que los enlaces de Linear (`[url](<url>)`) salen como hipervínculos. En Jira el texto sigue siendo plano.
+- **Ojo junto al autor:** abre ese comentario en Linear o Jira en el navegador externo. La URL la da el servidor en el campo `url` del comentario (contrato `TrackerIssueComment`): en Linear el `url` de su API y en Jira `<sitio>/browse/<clave>?focusedCommentId=<id>`.
 
 | Parte    | Archivos nuevos                                                                                                              |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------- |

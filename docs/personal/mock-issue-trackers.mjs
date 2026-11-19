@@ -208,12 +208,14 @@ const LINEAR_COMMENTS = {
   "PRO-1234": [
     {
       id: "lc-1",
-      body: "Tested on QA2 with the invited user flow.\n\nSSO works, but the redirect after login lands on /home instead of the original page.",
+      url: "https://linear.app/mock/issue/PRO-1234#comment-lc-1",
+      body: "Tested on QA2 with this record: [https://example.com/lightning/r/Lead/00Q/view?ws=%2Flightning](<https://example.com/lightning/r/Lead/00Q/view?ws=%2Flightning>)\n\nSSO works, but the redirect after login lands on /home instead of the original page.",
       createdAt: minutesAgo(90),
       user: { name: "ada@example.com", displayName: "ada", avatarUrl: null },
     },
     {
       id: "lc-2",
+      url: "https://linear.app/mock/issue/PRO-1234#comment-lc-2",
       body: "Thanks! I'll look at the redirect. Is it OK to release the SSO part today?",
       createdAt: minutesAgo(30),
       user: { name: "Guillermo Miranda", displayName: "guillermo", avatarUrl: null },
