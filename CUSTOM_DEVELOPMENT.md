@@ -489,6 +489,18 @@ Qué hace: el icono del calendario con reloj en la parte inferior de la barra la
 | --------------------------------------------------- | ------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarChrome.tsx` | icono `CalendarClockIcon` y el botón «Scheduled tasks» |
 
+### Icono de scheduler en el listado de hilos
+
+Qué hace: los hilos en los que corre una tarea programada (la tarea los tiene como hilo asociado) llevan un calendario con reloj verde justo antes del título. Si todas sus tareas están desactivadas, el verde sale apagado. Al pasar el ratón se ve el nombre de cada tarea, su frecuencia y si está en pausa. Los datos salen de la misma suscripción en vivo que usa Ajustes → Scheduled tasks (una por entorno, compartida por todas las filas). Las tareas sin hilo fijo, que crean un hilo nuevo en cada ejecución, no marcan esos hilos.
+
+| Archivo nuevo                                                    | Qué contiene            |
+| ---------------------------------------------------------------- | ----------------------- |
+| `apps/web/src/components/sidebar/SidebarThreadSchedulerIcon.tsx` | el icono con su tooltip |
+
+| Toca (archivos oficiales)                              | Qué añade                                                          |
+| ------------------------------------------------------ | ------------------------------------------------------------------ |
+| `apps/web/src/components/sidebar/SidebarThreadRow.tsx` | import y `<SidebarThreadSchedulerIcon>` antes de los dos `{title}` |
+
 ### Copiar el nombre de una rama desde el selector
 
 Qué hace: cada fila del desplegable de ramas lleva a la derecha un botón pequeño con el icono de portapapeles que copia el nombre completo de la rama (aunque la fila lo muestre recortado) y cambia a un check un momento. Pulsarlo no selecciona la rama ni cierra el desplegable, y funciona también en filas deshabilitadas. Sale en todos los selectores que usan `BranchPickerRefItem`: el de la barra de ramas del hilo y el de rama base del worktree en Ajustes → Scheduled tasks. Las filas «Create new ref» no lo llevan.
