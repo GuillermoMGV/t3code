@@ -3,6 +3,7 @@ import { asLaunchingThread } from "@t3tools/client-runtime/state/thread-inbox";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadTerminalStatusButton } from "../ThreadStatusIndicators";
 import { SidebarThreadIssueBadges, useThreadIssueSummary } from "./SidebarThreadIssueBadges";
+import { SidebarThreadSchedulerIcon } from "./SidebarThreadSchedulerIcon";
 import { discardComposerDraft } from "../../lib/discardComposerDraft";
 import { contextMenuSourceOf } from "../../contextMenuSource";
 import { requestCustomSnooze } from "../CustomSnoozeDialog";
@@ -1283,6 +1284,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 </span>
               )}
               {draftIndicator}
+              <SidebarThreadSchedulerIcon threadRef={threadRef} />
               {title}
               {multiline ? titleLineIcons : null}
               {pinIndicator}
@@ -1620,6 +1622,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {props.sweepAction !== null ? dragDestination : null}
             </div>
             <div className="mt-1 flex min-w-0 items-center gap-1.5">
+              <SidebarThreadSchedulerIcon threadRef={threadRef} />
               {title}
               {isRegeneratingTitle ? (
                 <span role="status" className="sr-only">
