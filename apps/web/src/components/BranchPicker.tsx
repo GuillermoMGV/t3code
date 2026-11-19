@@ -3,6 +3,7 @@ import type { VcsRef } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 
+import { BranchCopyButton } from "./BranchCopyButton";
 import { MiddleTruncate } from "./ui/middle-truncate";
 import { cn } from "../lib/utils";
 import { RefreshIcon } from "./ui/refresh-icon";
@@ -233,6 +234,7 @@ export function BranchPickerRefItem({
       <div className="flex w-full min-w-0 items-center justify-between gap-2">
         <MiddleTruncate value={itemValue} className="flex-1" />
         {badge && <span className="shrink-0 text-3xs text-muted-foreground/45">{badge}</span>}
+        <BranchCopyButton name={itemValue} />
       </div>
     </ComboboxItem>
   );

@@ -468,6 +468,18 @@ Qué hace: el icono del calendario con reloj en la parte inferior de la barra la
 | --------------------------------------------------- | ------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarChrome.tsx` | icono `CalendarClockIcon` y el botón «Scheduled tasks» |
 
+### Copiar el nombre de una rama desde el selector
+
+Qué hace: cada fila del desplegable de ramas lleva a la derecha un botón pequeño con el icono de portapapeles que copia el nombre completo de la rama (aunque la fila lo muestre recortado) y cambia a un check un momento. Pulsarlo no selecciona la rama ni cierra el desplegable, y funciona también en filas deshabilitadas. Sale en todos los selectores que usan `BranchPickerRefItem`: el de la barra de ramas del hilo y el de rama base del worktree en Ajustes → Scheduled tasks. Las filas «Create new ref» no lo llevan.
+
+| Archivo nuevo                                  | Qué contiene                                            |
+| ---------------------------------------------- | ------------------------------------------------------- |
+| `apps/web/src/components/BranchCopyButton.tsx` | el botón, que frena sus eventos para no activar la fila |
+
+| Toca (archivos oficiales)                  | Qué añade                                              |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `apps/web/src/components/BranchPicker.tsx` | import y `<BranchCopyButton>` en `BranchPickerRefItem` |
+
 ### Una cuenta de GitHub por repositorio
 
 Qué hace: si `gh` tiene **varias cuentas en el mismo host** (por ejemplo `Guillermo-Miranda-01` para Properti y `GuillermoMGV` para ASTI, ver `gh auth status`), cada petición a GitHub usa la cuenta que llega a su repositorio, en vez de la cuenta activa para todo. No hay que configurar nada: basta con haber hecho `gh auth login` con cada cuenta.
