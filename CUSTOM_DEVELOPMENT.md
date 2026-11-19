@@ -183,6 +183,7 @@ Qué hace: el estado y el asignado de un ticket se cambian con un clic en tres s
 
 - **Estados:** Linear ofrece los estados del equipo del ticket, en el orden de su tablero. Jira ofrece los estados a los que llevan las **transiciones** disponibles del ticket (como en Jira, el actual no aparece); si una transición exige campos (por ejemplo, una resolución), Jira la rechaza y el aviso muestra su motivo.
 - **Asignados:** Linear, los miembros activos del equipo; Jira, los usuarios asignables al ticket (hasta 1000, sin apps ni cuentas desactivadas). «Unassigned» quita el asignado.
+- **Nombres de Linear:** cuando un usuario no tiene nombre completo, Linear guarda su email en `name`; en ese caso se muestra su `displayName` (como hace Linear), en asignados, desplegable y notificaciones. Jira ya usa `displayName`.
 - Tras el cambio, el servidor vuelve a leer el ticket y refresca su caché; el panel, la página de tickets, la lista de PR y las insignias de la barra lateral muestran el valor nuevo al momento. Como las búsquedas de los gestores se indexan con retraso, el cliente recuerda el ticket leído tras el cambio (`editedIssueAtom`) y lo muestra mientras la lista no traiga algo igual de nuevo (`shownIssue` compara `updatedAt`).
 - Las opciones se piden al abrir el desplegable (`issueTrackers.getEditOptions`, un minuto de caché en el cliente). Los cambios son `setIssueState` (id de estado de Linear o id de transición de Jira) y `setIssueAssignee` (id de usuario de Linear o accountId de Jira; null desasigna) dentro de `issueTrackers.mutate`.
 

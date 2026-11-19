@@ -16,8 +16,16 @@ const SEARCH_LIMIT = 25;
 // IssueSearchResult is not an Issue, so the selection is spelled out instead of a fragment.
 const ISSUE_FIELDS = `identifier title url dueDate updatedAt
   state { name color type }
-  assignee { name avatarUrl }
+  assignee { name displayName avatarUrl }
   project { name url }`;
+
+/** Linear fills `name` with the email when nobody set a full name; its app shows `displayName` then. */
+export function linearUserName(user: {
+  readonly name: string;
+  readonly displayName?: string | undefined;
+}) {
+  return user.name.includes("@") && user.displayName ? user.displayName : user.name;
+}
 
 const LinearIssueNode = Schema.Struct({
   identifier: Schema.String,
@@ -34,6 +42,7 @@ const LinearIssueNode = Schema.Struct({
     Schema.NullOr(
       Schema.Struct({
         name: Schema.String,
+        displayName: Schema.optional(Schema.String),
         avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
       }),
     ),
@@ -100,6 +109,7 @@ const EditOptionsData = Schema.Struct({
             Schema.Struct({
               id: Schema.String,
               name: Schema.String,
+              displayName: Schema.optional(Schema.String),
               avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
               active: Schema.optional(Schema.Boolean),
             }),
@@ -168,7 +178,7 @@ function toTrackerIssue(node: LinearIssueNode): TrackerIssue | null {
       ? { name: node.state.name, color: node.state.color, category: node.state.type }
       : null,
     assignee: node.assignee
-      ? { name: node.assignee.name, avatarUrl: node.assignee.avatarUrl ?? null }
+      ? { name: linearUserName(node.assignee), avatarUrl: node.assignee.avatarUrl ?? null }
       : null,
     dueDate: node.dueDate ?? null,
     updatedAt: node.updatedAt,
@@ -363,6 +373,7 @@ export const makeLinearApi = Effect.gen(function* () {
                 nodes {
                   id
                   name
+                  displayName
                   avatarUrl
                   active
                 }
@@ -391,12 +402,12 @@ export const makeLinearApi = Effect.gen(function* () {
         })),
       assignees: team.members.nodes
         .filter((member) => member.active !== false)
-        .toSorted((left, right) => left.name.localeCompare(right.name))
         .map((member) => ({
           id: member.id,
-          name: member.name,
+          name: linearUserName(member),
           avatarUrl: member.avatarUrl ?? null,
-        })),
+        }))
+        .toSorted((left, right) => left.name.localeCompare(right.name)),
     };
   });
 

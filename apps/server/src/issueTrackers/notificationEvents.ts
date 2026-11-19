@@ -3,6 +3,8 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
+import { linearUserName } from "./linearApi.ts";
+
 // Fork-only notifications bell; see CUSTOM_DEVELOPMENT.md. Pure parts, tested on their own.
 
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]*-[1-9]\d*$/;
@@ -30,7 +32,10 @@ function toIsoDate(value: string): string | null {
   return Option.isSome(parsed) ? DateTime.formatIso(parsed.value) : null;
 }
 
-const LinearUser = Schema.Struct({ name: Schema.String });
+const LinearUser = Schema.Struct({
+  name: Schema.String,
+  displayName: Schema.optional(Schema.String),
+});
 
 export const LinearNotificationNode = Schema.Struct({
   id: Schema.String,
@@ -104,7 +109,7 @@ export function toLinearNotification(
     tracker: "linear",
     kind,
     issue: { key, title: issue.title, url: issue.url },
-    actor: node.actor?.name ?? node.botActor?.name ?? null,
+    actor: (node.actor ? linearUserName(node.actor) : null) ?? node.botActor?.name ?? null,
     text: node.comment ? shorten(node.comment.body) : null,
     detail:
       kind === "statusChanged"

@@ -52,7 +52,7 @@ const LINEAR_QUERY = `query Notifications {
   notifications(first: 50, orderBy: createdAt) {
     nodes {
       id type readAt createdAt snoozedUntilAt
-      actor { name }
+      actor { name displayName }
       ... on IssueNotification {
         issue { identifier title url state { name } }
         comment { body }

@@ -252,7 +252,13 @@ describe("makeLinearApi", () => {
                 },
                 members: {
                   nodes: [
-                    { id: "u-2", name: "Grace Hopper", avatarUrl: null, active: true },
+                    {
+                      id: "u-2",
+                      name: "grace@acme.dev",
+                      displayName: "grace",
+                      avatarUrl: null,
+                      active: true,
+                    },
                     { id: "u-3", name: "Gone Person", active: false },
                     { id: "u-1", name: "Ada Lovelace", avatarUrl: "https://avatar/ada" },
                   ],
@@ -271,7 +277,7 @@ describe("makeLinearApi", () => {
         ],
         assignees: [
           { id: "u-1", name: "Ada Lovelace", avatarUrl: "https://avatar/ada" },
-          { id: "u-2", name: "Grace Hopper", avatarUrl: null },
+          { id: "u-2", name: "grace", avatarUrl: null },
         ],
       });
       yield* api.updateIssue("lin_api_key", key("PRO-1"), { assigneeId: null });
