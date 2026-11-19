@@ -491,7 +491,7 @@ Qué hace: el icono del calendario con reloj en la parte inferior de la barra la
 
 ### Icono de scheduler en el listado de hilos
 
-Qué hace: los hilos en los que corre una tarea programada (la tarea los tiene como hilo asociado) llevan un calendario con reloj verde justo antes del título. Si todas sus tareas están desactivadas, el verde sale apagado. Al pasar el ratón se ve el nombre de cada tarea, su frecuencia y si está en pausa. Los datos salen de la misma suscripción en vivo que usa Ajustes → Scheduled tasks (una por entorno, compartida por todas las filas). Las tareas sin hilo fijo, que crean un hilo nuevo en cada ejecución, no marcan esos hilos.
+Qué hace: los hilos en los que corre una tarea programada (la tarea los tiene como hilo asociado) llevan un calendario con reloj morado oscuro justo antes del título (morado claro en tema oscuro). Al pasar el ratón se ve el nombre de cada tarea, su frecuencia y si está en pausa. Los datos salen de la misma suscripción en vivo que usa Ajustes → Scheduled tasks (una por entorno, compartida por todas las filas). Las tareas sin hilo fijo, que crean un hilo nuevo en cada ejecución, no marcan esos hilos.
 
 | Archivo nuevo                                                    | Qué contiene            |
 | ---------------------------------------------------------------- | ----------------------- |
@@ -500,6 +500,7 @@ Qué hace: los hilos en los que corre una tarea programada (la tarea los tiene c
 | Toca (archivos oficiales)                              | Qué añade                                                          |
 | ------------------------------------------------------ | ------------------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarThreadRow.tsx` | import y `<SidebarThreadSchedulerIcon>` antes de los dos `{title}` |
+| `apps/web/src/index.css`                               | color `scheduler-foreground` (tema claro, oscuro y su `--color-*`) |
 
 ### «Working» parpadea en el listado de hilos
 
