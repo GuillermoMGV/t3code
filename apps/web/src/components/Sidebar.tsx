@@ -160,6 +160,7 @@ import { useThreadSearch } from "../state/queries";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
 import { appAtomRegistry } from "../rpc/atomRegistry";
+import { readThreadIssueSummary } from "../state/issueTrackers";
 import { canShareWithGuestAtom } from "./chat/guestShareAvailability";
 import { openGuestShareDialog } from "./chat/guestShareDialogState";
 import {
@@ -2632,9 +2633,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 projectRef.projectId === thread.projectId,
             ),
           ) ?? null;
+        const ticketUrl = readThreadIssueSummary(appAtomRegistry, threadRef)?.url ?? null;
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             buildThreadActionMenuItems({
+              ticketUrl,
               canOperate: readEnvironmentScope(
                 threadRef.environmentId,
                 AuthOrchestrationOperateScope,
@@ -2778,6 +2781,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             }
             return;
           }
+          case "open-ticket":
+            if (ticketUrl) void api.shell.openExternal(ticketUrl);
+            return;
           case "rename":
             startThreadRename(threadRef, thread.title);
             return;

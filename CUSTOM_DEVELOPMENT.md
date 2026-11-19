@@ -480,6 +480,19 @@ Qué hace: cada fila del desplegable de ramas lleva a la derecha un botón peque
 | ------------------------------------------ | ------------------------------------------------------ |
 | `apps/web/src/components/BranchPicker.tsx` | import y `<BranchCopyButton>` en `BranchPickerRefItem` |
 
+### Ir al ticket desde el menú del hilo
+
+Qué hace: si el hilo tiene un ticket de Linear o Jira vinculado, el menú contextual del hilo (clic derecho en la barra lateral, o el menú de la cabecera del chat) muestra «Go to ticket» justo encima de «Rename thread». Abre el ticket en el navegador externo. Usa el primer ticket de los resúmenes que ya carga la lista de hilos (el mismo que pintan sus insignias), así que no hace peticiones nuevas; si los resúmenes aún no han cargado, la opción no aparece.
+
+| Toca (archivos oficiales)                           | Qué añade                                                                |
+| --------------------------------------------------- | ------------------------------------------------------------------------ |
+| `apps/web/src/components/threadActionMenu.logic.ts` | id `open-ticket`, campo `ticketUrl` y la entrada antes de `rename`       |
+| `apps/web/src/components/Sidebar.tsx`               | import, `ticketUrl` con `readThreadIssueSummary` y el caso `open-ticket` |
+| `apps/web/src/hooks/useThreadActionMenu.ts`         | imports, `ticketUrl` y el caso `open-ticket`                             |
+| `apps/web/src/contextMenuFallback.ts`               | icono `external-link` del menú web                                       |
+
+`readThreadIssueSummary` vive en el archivo del fork `apps/web/src/state/issueTrackers.ts`.
+
 ### Una cuenta de GitHub por repositorio
 
 Qué hace: si `gh` tiene **varias cuentas en el mismo host** (por ejemplo `Guillermo-Miranda-01` para Properti y `GuillermoMGV` para ASTI, ver `gh auth status`), cada petición a GitHub usa la cuenta que llega a su repositorio, en vez de la cuenta activa para todo. No hay que configurar nada: basta con haber hecho `gh auth login` con cada cuenta.

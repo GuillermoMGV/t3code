@@ -17,6 +17,7 @@ export type ThreadActionMenuId =
   | "snooze"
   | `snooze:${string}`
   | "unsnooze"
+  | "open-ticket"
   | "rename"
   | "regenerate-title"
   | "mark-unread"
@@ -95,12 +96,15 @@ export interface ThreadActionMenuState {
   readonly canShareWithGuest?: boolean;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
+  /** Fork-only: the linked Linear or Jira issue's URL, opened in the external browser. */
+  readonly ticketUrl?: string | null;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
 export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean {
   return ![
     "find",
+    "open-ticket",
     "new-thread-on-branch",
     "project-settings",
     "mark-unread",
@@ -167,7 +171,22 @@ export function buildThreadActionMenuItems(
               },
         ]
       : []),
-    { id: "rename", label: "Rename thread", icon: "pencil", separatorBefore: true },
+    ...(state.ticketUrl
+      ? [
+          {
+            id: "open-ticket" as const,
+            label: "Go to ticket",
+            icon: "external-link",
+            separatorBefore: true,
+          },
+        ]
+      : []),
+    {
+      id: "rename",
+      label: "Rename thread",
+      icon: "pencil",
+      separatorBefore: !state.ticketUrl,
+    },
     ...(state.supports.titleRegeneration
       ? [
           {

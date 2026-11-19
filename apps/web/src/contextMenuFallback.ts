@@ -124,6 +124,11 @@ const ICON_PATHS: Record<string, ReadonlyArray<{ tag: string; attrs: Record<stri
     { tag: "line", attrs: { x1: "19", x2: "19", y1: "8", y2: "14" } },
     { tag: "line", attrs: { x1: "22", x2: "16", y1: "11", y2: "11" } },
   ],
+  "external-link": [
+    { tag: "path", attrs: { d: "M15 3h6v6" } },
+    { tag: "path", attrs: { d: "M10 14 21 3" } },
+    { tag: "path", attrs: { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" } },
+  ],
   "folder-plus": [
     { tag: "path", attrs: { d: "M12 10v6" } },
     { tag: "path", attrs: { d: "M9 13h6" } },

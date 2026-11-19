@@ -1,6 +1,11 @@
-import { type EnvironmentId, type TrackerIssue, WS_METHODS } from "@t3tools/contracts";
+import {
+  type EnvironmentId,
+  type ScopedThreadRef,
+  type TrackerIssue,
+  WS_METHODS,
+} from "@t3tools/contracts";
 import { Effect } from "effect";
-import { AsyncResult, Atom } from "effect/reactivity";
+import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity";
 import {
   createEnvironmentRpcCommand,
   createEnvironmentRpcQueryAtomFamily,
@@ -122,4 +127,18 @@ export function threadIssuesAtom(environmentIds: ReadonlyArray<EnvironmentId>) {
     threadIssuesAtoms.set(key, atom);
   }
   return atom;
+}
+
+/** The thread's first linked issue from the cached summaries, for menus that read it once. */
+export function readThreadIssueSummary(
+  registry: AtomRegistry.AtomRegistry,
+  threadRef: ScopedThreadRef,
+): TrackerIssue | null {
+  const summaries = AsyncResult.getOrElse(
+    registry.get(threadSummaries({ environmentId: threadRef.environmentId, input: {} })),
+    () => null,
+  );
+  return (
+    summaries?.threads.find((summary) => summary.threadId === threadRef.threadId)?.issues[0] ?? null
+  );
 }

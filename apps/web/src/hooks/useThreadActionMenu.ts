@@ -36,6 +36,8 @@ import {
 } from "../state/entities";
 import { usePrimaryEnvironmentId } from "../state/environments";
 import { readLocalApi } from "../localApi";
+import { appAtomRegistry } from "../rpc/atomRegistry";
+import { readThreadIssueSummary } from "../state/issueTrackers";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import {
   deriveLogicalProjectKeyFromSettings,
@@ -128,7 +130,9 @@ export function useThreadActionMenu(input: {
       };
       const isRegeneratingTitle = thread.titleRegeneration != null;
       const snoozePresets = resolveSnoozePresets(now, timestampFormat, threadRef.environmentId);
+      const ticketUrl = readThreadIssueSummary(appAtomRegistry, threadRef)?.url ?? null;
       const items = buildThreadActionMenuItems({
+        ticketUrl,
         canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
         canFind: onFind !== undefined,
         branch: thread.branch ?? null,
@@ -238,6 +242,9 @@ export function useThreadActionMenu(input: {
           await reportFailure("Failed to update auto-settle", () =>
             setThreadAutoSettle(threadRef, action === "auto-settle:enabled"),
           );
+          return;
+        case "open-ticket":
+          if (ticketUrl) void api.shell.openExternal(ticketUrl);
           return;
         case "rename":
           onStartRename();

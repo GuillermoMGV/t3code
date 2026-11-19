@@ -35,6 +35,7 @@ describe("buildThreadActionMenuItems", () => {
         isPinned: reversed,
         isSettled: reversed,
         isSnoozed: reversed,
+        ticketUrl: "https://linear.app/acme/issue/PRO-1",
       });
       const expected = reversed
         ? [
@@ -64,6 +65,14 @@ describe("buildThreadActionMenuItems", () => {
       ).toBe(true);
     },
   );
+
+  it("offers the linked ticket right above rename, only when there is one", () => {
+    const ids = (ticketUrl: string | null) =>
+      buildThreadActionMenuItems({ ...baseState, ticketUrl }).map((item) => item.id);
+    const withTicket = ids("https://linear.app/acme/issue/PRO-1");
+    expect(withTicket[withTicket.indexOf("rename") - 1]).toBe("open-ticket");
+    expect(ids(null)).not.toContain("open-ticket");
+  });
 
   it("disables archive and turning into a project while the thread is running", () => {
     const items = buildThreadActionMenuItems({
