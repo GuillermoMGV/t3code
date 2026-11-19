@@ -1,6 +1,7 @@
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { CalendarClockIcon } from "lucide-react";
 
+import { cn } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
 import { serverEnvironment } from "~/state/server";
 import { scheduleLabel } from "../settings/scheduledTasksSettings.logic";
@@ -8,7 +9,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 // Fork-only scheduler marker for thread rows; see CUSTOM_DEVELOPMENT.md.
 
-/** Purple clock before the title of a thread that a scheduled task runs in. */
+/** Clock before the title of a thread that a scheduled task runs in. */
 export function SidebarThreadSchedulerIcon({ threadRef }: { threadRef: ScopedThreadRef }) {
   const { data } = useEnvironmentQuery(
     serverEnvironment.scheduledTasksLive({ environmentId: threadRef.environmentId, input: {} }),
@@ -28,7 +29,13 @@ export function SidebarThreadSchedulerIcon({ threadRef }: { threadRef: ScopedThr
           />
         }
       >
-        <CalendarClockIcon aria-hidden className="size-3.5 shrink-0 text-scheduler-foreground" />
+        <CalendarClockIcon
+          aria-hidden
+          className={cn(
+            "size-3.5 shrink-0",
+            active ? "text-success-foreground" : "text-error-foreground",
+          )}
+        />
       </TooltipTrigger>
       <TooltipPopup side="top">
         {tasks.map((task) => (
