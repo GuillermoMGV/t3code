@@ -30,6 +30,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { IssueCommentsToggle } from "./IssueComments";
 import { IssueFieldPicker, useShownIssue } from "./IssueFieldPicker";
 import { IssueTrackerLinkDialog } from "./IssueTrackerLinkDialog";
 import {
@@ -305,6 +306,16 @@ function IssueTrackerRow({
             environmentId={environmentId}
             issue={issue}
             menu={menu(issue.key, issue.url)}
+            comments={
+              row.commentCount > 0 ? (
+                <IssueCommentsToggle
+                  environmentId={environmentId}
+                  threadId={threadId}
+                  tracker={tracker}
+                  count={row.commentCount}
+                />
+              ) : null
+            }
           />
 
           {dialog}
@@ -319,10 +330,12 @@ function IssueFields({
   environmentId,
   issue: listed,
   menu,
+  comments,
 }: {
   environmentId: EnvironmentId;
   issue: TrackerIssue;
   menu: ReactNode;
+  comments: ReactNode;
 }) {
   const issue = useShownIssue(environmentId, listed);
   return (
@@ -332,14 +345,18 @@ function IssueFields({
         <span className="flex-1" />
         {menu}
       </div>
-      <IssueFieldPicker
-        environmentId={environmentId}
-        issue={issue}
-        field="state"
-        className="-ms-1 h-5 self-start px-1 text-foreground/80"
-      >
-        {issue.state === null ? <span>No status</span> : <IssueStateBadge state={issue.state} />}
-      </IssueFieldPicker>
+      <div className="flex min-w-0 items-center">
+        <IssueFieldPicker
+          environmentId={environmentId}
+          issue={issue}
+          field="state"
+          className="-ms-1 h-5 self-start px-1 text-foreground/80"
+        >
+          {issue.state === null ? <span>No status</span> : <IssueStateBadge state={issue.state} />}
+        </IssueFieldPicker>
+        <span className="flex-1" />
+        {comments}
+      </div>
       <IssueFieldPicker
         environmentId={environmentId}
         issue={issue}

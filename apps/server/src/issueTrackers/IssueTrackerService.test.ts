@@ -3,6 +3,7 @@ import type { IssueKey } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
+import { jiraIssueComments, linearIssueComments } from "./issueComments.ts";
 import {
   applyThreadLinkMutation,
   rememberDetectedLink,
@@ -509,6 +510,84 @@ describe("makeJiraApi", () => {
       );
       const error = yield* api.myself(JIRA_CREDENTIALS).pipe(Effect.flip);
       expect(error.reason).toBe("unauthorized");
+    }),
+  );
+});
+
+describe("issue comments", () => {
+  it.effect("reads Linear comments newest first with display names", () =>
+    Effect.gen(function* () {
+      const { http } = httpAnswering(() => ({
+        status: 200,
+        body: {
+          data: {
+            issue: {
+              comments: {
+                nodes: [
+                  {
+                    id: "c1",
+                    body: "First ",
+                    createdAt: "2026-11-17T10:00:00.000Z",
+                    user: { name: "ada@example.com", displayName: "ada", avatarUrl: null },
+                  },
+                  { id: "c2", body: "Bot note", createdAt: "2026-11-18T10:00:00.000Z", user: null },
+                ],
+              },
+            },
+          },
+        },
+      }));
+      const api = yield* makeLinearApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
+      expect(yield* linearIssueComments(api, "lin_api_key", key("PRO-1"))).toEqual([
+        { id: "c2", author: null, createdAt: "2026-11-18T10:00:00.000Z", body: "Bot note" },
+        {
+          id: "c1",
+          author: { name: "ada", avatarUrl: null },
+          createdAt: "2026-11-17T10:00:00.000Z",
+          body: "First",
+        },
+      ]);
+    }),
+  );
+
+  it.effect("reads Jira comments as text, one line per block", () =>
+    Effect.gen(function* () {
+      const { requests, http } = httpAnswering(() => ({
+        status: 200,
+        body: {
+          comments: [
+            {
+              id: "10",
+              created: "2026-11-17T10:00:00.000+0000",
+              author: { displayName: "Ada Lovelace", avatarUrls: { "48x48": "https://a/48" } },
+              body: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      { type: "mention", attrs: { text: "@Grace" } },
+                      { type: "text", text: " tested in QA2" },
+                    ],
+                  },
+                  { type: "paragraph", content: [{ type: "text", text: "All good" }] },
+                ],
+              },
+            },
+          ],
+        },
+      }));
+      const api = yield* makeJiraApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
+      expect(yield* jiraIssueComments(api, JIRA_CREDENTIALS, key("OPS-7"))).toEqual([
+        {
+          id: "10",
+          author: { name: "Ada Lovelace", avatarUrl: "https://a/48" },
+          createdAt: "2026-11-17T10:00:00.000+0000",
+          body: "@Grace tested in QA2\nAll good",
+        },
+      ]);
+      expect(requests[0]?.url.pathname).toBe("/rest/api/3/issue/OPS-7/comment");
+      expect(requests[0]?.url.searchParams.get("orderBy")).toBe("-created");
     }),
   );
 });

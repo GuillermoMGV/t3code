@@ -201,6 +201,27 @@ Qué hace: el estado y el asignado de un ticket se cambian con un clic en tres s
 
 Probar: el mock de gestores sirve estados, transiciones y personas y aplica los cambios en memoria (en Jira, pasar a «Done» falla a propósito con «Resolution is required.» para ver el aviso de error). Tests: `vp test run apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueFieldPicker.logic.test.ts`. Comprobado en dev contra los mocks: página de tickets (Linear y Jira: estado, asignado, búsqueda y error) y panel del hilo (la insignia de la barra lateral se actualiza a la vez). La lista de PR usa el mismo selector, pero no se probó en vivo porque ninguna PR listada nombraba un ticket. Las llamadas reales (`issueUpdate` de Linear; `POST /issue/{key}/transitions` y `PUT /issue/{key}/assignee` de Jira) siguen la documentación oficial y solo se han ejecutado contra los mocks. Limitaciones: no está en la app móvil ni en las tarjetas de ticket bajo las respuestas del agente.
 
+### Comentarios del ticket en el panel del hilo
+
+Qué hace: si el ticket de Linear o Jira del hilo tiene comentarios, su fila del panel muestra un **bocadillo** a la derecha del estado. Al pulsarlo aparece una tarjeta flotante abajo a la derecha del chat, encima de la caja de texto, con todos los comentarios del más nuevo al más antiguo: autor, fecha y texto. El bocadillo (o la X de la tarjeta) la oculta. La tarjeta sigue abierta aunque el panel se cierre y se oculta al cambiar de hilo.
+
+- **Check in chat:** cada comentario lleva este botón. Añade al final de la caja de texto `Check this comment on ticket <clave> (<título>), posted by <autor> on <fecha>:`, el comentario citado y la URL del ticket, **sin enviar**, y deja el foco en la caja.
+- **Datos:** los comentarios llegan con la misma consulta del panel (`issueTrackers.getThreadIssues`, campo opcional `comments` de cada fila), así que no hay RPC nueva y se refrescan cada minuto con el resto del ticket. Linear: `issue(id) { comments(first: 100) }` con el cuerpo en markdown. Jira: `GET /rest/api/3/issue/{clave}/comment?orderBy=-created&maxResults=100`, con el cuerpo ADF pasado a texto (una línea por bloque). Si los comentarios fallan, el ticket se muestra igual sin bocadillo y el servidor deja un aviso en el log.
+- **Límites:** hasta 100 comentarios por ticket. Los comentarios de integraciones (sin usuario) salen como «Unknown author». El texto se muestra plano, sin formato markdown. No está en la app móvil.
+
+| Parte    | Archivos nuevos                                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Servidor | `apps/server/src/issueTrackers/issueComments.ts`                                                                             |
+| Web      | `apps/web/src/components/chat/IssueComments.tsx` (bocadillo y tarjeta), `issueComments.logic.ts` (+ test) (texto del prompt) |
+
+Archivos del fork que cambian: `issueTracker.ts` (contrato: `TrackerIssueComment` y `comments` en la fila), `IssueTrackerService.ts` (pide los comentarios junto al ticket), `issueTrackerRows.logic.ts` (`commentCount`), `ThreadDetailsIssueTrackerRows.tsx` (bocadillo junto al estado) y `mock-issue-trackers.mjs` (PRO-1234 trae 3 comentarios; los tickets de Jira, los de su actividad).
+
+| Toca (archivos oficiales)              | Qué añade                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------- |
+| `apps/web/src/components/ChatView.tsx` | import y `<ThreadIssueComments>` junto al panel del hilo (pasa `composerRef`) |
+
+Probar: con los mocks (sección de Linear y Jira), vincula PRO-1234 a un hilo; el bocadillo dice «Show 3 comments». Tests: `vp test run apps/server/src/issueTrackers/IssueTrackerService.test.ts apps/web/src/components/chat/issueComments.logic.test.ts apps/web/src/components/chat/issueTrackerRows.logic.test.ts`. Comprobado en dev contra el mock de Linear (abrir, cerrar, «Check in chat»); Jira solo con tests y el mock, y ninguno contra los gestores reales.
+
 ### Campana de notificaciones de Linear, Jira y Slack
 
 Qué hace: con Linear, Jira o Slack conectado, aparece una **campana** en el pie de la barra lateral (junto a Ajustes, Pull requests y Uso). Un globo rojo con el número indica las notificaciones sin leer; no se anima. Al pulsarla se abre una lista, de la más nueva a la más antigua. Cada notificación indica el gestor (icono y nombre), quién lo hizo, el tipo (te asignaron, te quitaron, comentó, te mencionó, cambió el estado, ...), la clave y el título del ticket y, si es un comentario, su texto.

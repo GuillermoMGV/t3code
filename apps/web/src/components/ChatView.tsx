@@ -314,6 +314,7 @@ import {
 } from "./chat/PanelLayoutControls";
 import type { ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { ThreadDetailsPanel } from "./chat/ThreadDetailsPanel";
+import { ThreadIssueComments } from "./chat/IssueComments";
 import { NoActiveThreadState } from "./NoActiveThreadState";
 import {
   resolveEffectiveEnvMode,
@@ -3888,6 +3889,13 @@ export default function ChatView(props: ChatViewProps) {
                   onConfirm={handleSwitchCheckoutToThreadStable}
                 />
 
+                {isServerThread && !draftId ? (
+                  <ThreadIssueComments
+                    environmentId={activeThread.environmentId}
+                    threadId={activeThread.id}
+                    composerRef={composerRef}
+                  />
+                ) : null}
                 <ThreadDetailsPanel
                   anchor={threadPanelPopoverAnchorRef}
                   handle={threadPanelPopoverHandle}

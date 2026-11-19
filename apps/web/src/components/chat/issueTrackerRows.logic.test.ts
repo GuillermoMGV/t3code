@@ -59,7 +59,13 @@ describe("resolveIssueTrackerPanelView", () => {
       resolveIssueTrackerPanelView({
         data: {
           rows: [
-            row({ link: { key: key("PRO-1"), source: "manual" }, issue }),
+            {
+              ...row({ link: { key: key("PRO-1"), source: "manual" }, issue }),
+              comments: [
+                { id: "c1", author: null, createdAt: "2026-11-18T10:00:00Z", body: "Done" },
+                { id: "c2", author: null, createdAt: "2026-11-17T10:00:00Z", body: "Testing" },
+              ],
+            },
             row({
               tracker: "jira",
               connected: false,
@@ -72,7 +78,7 @@ describe("resolveIssueTrackerPanelView", () => {
     ).toEqual({
       kind: "rows",
       rows: [
-        { kind: "issue", tracker: "linear", issue, source: "manual" },
+        { kind: "issue", tracker: "linear", issue, source: "manual", commentCount: 2 },
         { kind: "connectToSee", tracker: "jira", key: "OPS-2" },
       ],
     });
