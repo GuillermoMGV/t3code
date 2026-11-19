@@ -817,6 +817,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         }
                       : null;
   const isWokeStatus = topStatus?.icon === "woke";
+  // Fork-only: the working icon and label pulse; see CUSTOM_DEVELOPMENT.md.
+  const workingPulse =
+    topStatus?.icon === "working" ? "animate-status-pulse motion-reduce:animate-none" : undefined;
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
     effectiveEnvMode: thread.worktreePath === null ? "local" : "worktree",
@@ -1341,8 +1344,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           topStatus.className,
                         )}
                       >
-                        <TopStatusIcon icon={topStatus.icon} className="size-3" />
-                        {topStatus.label}
+                        <TopStatusIcon
+                          icon={topStatus.icon}
+                          className={cn("size-3", workingPulse)}
+                        />
+                        <span className={workingPulse}>{topStatus.label}</span>
                       </span>
                     ) : (
                       <span className="text-xs">
@@ -1534,11 +1540,14 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                             topStatus.className,
                           )}
                         >
-                          <TopStatusIcon icon={topStatus.icon} className="size-4" />
+                          <TopStatusIcon
+                            icon={topStatus.icon}
+                            className={cn("size-4", workingPulse)}
+                          />
                           {/* Not a live region: a collapsed sidebar is inert, so
                             BackgroundThreadAnnouncer and the open thread's
                             timeline speak status changes instead. */}
-                          {topStatus.label}
+                          <span className={workingPulse}>{topStatus.label}</span>
                           {status === "preparing" || status === "working" ? (
                             <span aria-hidden>
                               <WorkingDuration

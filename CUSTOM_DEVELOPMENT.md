@@ -501,6 +501,14 @@ Qué hace: los hilos en los que corre una tarea programada (la tarea los tiene c
 | ------------------------------------------------------ | ------------------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarThreadRow.tsx` | import y `<SidebarThreadSchedulerIcon>` antes de los dos `{title}` |
 
+### «Working» parpadea en el listado de hilos
+
+Qué hace: mientras un hilo trabaja, el círculo discontinuo azul y la palabra «Working» (o «Goal») parpadean despacio para que se note que está vivo. El contador de tiempo de al lado no parpadea. Reutiliza `animate-status-pulse` del propio repo: un ciclo de 2 s con pocos fotogramas escalonados, así que no redibuja en cada refresco de pantalla. Con «reducir movimiento» activado en el sistema queda fijo.
+
+| Toca (archivos oficiales)                              | Qué añade                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `apps/web/src/components/sidebar/SidebarThreadRow.tsx` | `workingPulse` y su clase en el icono y la etiqueta de estado (fila y carpeta) |
+
 ### Copiar el nombre de una rama desde el selector
 
 Qué hace: cada fila del desplegable de ramas lleva a la derecha un botón pequeño con el icono de portapapeles que copia el nombre completo de la rama (aunque la fila lo muestre recortado) y cambia a un check un momento. Pulsarlo no selecciona la rama ni cierra el desplegable, y funciona también en filas deshabilitadas. Sale en todos los selectores que usan `BranchPickerRefItem`: el de la barra de ramas del hilo y el de rama base del worktree en Ajustes → Scheduled tasks. Las filas «Create new ref» no lo llevan.
