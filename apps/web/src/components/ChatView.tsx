@@ -284,7 +284,6 @@ import {
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
-import { HomeDashboardSlot } from "./home/HomeDashboardSlot";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
   BranchRestoreConfirmHost,
@@ -3587,7 +3586,6 @@ export default function ChatView(props: ChatViewProps) {
                       </div>
                     </div>
                   ) : null}
-                  {isDraftHeroState ? <HomeDashboardSlot /> : null}
                   <div
                     ref={draftHeroComposerAnchorRef}
                     className="relative z-10"

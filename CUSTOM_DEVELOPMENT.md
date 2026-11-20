@@ -610,28 +610,6 @@ Tests: `vp test run apps/server/src/skills/SkillsService.test.ts apps/web/src/co
 
 Limitaciones: usa `~/.claude` y `~/.codex` aunque `CLAUDE_CONFIG_DIR`, `CODEX_HOME` o el `homePath` de Claude en T3 apunten a otra carpeta; no busca skills en subcarpetas de un proyecto (monorepos con `.claude/skills` en un paquete) ni en proyectos que no estén en T3 Code; las skills de plugins y sincronizadas no se pueden borrar desde aquí; no se pueden editar (usa «Open in editor»).
 
-### Panel de inicio: lo que está en tu tejado
-
-Qué hace: al pulsar «T3 Code» arriba a la izquierda (o abrir un hilo nuevo), debajo de la caja de texto aparecen cuatro tarjetas con lo que espera algo de ti. Cada una enseña 4 filas y «+N more» para ver el resto.
-
-- **Needs you (hilos):** hilos que no están settled, ni pospuestos (snooze) ni archivados, que no son subagentes y cuyo agente no está trabajando. Orden: «Needs approval», «Asks you», «Guest message», «Plan ready», «Failed», «New reply» (terminó y no lo has abierto) y «Your turn» (terminó, lo leíste y no lo has cerrado). Usa la misma lógica de estado que la barra lateral (`resolveThreadStatusPill`), así que un hilo pospuesto o settled desaparece al momento. La cabecera dice cuántos están trabajando. Clic abre el hilo.
-- **My issues (Linear y Jira):** los tickets abiertos asignados a ti (la misma consulta que el diálogo de vincular). Como en tu flujo el ticket se reasigna a quien debe actuar, quedan fuera solo los aparcados o en espera de otros: categoría backlog, y estados cuyo nombre contiene `block`, `hold`, `waiting` o `review` (Blocked, Code Review, Business Review…). Orden: vencidos o que vencen en 3 días, luego empezados y luego por actualización. Cada fila muestra estado y vencimiento, abre el ticket al pulsar el título y lleva «Start thread» / «Go to thread», los mismos botones de la página Issues (ahora en `IssueThreadActions.tsx`).
-- **Pull requests:** tus PR abiertas que están en tu lado (conflictos, checks fallando, cambios pedidos o aprobada lista para mergear) y las que te piden revisar. Las que esperan revisión o checks, y los drafts, no salen. Dos lecturas por servidor (`involvement` «authored» y «reviewing», `state: "open"`, 50), cacheadas como el resto de la página de PR. Clic abre la PR en la página de pull requests.
-- **Scheduled tasks:** todas las tareas programadas de los servidores conectados (activas primero), con un **interruptor para pausarlas o reanudarlas** (`setScheduledTaskEnabled`, el mismo que Ajustes, con su permiso) y la próxima ejecución. Clic en el nombre abre su hilo si tiene uno; «Manage» lleva a Ajustes → Scheduled tasks.
-- Una tarjeta sin gestor conectado (tickets), sin servidor capaz (PR) o sin tareas no aparece. El panel cuelga bajo la caja de texto sin moverla, ocupa como mucho la mitad inferior de la pantalla con scroll propio y se oculta en ventanas de menos de 40rem de alto.
-
-| Parte | Archivos nuevos                                                                                                                                                                        |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web   | `apps/web/src/components/home/HomeDashboard.tsx`, `HomeDashboardSlot.tsx`, `homeDashboard.logic.ts` (+ test) (criterios de «en tu tejado»), `components/issues/IssueThreadActions.tsx` |
-
-También cambia un archivo del fork: `IssuesPage.tsx` importa de `IssueThreadActions.tsx` los botones y hooks que antes tenía dentro.
-
-| Toca (archivos oficiales)              | Qué añade                                                          |
-| -------------------------------------- | ------------------------------------------------------------------ |
-| `apps/web/src/components/ChatView.tsx` | import y `<HomeDashboardSlot />` tras el titular del hilo borrador |
-
-Tests: `vp test run apps/web/src/components/home/homeDashboard.logic.test.ts`. Limitaciones: no hay ajuste para ocultarlo; no está en la app móvil; los criterios de estado de ticket van por nombre, así que un estado de espera con otro nombre (por ejemplo «QA») sí aparece.
-
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
