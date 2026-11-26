@@ -1,5 +1,7 @@
 import type { PullRequestActor, PullRequestState } from "@t3tools/contracts";
 
+import { pendingReviewers } from "../pullRequest/pullRequestReviewActions.logic";
+
 // Fork-only PR ordering and pending-review badge for the thread panel; see CUSTOM_DEVELOPMENT.md.
 
 const BASE_BRANCH_RANK: Readonly<Record<string, number>> = { develop: 0, master: 1 };
@@ -19,10 +21,7 @@ export function orderPullRequestsByBaseBranch<T>(
     .map(({ item }) => item);
 }
 
-/**
- * Requested reviewers who have not reviewed yet. GitHub drops a request once its reviewer
- * submits a review, so the requests left on an open pull request are the reviews still owed.
- */
+/** The pull request list's Remind rule, applied to the detail the panel row already loads. */
 export function pendingReviewActors(
   detail: {
     readonly state: PullRequestState;
@@ -31,7 +30,14 @@ export function pendingReviewActors(
     readonly reviewers?: ReadonlyArray<PullRequestActor>;
   } | null,
 ): ReadonlyArray<PullRequestActor> {
-  if (detail === null || detail.state !== "open") return [];
-  const author = detail.author?.login.toLowerCase();
-  return (detail.reviewers ?? []).filter((reviewer) => reviewer.login.toLowerCase() !== author);
+  if (detail === null) return [];
+  const reviewers = detail.reviewers ?? [];
+  const pending = new Set(
+    pendingReviewers({
+      state: detail.state,
+      author: detail.author,
+      reviewRequestLogins: reviewers.map((reviewer) => reviewer.login),
+    }),
+  );
+  return reviewers.filter((reviewer) => pending.has(reviewer.login));
 }

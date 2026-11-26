@@ -13,13 +13,19 @@ export function canAddressReview(entry: Pick<ReviewEntry, "state" | "reviewDecis
 }
 
 /**
- * Requested reviewers who have not reviewed yet. GitHub drops a request once its reviewer
- * submits a review, so the remaining requests are exactly the people still owing one.
+ * Requested reviewers who have not reviewed yet, whatever the review decision: GitHub drops a
+ * request once its reviewer submits a review, so the remaining requests are the reviews still
+ * owed. The thread panel's pending-review badge uses the same rule. Teams (`org/team`) and the
+ * author never count.
  */
-export function pendingReviewers(entry: ReviewEntry): ReadonlyArray<string> {
-  if (entry.state !== "open" || entry.reviewDecision === "approved") return [];
+export function pendingReviewers(
+  entry: Pick<ReviewEntry, "state" | "reviewRequestLogins" | "author">,
+): ReadonlyArray<string> {
+  if (entry.state !== "open") return [];
   const author = entry.author?.login.toLowerCase();
-  return (entry.reviewRequestLogins ?? []).filter((login) => login.toLowerCase() !== author);
+  return (entry.reviewRequestLogins ?? []).filter(
+    (login) => login.toLowerCase() !== author && !login.includes("/"),
+  );
 }
 
 /** The turn sent to the agent; the URL lets the thread detect and link the pull request. */

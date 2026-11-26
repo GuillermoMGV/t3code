@@ -24,10 +24,11 @@ describe("row action visibility", () => {
       state: "open",
       author,
       reviewDecision: "review-required",
-      reviewRequestLogins: ["ada", "ME"],
+      reviewRequestLogins: ["ada", "ME", "acme/reviewers"],
     } as const;
     expect(pendingReviewers(entry)).toEqual(["ada"]);
-    expect(pendingReviewers({ ...entry, reviewDecision: "approved" })).toEqual([]);
+    const approved = { ...entry, reviewDecision: "approved" } as const;
+    expect(pendingReviewers(approved)).toEqual(["ada"]);
     expect(pendingReviewers({ ...entry, state: "closed" })).toEqual([]);
     expect(pendingReviewers({ ...entry, reviewRequestLogins: undefined })).toEqual([]);
   });
