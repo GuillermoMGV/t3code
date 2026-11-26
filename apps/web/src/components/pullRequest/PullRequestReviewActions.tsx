@@ -10,11 +10,12 @@ import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
 import type { ModelSelection, ScopedProjectRef } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { AsyncResult } from "effect/reactivity";
-import { BellIcon, ShuffleIcon, WrenchIcon } from "lucide-react";
-import { useContext, useState } from "react";
+import { BellIcon, CheckIcon, CopyIcon, ShuffleIcon, WrenchIcon } from "lucide-react";
+import { useContext, useRef, useState } from "react";
 import { RegistryContext } from "@effect/atom-react";
 
 import { useComposerDraftStore } from "~/composerDraftStore";
+import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
 import { newMessageId, newThreadId } from "~/lib/utils";
@@ -31,6 +32,10 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 import { buildThreadRouteParams } from "~/threadRoutes";
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE } from "~/types";
+import {
+  ANCHORED_COPY_TOAST_TIMEOUT_MS,
+  showAnchoredCopyErrorToast,
+} from "../ui/anchoredCopyToast";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -362,6 +367,11 @@ function ReminderForm({
   const [needsSlackUser, setNeedsSlackUser] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const copyRef = useRef<HTMLButtonElement>(null);
+  const { copyToClipboard, isCopied } = useCopyToClipboard<void>({
+    onError: (copyError: Error) => showAnchoredCopyErrorToast(copyRef, copyError),
+    timeout: ANCHORED_COPY_TOAST_TIMEOUT_MS,
+  });
   const mutate = useAtomCommand(slackEnvironment.mutate, { reportFailure: false });
 
   const send = async () => {
@@ -469,10 +479,36 @@ function ReminderForm({
           <ShuffleIcon aria-hidden className="size-3" />
           Another message
         </Button>
-        <Button type="submit" size="xs" disabled={pending || text.trim().length === 0}>
-          {pending ? <Spinner size="xs" /> : null}
-          Send
-        </Button>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  ref={copyRef}
+                  type="button"
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label="Copy message"
+                  disabled={text.trim().length === 0}
+                  onClick={() => copyToClipboard(text)}
+                />
+              }
+            >
+              {isCopied ? (
+                <CheckIcon aria-hidden className="size-3 text-primary" />
+              ) : (
+                <CopyIcon aria-hidden className="size-3" />
+              )}
+            </TooltipTrigger>
+            <TooltipPopup>
+              <p>{isCopied ? "Copied" : "Copy message"}</p>
+            </TooltipPopup>
+          </Tooltip>
+          <Button type="submit" size="xs" disabled={pending || text.trim().length === 0}>
+            {pending ? <Spinner size="xs" /> : null}
+            Send
+          </Button>
+        </div>
       </div>
     </form>
   );
