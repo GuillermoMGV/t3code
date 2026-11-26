@@ -35,6 +35,7 @@ import {
 } from "../ThreadStatusIndicators";
 
 import { ThreadDetailsPrRow } from "./ThreadDetailsPrRow";
+import { orderPullRequestsByBaseBranch } from "./threadDetailsPrOrder.logic";
 
 function ThreadDetailsPrLinkRow({
   environmentId,
@@ -109,30 +110,43 @@ function ThreadDetailsPrRows({
             },
           });
   const currentRow = <ThreadDetailsPrRow {...row} onStopWatching={stopWatching(currentLink)} />;
-  const rest =
+  const others =
     currentLink === null
       ? []
       : pipe(visibleThreadPullRequests(links), resolveThreadPullRequestChains, pullRequestListLines)
           .map((line) => line.link)
           .filter((link) => threadPullRequestKeyOf(link) !== threadPullRequestKeyOf(currentLink));
-  if (rest.length === 0) return currentRow;
+  if (currentLink === null || others.length === 0) return currentRow;
+  // Fork-only: the pull request into develop leads, the one into master follows.
+  const [first, ...rest] = orderPullRequestsByBaseBranch(
+    [currentLink, ...others],
+    (link) => link.snapshot?.baseBranch ?? (link === currentLink ? row.pr?.baseRef : null),
+  );
+  const linkRow = (link: ThreadPullRequestLink) =>
+    link === currentLink ? (
+      <ThreadDetailsPrRow
+        key={threadPullRequestKeyOf(link)}
+        {...row}
+        onStopWatching={stopWatching(currentLink)}
+      />
+    ) : (
+      <ThreadDetailsPrLinkRow
+        key={threadPullRequestKeyOf(link)}
+        environmentId={row.environmentId}
+        link={link}
+        onOpen={(event) => onOpenLink(event, link.url)}
+        onActed={row.onActed}
+        onStopWatching={stopWatching(link)}
+        composerTarget={row.composerTarget}
+      />
+    );
 
   return (
     <>
-      {currentRow}
+      {first === undefined ? currentRow : linkRow(first)}
       {expanded ? (
         <div data-thread-details-pr-list className="flex flex-col">
-          {rest.map((link) => (
-            <ThreadDetailsPrLinkRow
-              key={threadPullRequestKeyOf(link)}
-              environmentId={row.environmentId}
-              link={link}
-              onOpen={(event) => onOpenLink(event, link.url)}
-              onActed={row.onActed}
-              onStopWatching={stopWatching(link)}
-              composerTarget={row.composerTarget}
-            />
-          ))}
+          {rest.map(linkRow)}
         </div>
       ) : null}
       <ThreadDetailsControl

@@ -637,6 +637,23 @@ Tests: `vp test run apps/server/src/skills/SkillsService.test.ts apps/web/src/co
 
 Limitaciones: usa `~/.claude` y `~/.codex` aunque `CLAUDE_CONFIG_DIR`, `CODEX_HOME` o el `homePath` de Claude en T3 apunten a otra carpeta; no busca skills en subcarpetas de un proyecto (monorepos con `.claude/skills` en un paquete) ni en proyectos que no estén en T3 Code; las skills de plugins y sincronizadas no se pueden borrar desde aquí; no se pueden editar (usa «Open in editor»).
 
+### PR a develop primero y revisión pendiente en el panel del hilo
+
+Qué hace: cuando un hilo tiene varias PR, el panel de detalles pone primero la que va a `develop` y justo debajo la que va a `master` (el resto, después, en su orden). La rama base sale del snapshot de cada PR vinculada (o de la PR de la rama si no hay snapshot). Además, una PR abierta con revisores pedidos que aún no han revisado muestra un icono naranja (persona con lupa, con el número si son varios) junto a los checks; al pasar el ratón dice «Waiting for review from …». Los revisores salen del detalle de la PR que el panel ya carga (`reviewers`, que en GitHub son las peticiones de revisión pendientes: GitHub quita la petición en cuanto el revisor revisa); el autor queda fuera.
+
+| Parte | Archivos nuevos                                                                                   |
+| ----- | ------------------------------------------------------------------------------------------------- |
+| Web   | `apps/web/src/components/chat/threadDetailsPrOrder.logic.ts` (+ test), `PrPendingReviewBadge.tsx` |
+
+| Toca (archivos oficiales)                              | Qué añade                                                                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `apps/web/src/components/chat/ThreadDetailsPrRows.tsx` | ordena `[actual, ...resto]` con `orderPullRequestsByBaseBranch` y pinta la primera como fila principal                   |
+| `apps/web/src/components/chat/ThreadDetailsPrRow.tsx`  | `pendingReviewActors(detail)`, `<PrPendingReviewBadge />` en la línea de metadatos y la condición para mostrar esa línea |
+
+Probar: `vp test run apps/web/src/components/chat/threadDetailsPrOrder.logic.test.ts`. En la app, con `vp run migrate-dev-db --base-dir .t3` y un hilo con PR a develop y master (probado con PRO-4415: #2207 a develop con revisor pendiente sale primero con el icono; #2208 a master, sin revisores, debajo y sin icono, igual que `gh pr view --json reviewRequests`).
+
+Limitaciones: los nombres `develop` y `master` están fijos (no `main`). En Bitbucket y Azure DevOps la lista de revisores incluye a quien ya aprobó, así que el icono puede seguir tras aprobar; los equipos pedidos como revisores cuentan como pendientes. Con el panel plegado solo se ve la primera PR. No existe en la app móvil.
+
 ### Fondo ilustrado en la pantalla de nuevo hilo
 
 Qué hace: la pantalla de nuevo hilo («What should we build in …?») muestra detrás del titular y del composer una ilustración fija, con estrellas en las esquinas, cuadrículas de puntos y ondas de luz abajo a la derecha. Desaparece al enviar el primer mensaje. Hay una versión clara y otra oscura, según el tema. No tiene animación.

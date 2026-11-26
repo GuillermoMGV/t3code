@@ -81,6 +81,8 @@ import {
   THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
 } from "./threadDetailsPanelStyles";
+import { PrPendingReviewBadge } from "./PrPendingReviewBadge";
+import { pendingReviewActors } from "./threadDetailsPrOrder.logic";
 
 // A null checks response is settled; polling cannot find checks.
 const isSettledWithoutChecks = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
@@ -469,10 +471,12 @@ export function ThreadDetailsPrRow({
   );
 
   const showChecks = detail !== null && checksRollup !== null && !conflicting && !detail.isDraft;
+  const pendingReviewers = pendingReviewActors(detail);
 
   return (
     <>
-      {detail !== null && (showChecks || trailingAction !== null || watching) ? (
+      {detail !== null &&
+      (showChecks || trailingAction !== null || watching || pendingReviewers.length > 0) ? (
         <div className="pb-1.5">
           {openRow(detail.title, "row", true)}
           <div className="flex h-5 min-w-0 items-center gap-0.5 ps-9 pe-2.5 text-xs text-muted-foreground">
@@ -486,6 +490,7 @@ export function ThreadDetailsPrRow({
               />
             ) : null}
             {watchControl("icon")}
+            <PrPendingReviewBadge reviewers={pendingReviewers} />
             <span className="flex-1" />
             {trailingAction ? (
               <Tooltip>
