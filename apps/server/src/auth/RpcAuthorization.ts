@@ -139,6 +139,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.skillsList]: AuthFilesystemReadScope,
   [WS_METHODS.skillsRead]: AuthFilesystemReadScope,
   [WS_METHODS.skillsMutate]: AuthFilesystemWriteScope,
+  [WS_METHODS.scheduledThreadsList]: AuthOrchestrationReadScope,
   [WS_METHODS.scheduledTasksSubscribe]: AuthOrchestrationReadScope,
   [WS_METHODS.secretsAnswerRequest]: AuthOrchestrationOperateScope,
   // Delivery logs hold request bodies, so they need the same scope as the URL.

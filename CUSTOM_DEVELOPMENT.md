@@ -503,6 +503,33 @@ Qué hace: los hilos en los que corre una tarea programada (la tarea los tiene c
 | ------------------------------------------------------ | ------------------------------------------------------------------ |
 | `apps/web/src/components/sidebar/SidebarThreadRow.tsx` | import y `<SidebarThreadSchedulerIcon>` antes de los dos `{title}` |
 
+### Ocultar los hilos creados por tareas programadas
+
+Qué hace: en la cabecera de la barra lateral, tras el filtro de proyectos, un botón con el calendario y reloj oculta o muestra los hilos que **creó** una tarea programada (los de «New thread each run» y el hilo que lanzó la primera ejecución de una tarea que continúa en él). Un hilo tuyo al que después vinculaste una tarea no cuenta. Ocultos, el icono pasa a un calendario tachado con un punto y el tooltip dice cuántos hay ocultos (también en «Snoozed» y «Settled»). El botón solo aparece si algún hilo listado vino de una tarea, y la preferencia se guarda en el navegador (`localStorage`, clave `t3code:sidebar:hide-scheduled-threads`), así que cada navegador o dispositivo tiene la suya. Se combina con el filtro de tickets.
+
+- **Cómo se detecta:** `ScheduledTaskService` (oficial) da a cada mensaje que envía el id `scheduled-task-message:<…>`. El servidor lista los hilos cuyo **primer** mensaje tiene ese prefijo (`scheduledThreads.list`, una consulta por rango sobre la clave primaria de `orchestration_v2_projection_messages`, menos de 1 ms con datos reales). El cliente la repite cada minuto para recoger hilos nuevos. Si el oficial cambia ese prefijo, el botón deja de encontrar hilos: hay que actualizar `SCHEDULED_MESSAGE_PREFIX`.
+- El filtro de tickets por asignado ya existía (icono del ticket, sección «Assignee»); no se ha cambiado.
+
+| Parte     | Archivos nuevos                                                                                               |
+| --------- | ------------------------------------------------------------------------------------------------------------- |
+| Contratos | `packages/contracts/src/scheduledThreads.ts`                                                                  |
+| Servidor  | `apps/server/src/scheduledThreads/ScheduledThreadsService.ts` (+ test)                                        |
+| Web       | `apps/web/src/state/scheduledThreads.ts`, `apps/web/src/components/sidebar/SidebarScheduledThreadsToggle.tsx` |
+
+| Toca (archivos oficiales)                             | Qué añade                                                                                        |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `packages/contracts/src/rpc.ts`                       | import, método `scheduledThreads.list` en `WS_METHODS`, su `Rpc.make` y registro en `WsRpcGroup` |
+| `packages/contracts/src/index.ts`                     | `export * from "./scheduledThreads.ts"`                                                          |
+| `apps/server/src/auth/RpcAuthorization.ts`            | permiso de lectura (orchestration read)                                                          |
+| `apps/server/src/observability/RpcInstrumentation.ts` | categoría `scheduledTasks`                                                                       |
+| `apps/server/src/server.ts`                           | import y capa `ScheduledThreadsService.layer` (con `layerPersistence`)                           |
+| `apps/server/src/ws.ts`                               | import, `yield* ScheduledThreadsService` y el handler                                            |
+| `apps/server/src/ws.test.ts`                          | import y `Layer.mock(ScheduledThreadsService)`                                                   |
+
+En la web solo cambia `SidebarIssueControls.tsx` (del fork): `useIssueFilteredThreads` aplica también este filtro y `SidebarIssueControls` pinta el botón antes de los de tickets, así que `Sidebar.tsx` no se toca.
+
+Probar: `vp run migrate-dev-db -- --base-dir .t3` copia tus hilos (incluidos los creados por tareas, sin las tareas), arranca `vp run dev --home-dir .t3 --no-seed` y pulsa el botón: el contador de «Settled» o «Snoozed» baja en el número de hilos ocultos. Test: `vp test run apps/server/src/scheduledThreads/ScheduledThreadsService.test.ts`.
+
 ### «Working» parpadea en el listado de hilos
 
 Qué hace: mientras un hilo trabaja, el círculo discontinuo azul y la palabra «Working» (o «Goal») parpadean despacio para que se note que está vivo. El contador de tiempo de al lado no parpadea. Reutiliza `animate-status-pulse` del propio repo: un ciclo de 2 s con pocos fotogramas escalonados, así que no redibuja en cada refresco de pantalla. Con «reducir movimiento» activado en el sistema queda fijo.

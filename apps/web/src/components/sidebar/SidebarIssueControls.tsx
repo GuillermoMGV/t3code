@@ -31,6 +31,10 @@ import {
   type SidebarIssueFilter,
   toggleFilterValue,
 } from "./sidebarIssueFilter.logic";
+import {
+  SidebarScheduledThreadsToggle,
+  useScheduledFilteredThreads,
+} from "./SidebarScheduledThreadsToggle";
 
 // Fork-only Linear and Jira thread list filter and refresh; see CUSTOM_DEVELOPMENT.md.
 
@@ -45,12 +49,13 @@ function environmentIdsOf(threads: ReadonlyArray<EnvironmentThreadShell>): Envir
   return [...new Set(threads.map((thread) => thread.environmentId))].toSorted();
 }
 
-/** The threads that pass the issue filter; the same array while no filter is set. */
+/** The threads that pass the issue filter and the scheduled toggle; the same array while unfiltered. */
 export function useIssueFilteredThreads(
-  threads: ReadonlyArray<EnvironmentThreadShell>,
+  listedThreads: ReadonlyArray<EnvironmentThreadShell>,
 ): ReadonlyArray<EnvironmentThreadShell> {
+  const threads = useScheduledFilteredThreads(listedThreads);
   const filter = useAtomValue(issueFilterAtom);
-  const issues = useAtomValue(threadIssuesAtom(environmentIdsOf(threads)));
+  const issues = useAtomValue(threadIssuesAtom(environmentIdsOf(listedThreads)));
   if (issueFilterCount(filter) === 0) return threads;
   return threads.filter((thread) =>
     matchesIssueFilter(
@@ -60,8 +65,21 @@ export function useIssueFilteredThreads(
   );
 }
 
-/** Filter and refresh buttons for the thread list; hidden while no thread has a linked issue. */
+/** Scheduled toggle, then issue filter and refresh, which hide while no thread has an issue. */
 export function SidebarIssueControls({
+  threads,
+}: {
+  threads: ReadonlyArray<EnvironmentThreadShell>;
+}) {
+  return (
+    <>
+      <SidebarScheduledThreadsToggle threads={threads} />
+      <SidebarIssueFilterControls threads={threads} />
+    </>
+  );
+}
+
+function SidebarIssueFilterControls({
   threads,
 }: {
   threads: ReadonlyArray<EnvironmentThreadShell>;

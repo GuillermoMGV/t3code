@@ -254,6 +254,7 @@ import * as SlackService from "./slack/SlackService.ts";
 import * as SalesforceDataService from "./salesforce/SalesforceDataService.ts";
 import * as SalesforceService from "./salesforce/SalesforceService.ts";
 import * as SkillsService from "./skills/SkillsService.ts";
+import * as ScheduledThreadsService from "./scheduledThreads/ScheduledThreadsService.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewGuideService.ts";
 import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
@@ -1592,6 +1593,7 @@ export const layerWsRpc = (
       const salesforce = yield* SalesforceService.SalesforceService;
       const salesforceData = yield* SalesforceDataService.SalesforceDataService;
       const skills = yield* SkillsService.SkillsService;
+      const scheduledThreads = yield* ScheduledThreadsService.ScheduledThreadsService;
       // Without the project list, the inventory still shows user skills.
       const skillProjects = projectService
         .listShells()
@@ -2744,6 +2746,7 @@ export const layerWsRpc = (
           skillProjects.pipe(Effect.flatMap((shells) => skills.read(input, shells))),
         [WS_METHODS.skillsMutate]: (input) =>
           skillProjects.pipe(Effect.flatMap((shells) => skills.mutate(input, shells))),
+        [WS_METHODS.scheduledThreadsList]: () => scheduledThreads.list,
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
         [WS_METHODS.serverReportClientActivity]: (input, metadata) =>
           Ref.update(rpcClientIds, (clientIds) => {

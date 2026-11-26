@@ -68,6 +68,7 @@ export * from "./issueTracker.ts";
 export * from "./issueTrackerNotifications.ts";
 export * from "./salesforce.ts";
 export * from "./skills.ts";
+export * from "./scheduledThreads.ts";
 export * from "./slack.ts";
 export * from "./scheduledTask.ts";
 export * from "./worktreeMcp.ts";

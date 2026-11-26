@@ -407,6 +407,11 @@ import {
   SkillsMutationResult,
 } from "./skills.ts";
 import {
+  ScheduledThreadsError,
+  ScheduledThreadsInput,
+  ScheduledThreadsResult,
+} from "./scheduledThreads.ts";
+import {
   StorageCleanupReport,
   DatabaseReclaimError,
   DatabaseStorageStatus,
@@ -614,6 +619,7 @@ export const WS_METHODS = {
   skillsList: "skills.list",
   skillsRead: "skills.read",
   skillsMutate: "skills.mutate",
+  scheduledThreadsList: "scheduledThreads.list",
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
@@ -1192,6 +1198,12 @@ const WsSkillsReadRpc = Rpc.make(WS_METHODS.skillsRead, {
   payload: SkillDetailInput,
   success: SkillDetail,
   error: Schema.Union([SkillsError, EnvironmentAuthorizationError]),
+});
+
+const WsScheduledThreadsListRpc = Rpc.make(WS_METHODS.scheduledThreadsList, {
+  payload: ScheduledThreadsInput,
+  success: ScheduledThreadsResult,
+  error: Schema.Union([ScheduledThreadsError, EnvironmentAuthorizationError]),
 });
 
 const WsSkillsMutateRpc = Rpc.make(WS_METHODS.skillsMutate, {
@@ -2365,6 +2377,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSkillsListRpc,
   WsSkillsReadRpc,
   WsSkillsMutateRpc,
+  WsScheduledThreadsListRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,

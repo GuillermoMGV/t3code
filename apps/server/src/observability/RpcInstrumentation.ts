@@ -111,6 +111,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.skillsList]: "server",
   [WS_METHODS.skillsRead]: "server",
   [WS_METHODS.skillsMutate]: "server",
+  [WS_METHODS.scheduledThreadsList]: "scheduledTasks",
   [WS_METHODS.serverGetUsageSummary]: "server",
   [WS_METHODS.serverRefreshUsageRates]: "server",
   [WS_METHODS.serverSignalProcess]: "server",
