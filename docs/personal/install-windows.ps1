@@ -51,7 +51,10 @@ try {
 
     if (-not $SkipBackup -and (Test-Path -LiteralPath $userData)) {
         $backup = Join-Path (Split-Path $userData) "userdata-backup-$(Get-Date -Format yyyyMMdd-HHmmss)"
-        Copy-Item -LiteralPath $userData -Destination $backup -Recurse
+        # robocopy /XJ salta los enlaces (junctions): las skills enlazadas de los proveedores viven
+        # fuera de userdata y un enlace roto hacia ellas tumbaba Copy-Item.
+        robocopy $userData $backup /E /XJ /R:0 /W:0 /NFL /NDL /NJH /NJS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "Fallo la copia de datos (robocopy $LASTEXITCODE)." }
         Write-Log "Copia de datos: $backup"
     }
 
