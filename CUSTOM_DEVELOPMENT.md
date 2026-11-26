@@ -637,6 +637,21 @@ Tests: `vp test run apps/server/src/skills/SkillsService.test.ts apps/web/src/co
 
 Limitaciones: usa `~/.claude` y `~/.codex` aunque `CLAUDE_CONFIG_DIR`, `CODEX_HOME` o el `homePath` de Claude en T3 apunten a otra carpeta; no busca skills en subcarpetas de un proyecto (monorepos con `.claude/skills` en un paquete) ni en proyectos que no estén en T3 Code; las skills de plugins y sincronizadas no se pueden borrar desde aquí; no se pueden editar (usa «Open in editor»).
 
+### Fondo ilustrado en la pantalla de nuevo hilo
+
+Qué hace: la pantalla de nuevo hilo («What should we build in …?») muestra detrás del titular y del composer una ilustración fija, con estrellas en las esquinas, cuadrículas de puntos y ondas de luz abajo a la derecha. Desaparece al enviar el primer mensaje. Hay una versión clara y otra oscura, según el tema. No tiene animación.
+
+- Las imágenes se generaron con Codex (GPT-6.2 Sol). Después se les restó el color de fondo: la oscura se mezcla con `mix-blend-screen` y la clara con `mix-blend-multiply`. Así se adapta al fondo de cualquier tema, también a los personalizados. Para cambiarlas, genera una imagen nueva sobre un fondo liso y repite la conversión con sharp: oscura, `linear(1.7, -1.7·fondo)`; clara, `linear(1.5·255/fondo, -127.5)`. Guárdala en WebP con calidad 82.
+- Solo web y escritorio. Móvil no la tiene.
+
+| Parte | Archivos nuevos                                                                                                                      |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Web   | `apps/web/src/components/chat/DraftHeroBackdrop.tsx`, `apps/web/src/assets/draft-hero/draft-hero-dark.webp`, `draft-hero-light.webp` |
+
+| Toca (archivos oficiales)              | Qué añade                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| `apps/web/src/components/ChatView.tsx` | import y `{isDraftHeroState ? <DraftHeroBackdrop /> : null}` en el overlay del composer |
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:
