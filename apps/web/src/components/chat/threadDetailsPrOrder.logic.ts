@@ -31,7 +31,7 @@ export function pendingReviewActors(
   } | null,
 ): ReadonlyArray<PullRequestActor> {
   if (detail === null) return [];
-  const reviewers = detail.reviewers ?? [];
+  const reviewers = (detail.reviewers ?? []).filter((reviewer) => reviewer.isBot !== true);
   const pending = new Set(
     pendingReviewers({
       state: detail.state,

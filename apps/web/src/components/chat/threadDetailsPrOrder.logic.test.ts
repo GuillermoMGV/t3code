@@ -25,7 +25,12 @@ describe("pendingReviewActors", () => {
       pendingReviewActors({
         state: "open",
         author: actor("Me"),
-        reviewers: [actor("ada"), actor("me"), actor("acme/reviewers")],
+        reviewers: [
+          actor("ada"),
+          actor("me"),
+          actor("acme/reviewers"),
+          { ...actor("lola"), isBot: true },
+        ],
       }).map((reviewer) => reviewer.login),
     ).toEqual(["ada"]);
   });

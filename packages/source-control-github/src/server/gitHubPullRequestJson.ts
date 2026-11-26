@@ -129,6 +129,7 @@ interface ReviewRequestFields {
 interface LatestReviewFields {
   readonly state?: string | null | undefined;
   readonly isMinimized?: boolean | undefined;
+  readonly author?: { readonly __typename?: string | null | undefined } | null | undefined;
 }
 
 /** Check runs use status/conclusion; commit statuses use a single state. */
@@ -526,12 +527,15 @@ function toReviewDecisionWithReviews(
   reviews: ReadonlyArray<LatestReviewFields> | undefined,
 ): PullRequestReviewDecision | null {
   const summarized = toReviewDecision(value);
+  const visible = (reviews ?? []).filter((review) => !review.isMinimized);
+  // Fork-only: only people count; an app's "changes requested" is ignored. See CUSTOM_DEVELOPMENT.md.
+  const human = visible.filter((review) => review.author?.__typename !== "Bot");
+  const states = new Set(human.map((review) => review.state?.trim().toUpperCase() ?? ""));
+  if (summarized === "changes-requested" && human.length < visible.length) {
+    if (states.has("CHANGES_REQUESTED")) return "changes-requested";
+    return states.has("APPROVED") ? "approved" : "review-required";
+  }
   if (summarized === "approved" || summarized === "changes-requested") return summarized;
-  const states = new Set(
-    (reviews ?? [])
-      .filter((review) => !review.isMinimized)
-      .map((review) => review.state?.trim().toUpperCase() ?? ""),
-  );
   if (states.has("CHANGES_REQUESTED")) return "changes-requested";
   if (summarized === null && states.has("APPROVED")) return "approved";
   return summarized;

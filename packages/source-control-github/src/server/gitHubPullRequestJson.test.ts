@@ -314,6 +314,40 @@ describe("pull request list decoding", () => {
     ]);
   });
 
+  // Fork-only: only people's reviews count; see CUSTOM_DEVELOPMENT.md.
+  it("ignores an app's changes requested in favor of what people said", () => {
+    const bot = { __typename: "Bot", login: "lola-properti" };
+    const batch = expectSuccess(
+      decodePullRequestListJson(
+        listJson([
+          {
+            reviewDecision: "CHANGES_REQUESTED",
+            latestReviews: [{ author: bot, state: "CHANGES_REQUESTED" }],
+          },
+          {
+            reviewDecision: "CHANGES_REQUESTED",
+            latestReviews: [
+              { author: bot, state: "CHANGES_REQUESTED" },
+              { author: user("octocat"), state: "APPROVED" },
+            ],
+          },
+          {
+            reviewDecision: "CHANGES_REQUESTED",
+            latestReviews: [
+              { author: bot, state: "CHANGES_REQUESTED" },
+              { author: user("octocat"), state: "CHANGES_REQUESTED" },
+            ],
+          },
+        ]),
+      ),
+    );
+    expect(batch.items.map((entry) => entry.reviewDecision)).toEqual([
+      "review-required",
+      "approved",
+      "changes-requested",
+    ]);
+  });
+
   it("keeps review required when an approval falls short of the branch's required count", () => {
     const batch = expectSuccess(
       decodePullRequestListJson(
