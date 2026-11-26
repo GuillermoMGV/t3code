@@ -9,10 +9,10 @@ import { pullRequestIssueKey } from "../pullRequest/pullRequestIssue.logic";
 import type { EnvironmentPullRequestEntry } from "../pullRequest/pullRequestList.logic";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import {
-  PullRequestReviewDecisionGlyph,
   PullRequestStateGlyph,
   pullRequestChecksStatePresentation,
 } from "../pullRequest/pullRequestPresentation";
+import { PullRequestReviewStatusGlyph } from "../pullRequest/PullRequestReviewStatusGlyph";
 import { usePullRequestScope } from "../pullRequest/usePullRequestListView";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { pullRequestsByIssueKey } from "./issuesPage.logic";
@@ -114,9 +114,7 @@ function IssuePullRequest({ entry }: { entry: EnvironmentPullRequestEntry }) {
           <TooltipPopup>{checks.label}</TooltipPopup>
         </Tooltip>
       )}
-      {entry.reviewDecision === undefined ? null : (
-        <PullRequestReviewDecisionGlyph decision={entry.reviewDecision} />
-      )}
+      <PullRequestReviewStatusGlyph entry={entry} />
     </span>
   );
 }

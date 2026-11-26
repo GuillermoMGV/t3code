@@ -26,7 +26,8 @@ import {
 } from "./PullRequestListRow";
 import { PullRequestIssueLine, PullRequestTargetBranches } from "./PullRequestIssueBadges";
 import { PullRequestReviewActions } from "./PullRequestReviewActions";
-import { PullRequestLabelChip, PullRequestReviewDecisionGlyph } from "./pullRequestPresentation";
+import { PullRequestLabelChip } from "./pullRequestPresentation";
+import { PullRequestReviewStatusGlyph } from "./PullRequestReviewStatusGlyph";
 
 const LABEL_SLOTS = [
   { overflow: "@xl/pr-row-meta:hidden" },
@@ -172,9 +173,7 @@ function PullRequestRowImpl({
                   }}
                 />
               )}
-              {entry.reviewDecision === undefined ? null : (
-                <PullRequestReviewDecisionGlyph decision={entry.reviewDecision} />
-              )}
+              <PullRequestReviewStatusGlyph entry={entry} />
             </>
           }
           status={

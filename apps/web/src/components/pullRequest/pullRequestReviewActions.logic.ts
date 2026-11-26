@@ -7,9 +7,16 @@ type ReviewEntry = Pick<
   "state" | "reviewDecision" | "reviewRequestLogins" | "author"
 >;
 
-/** "Address review" applies to open pull requests a reviewer sent back. */
-export function canAddressReview(entry: Pick<ReviewEntry, "state" | "reviewDecision">): boolean {
-  return entry.state === "open" && entry.reviewDecision === "changes-requested";
+/**
+ * "Address review" applies to open pull requests a reviewer sent back, until the author asks for
+ * review again: then the ball is in the reviewer's court even though GitHub keeps the decision.
+ */
+export function canAddressReview(entry: ReviewEntry): boolean {
+  return (
+    entry.state === "open" &&
+    entry.reviewDecision === "changes-requested" &&
+    pendingReviewers(entry).length === 0
+  );
 }
 
 /**

@@ -16,7 +16,17 @@ describe("row action visibility", () => {
     ["open, approved", "open", "approved", false],
     ["merged, changes requested", "merged", "changes-requested", false],
   ] as const)("Address review on %s: %s", (_label, state, reviewDecision, expected) => {
-    expect(canAddressReview({ state, reviewDecision })).toBe(expected);
+    expect(canAddressReview({ state, reviewDecision, author })).toBe(expected);
+  });
+
+  it("hides Address review once review is requested again", () => {
+    const entry = {
+      state: "open",
+      reviewDecision: "changes-requested",
+      author,
+      reviewRequestLogins: ["ada"],
+    } as const;
+    expect(canAddressReview(entry)).toBe(false);
   });
 
   it("lists requested reviewers who have not reviewed, never the author", () => {
