@@ -67,6 +67,7 @@ import {
   MenuGroupLabel,
   MenuItem,
   MenuPopup,
+  MenuSearchInput,
   MenuSeparator,
   MenuTrigger,
 } from "../ui/menu";
@@ -85,6 +86,7 @@ import {
   IssueListFilter,
   issueListFilterStorageKey,
   issueProjectOptions,
+  matchingIssueProjects,
   issueStateOptions,
   issueThreadPrompt,
   resolveIssuesTracker,
@@ -568,7 +570,9 @@ function IssueProjectMenu({
   onFilter: (filter: IssueListFilter) => void;
   projectOptions: ReadonlyArray<string>;
 }) {
+  const [query, setQuery] = useState("");
   const chosen = filter.projects;
+  const shown = matchingIssueProjects(projectOptions, query);
   const label =
     chosen.length === 0
       ? "All projects"
@@ -576,7 +580,7 @@ function IssueProjectMenu({
         ? chosen[0]!
         : `${chosen.length} projects`;
   return (
-    <Menu>
+    <Menu onOpenChange={(open) => open || setQuery("")}>
       <MenuTrigger
         render={<Button size="sm" variant="outline" className="max-w-56 shrink-0" />}
         aria-label={`Project filter: ${label}`}
@@ -586,6 +590,15 @@ function IssueProjectMenu({
         <ChevronDownIcon aria-hidden />
       </MenuTrigger>
       <MenuPopup align="end" className="max-h-96 w-64 overflow-y-auto">
+        {projectOptions.length > 0 ? (
+          <MenuSearchInput
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            placeholder="Search projects"
+            aria-label="Search projects"
+          />
+        ) : null}
         <MenuCheckboxItem
           checked={chosen.length === 0}
           onCheckedChange={() => onFilter({ ...filter, projects: [] })}
@@ -593,7 +606,10 @@ function IssueProjectMenu({
           All projects
         </MenuCheckboxItem>
         {projectOptions.length > 0 ? <MenuSeparator /> : null}
-        {projectOptions.map((project) => (
+        {projectOptions.length > 0 && shown.length === 0 ? (
+          <MenuItem disabled>No matching projects</MenuItem>
+        ) : null}
+        {shown.map((project) => (
           <MenuCheckboxItem
             key={project}
             checked={chosen.includes(project)}

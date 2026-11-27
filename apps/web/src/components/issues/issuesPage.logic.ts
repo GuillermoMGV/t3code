@@ -184,6 +184,15 @@ export function issueProjectOptions(
   return [...new Set([...known, ...projects, ...filter.projects])];
 }
 
+/** The project menu's search: case-insensitive, anywhere in the name. */
+export function matchingIssueProjects(
+  projects: ReadonlyArray<string>,
+  query: string,
+): ReadonlyArray<string> {
+  const needle = query.trim().toLowerCase();
+  return needle === "" ? projects : projects.filter((name) => name.toLowerCase().includes(needle));
+}
+
 const MAX_PULL_REQUESTS_PER_ISSUE = 3;
 
 /**

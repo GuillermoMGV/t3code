@@ -8,6 +8,7 @@ import {
   issueAssigneeGroup,
   issueProjectOptions,
   issueStateOptions,
+  matchingIssueProjects,
   pullRequestsByIssueKey,
   issueThreadPrompt,
   resolveIssuesTracker,
@@ -200,6 +201,9 @@ describe("filterIssues", () => {
       "Billing",
       "Ops",
     ]);
+    expect(matchingIssueProjects(["Login", "Billing", "Ops"], " LOG ")).toEqual(["Login"]);
+    expect(matchingIssueProjects(["Login", "Billing"], "")).toEqual(["Login", "Billing"]);
+    expect(matchingIssueProjects(["Login"], "zzz")).toEqual([]);
     // The tracker's own list leads, so a filtered result never hides the other choices.
     expect(issueStateOptions(["Backlog", "Todo"], issues, filter({}))).toEqual([
       "Backlog",
