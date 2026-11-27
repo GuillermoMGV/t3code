@@ -77,6 +77,15 @@ describe("resolveIssueTrackerPanelView", () => {
                   url: null,
                 },
               ],
+              statusChanges: [
+                {
+                  id: "s1",
+                  actor: null,
+                  createdAt: "2026-11-17T11:00:00Z",
+                  from: null,
+                  to: { name: "Done", color: null },
+                },
+              ],
             },
             row({
               tracker: "jira",
@@ -90,7 +99,14 @@ describe("resolveIssueTrackerPanelView", () => {
     ).toEqual({
       kind: "rows",
       rows: [
-        { kind: "issue", tracker: "linear", issue, source: "manual", commentCount: 2 },
+        {
+          kind: "issue",
+          tracker: "linear",
+          issue,
+          source: "manual",
+          commentCount: 2,
+          statusChangeCount: 1,
+        },
         { kind: "connectToSee", tracker: "jira", key: "OPS-2" },
       ],
     });

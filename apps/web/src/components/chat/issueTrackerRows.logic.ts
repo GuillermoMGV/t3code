@@ -42,6 +42,7 @@ export type IssueTrackerRowView =
       readonly issue: TrackerIssue;
       readonly source: IssueTrackerLinkSource;
       readonly commentCount: number;
+      readonly statusChangeCount: number;
     };
 
 export type IssueTrackerPanelView =
@@ -77,6 +78,7 @@ export function resolveIssueTrackerPanelView(input: {
             issue: row.issue,
             source: link.source,
             commentCount: row.comments?.length ?? 0,
+            statusChangeCount: row.statusChanges?.length ?? 0,
           },
         ];
   });

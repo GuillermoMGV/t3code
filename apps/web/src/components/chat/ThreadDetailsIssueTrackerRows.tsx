@@ -307,12 +307,13 @@ function IssueTrackerRow({
             issue={issue}
             menu={menu(issue.key, issue.url)}
             comments={
-              row.commentCount > 0 ? (
+              row.commentCount + row.statusChangeCount > 0 ? (
                 <IssueCommentsToggle
                   environmentId={environmentId}
                   threadId={threadId}
                   tracker={tracker}
-                  count={row.commentCount}
+                  commentCount={row.commentCount}
+                  statusChangeCount={row.statusChangeCount}
                 />
               ) : null
             }

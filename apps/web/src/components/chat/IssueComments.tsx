@@ -6,10 +6,12 @@ import {
   type IssueTrackerKind,
   type ScopedThreadRef,
   type ThreadId,
+  type TrackerIssue,
   type TrackerIssueComment,
+  type TrackerIssueStatusChange,
 } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { EyeIcon, MessageSquareIcon, MessageSquareTextIcon } from "lucide-react";
+import { ArrowRightIcon, EyeIcon, MessageSquareIcon, MessageSquareTextIcon } from "lucide-react";
 
 import type { ComposerHandleRef } from "~/composerHandleContext";
 import { useNowMinute } from "~/hooks/useNowMinute";
@@ -28,13 +30,18 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { formatCommentDate, issueCommentPrompt } from "./issueComments.logic";
+import {
+  formatCommentDate,
+  issueActivityCountLabel,
+  issueActivityTimeline,
+  issueCommentPrompt,
+} from "./issueComments.logic";
 import { IssueAssigneeBadge, IssueTrackerIcon } from "./IssueTrackerParts";
 import { collectThreadIssueReferences } from "./issueTrackerRows.logic";
 import { useCheckCommentInThread } from "../sidebar/useCheckCommentInThread";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 
-// Fork-only ticket comments popover; see CUSTOM_DEVELOPMENT.md.
+// Fork-only ticket comments and status changes modal; see CUSTOM_DEVELOPMENT.md.
 
 type OpenComments = { readonly threadKey: string; readonly tracker: IssueTrackerKind };
 
@@ -48,22 +55,24 @@ const openCommentsAtom = Atom.make<OpenComments | null>(null).pipe(
   Atom.withLabel("issue-trackers:open-comments"),
 );
 
-/** The speech bubble in the panel's issue row; shown only when the issue has comments. */
+/** The speech bubble in the panel's issue row; shown only when the issue has some activity. */
 export function IssueCommentsToggle({
   environmentId,
   threadId,
   tracker,
-  count,
+  commentCount,
+  statusChangeCount,
 }: {
   environmentId: EnvironmentId;
   threadId: ThreadId;
   tracker: IssueTrackerKind;
-  count: number;
+  commentCount: number;
+  statusChangeCount: number;
 }) {
   const [open, setOpen] = useAtom(openCommentsAtom);
   const threadKey = threadKeyOf(environmentId, threadId);
   const shown = open?.threadKey === threadKey && open.tracker === tracker;
-  const label = `${shown ? "Hide" : "Show"} ${count} ${count === 1 ? "comment" : "comments"}`;
+  const label = `${shown ? "Hide" : "Show"} ${issueActivityCountLabel(commentCount, statusChangeCount)}`;
   return (
     <Tooltip>
       <TooltipTrigger
@@ -87,7 +96,7 @@ export function IssueCommentsToggle({
   );
 }
 
-/** The open issue's comments, newest first, in a modal over the chat. */
+/** The open issue's comments and status changes, newest first, in a modal over the chat. */
 export function ThreadIssueComments({
   environmentId,
   threadId,
@@ -130,6 +139,8 @@ function CommentsCard({
   const row = query.data?.rows.find((candidate) => candidate.tracker === tracker);
   const issue = row?.issue ?? null;
   const comments = row?.comments ?? [];
+  const statusChanges = row?.statusChanges ?? [];
+  const timeline = issueActivityTimeline(comments, statusChanges);
   const { checkInThread: check } = useCheckCommentInThread();
   if (issue === null) return null;
 
@@ -151,29 +162,37 @@ function CommentsCard({
           <div className="flex items-center gap-2">
             <IssueTrackerIcon tracker={tracker} className="size-4 shrink-0 text-muted-foreground" />
             <DialogTitle>
-              {issue.key} · {comments.length} {comments.length === 1 ? "comment" : "comments"}
+              {issue.key} · {issueActivityCountLabel(comments.length, statusChanges.length)}
             </DialogTitle>
           </div>
           <DialogDescription>{issue.title}</DialogDescription>
         </DialogHeader>
         <DialogPanel>
-          {comments.length === 0 ? (
+          {timeline.length === 0 ? (
             <p className="py-2 text-sm text-muted-foreground">
               {row?.comments === undefined
-                ? `${ISSUE_TRACKER_LABELS[tracker]} comments could not be loaded.`
-                : "No comments yet."}
+                ? `${ISSUE_TRACKER_LABELS[tracker]} activity could not be loaded.`
+                : "No comments or status changes yet."}
             </p>
           ) : (
             <ol className="divide-y">
-              {comments.map((comment) => (
-                <CommentItem
-                  key={comment.id}
-                  comment={comment}
-                  trackerLabel={ISSUE_TRACKER_LABELS[tracker]}
-                  threadRef={threadRef}
-                  onCheck={() => checkInThread(comment)}
-                />
-              ))}
+              {timeline.map((entry) =>
+                entry.kind === "comment" ? (
+                  <CommentItem
+                    key={`comment:${entry.comment.id}`}
+                    comment={entry.comment}
+                    trackerLabel={ISSUE_TRACKER_LABELS[tracker]}
+                    threadRef={threadRef}
+                    onCheck={() => checkInThread(entry.comment)}
+                  />
+                ) : (
+                  <StatusChangeItem
+                    key={`status:${entry.change.id}`}
+                    change={entry.change}
+                    currentState={issue.state}
+                  />
+                ),
+              )}
             </ol>
           )}
         </DialogPanel>
@@ -233,5 +252,63 @@ function CommentItem({
         </Button>
       </div>
     </li>
+  );
+}
+
+/** One line: who moved the issue from which status to which, and when. */
+function StatusChangeItem({
+  change,
+  currentState,
+}: {
+  change: TrackerIssueStatusChange;
+  currentState: TrackerIssue["state"];
+}) {
+  const now = new Date(`${useNowMinute()}:00Z`);
+  return (
+    <li className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-2.5 text-xs text-muted-foreground">
+      {change.actor === null ? (
+        <span>Someone</span>
+      ) : (
+        <IssueAssigneeBadge assignee={change.actor} className="font-medium text-foreground" />
+      )}
+      <span>{change.from === null ? "set status to" : "changed status"}</span>
+      {change.from === null ? null : (
+        <>
+          <StatusName status={change.from} currentState={currentState} />
+          <ArrowRightIcon aria-label="to" className="size-3 shrink-0" />
+        </>
+      )}
+      <StatusName status={change.to} currentState={currentState} />
+      <span className="shrink-0">·</span>
+      <time dateTime={change.createdAt} className="shrink-0 tabular-nums">
+        {formatCommentDate(change.createdAt, now)}
+      </time>
+    </li>
+  );
+}
+
+function StatusName({
+  status,
+  currentState,
+}: {
+  status: TrackerIssueStatusChange["to"];
+  currentState: TrackerIssue["state"];
+}) {
+  // Jira changelogs carry no colors; the issue's current state lends its own when names match.
+  const color = status.color ?? (currentState?.name === status.name ? currentState.color : null);
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1 font-medium text-foreground">
+      <span
+        aria-hidden
+        className={
+          color === null
+            ? "size-2 shrink-0 rounded-full bg-muted-foreground/40"
+            : "size-2 shrink-0 rounded-full"
+        }
+        // Each tracker defines its states' colors; showing them keeps states recognizable.
+        style={color === null ? undefined : { backgroundColor: color }}
+      />
+      <span className="truncate">{status.name}</span>
+    </span>
   );
 }

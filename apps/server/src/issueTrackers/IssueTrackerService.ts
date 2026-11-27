@@ -37,7 +37,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
-import { jiraIssueComments, linearIssueComments } from "./issueComments.ts";
+import { jiraIssueActivity, linearIssueActivity, NO_ACTIVITY } from "./issueComments.ts";
 import { issueThreadTitle, renameLinkedThread } from "./issueThreadTitle.ts";
 import { type JiraCredentials, makeJiraApi, normalizeJiraSiteUrl } from "./jiraApi.ts";
 import { makeLinearApi } from "./linearApi.ts";
@@ -270,28 +270,28 @@ const make = Effect.gen(function* () {
           ),
         );
 
-  /** Undefined when the comments cannot be read; the issue row still shows. */
-  const fetchComments = (tracker: IssueTrackerKind, key: IssueKey) =>
+  /** Undefined when comments and status changes cannot be read; the issue row still shows. */
+  const fetchActivity = (tracker: IssueTrackerKind, key: IssueKey) =>
     (tracker === "linear"
       ? readLinearKey.pipe(
           Effect.flatMap(
             Option.match({
-              onNone: () => Effect.succeed([]),
-              onSome: (apiKey) => linearIssueComments(linear, apiKey, key),
+              onNone: () => Effect.succeed(NO_ACTIVITY),
+              onSome: (apiKey) => linearIssueActivity(linear, apiKey, key),
             }),
           ),
         )
       : readJiraCredentials.pipe(
           Effect.flatMap(
             Option.match({
-              onNone: () => Effect.succeed([]),
-              onSome: (credentials) => jiraIssueComments(jira, credentials, key),
+              onNone: () => Effect.succeed(NO_ACTIVITY),
+              onSome: (credentials) => jiraIssueActivity(jira, credentials, key),
             }),
           ),
         )
     ).pipe(
       Effect.tapError((error) =>
-        Effect.logWarning("Could not read issue comments", { tracker, reason: error.reason }),
+        Effect.logWarning("Could not read issue activity", { tracker, reason: error.reason }),
       ),
       Effect.orElseSucceed(() => undefined),
     );
@@ -376,12 +376,12 @@ const make = Effect.gen(function* () {
           if (!connected || link === null) {
             return { tracker, connected, link, issue: null, error: null };
           }
-          const [issue, comments] = yield* Effect.all(
-            [fetchAndCache(tracker, link.key), fetchComments(tracker, link.key)],
+          const [issue, activity] = yield* Effect.all(
+            [fetchAndCache(tracker, link.key), fetchActivity(tracker, link.key)],
             { concurrency: 2 },
           );
           const row = { tracker, connected, link, issue: Option.getOrNull(issue), error: null };
-          return comments === undefined ? row : { ...row, comments };
+          return activity === undefined ? row : { ...row, ...activity };
         }).pipe(
           // One tracker failing must not hide the other's row.
           Effect.catch((error) =>

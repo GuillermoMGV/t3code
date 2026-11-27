@@ -80,6 +80,17 @@ export const TrackerIssueComment = Schema.Struct({
 });
 export type TrackerIssueComment = typeof TrackerIssueComment.Type;
 
+export const TrackerIssueStatusChange = Schema.Struct({
+  id: Schema.String,
+  /** Null for changes made by automations or deleted accounts. */
+  actor: Schema.NullOr(TrackerIssueAssignee),
+  createdAt: Schema.String,
+  /** Null when the issue was created in `to`. Jira changelogs carry no colors. */
+  from: Schema.NullOr(Schema.Struct({ name: Schema.String, color: Schema.NullOr(Schema.String) })),
+  to: Schema.Struct({ name: Schema.String, color: Schema.NullOr(Schema.String) }),
+});
+export type TrackerIssueStatusChange = typeof TrackerIssueStatusChange.Type;
+
 export const IssueTrackerThreadRow = Schema.Struct({
   tracker: IssueTrackerKind,
   connected: Schema.Boolean,
@@ -90,6 +101,8 @@ export const IssueTrackerThreadRow = Schema.Struct({
   error: Schema.NullOr(Schema.String),
   /** The issue's comments, newest first; absent when they could not be read. */
   comments: Schema.optional(Schema.Array(TrackerIssueComment)),
+  /** The issue's status changes, newest first; absent when they could not be read. */
+  statusChanges: Schema.optional(Schema.Array(TrackerIssueStatusChange)),
 });
 export type IssueTrackerThreadRow = typeof IssueTrackerThreadRow.Type;
 

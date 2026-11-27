@@ -203,6 +203,33 @@ const jiraActivity = {
   },
 };
 
+// Status changes for the same modal: Linear's issue history (only entries that moved the status).
+const LINEAR_HISTORY = {
+  "PRO-1234": [
+    {
+      id: "lh-1",
+      createdAt: minutesAgo(60 * 24 * 3),
+      actor: { name: "ada@example.com", displayName: "ada", avatarUrl: null },
+      fromState: null,
+      toState: { name: "Todo", color: "#e2e2e2" },
+    },
+    {
+      id: "lh-2",
+      createdAt: minutesAgo(120),
+      actor: { name: "Guillermo Miranda", displayName: "guillermo", avatarUrl: null },
+      fromState: { name: "Todo", color: "#e2e2e2" },
+      toState: { name: "In Progress", color: "#f2c94c" },
+    },
+    {
+      id: "lh-3",
+      createdAt: minutesAgo(15),
+      actor: null,
+      fromState: { name: "In Progress", color: "#f2c94c" },
+      toState: { name: "In Review", color: "#5e6ad2" },
+    },
+  ],
+};
+
 // Ticket comments for the thread panel's comments popover (PRO-1234 has some, the others none).
 const LINEAR_COMMENTS = {
   "PRO-1234": [
@@ -304,7 +331,10 @@ NodeHttp.createServer(async (req, res) => {
   }
   if (query.includes("query IssueComments")) {
     const comments = LINEAR_COMMENTS[variables.id] ?? [];
-    return sendJson(res, 200, { data: { issue: { comments: { nodes: comments } } } });
+    const history = LINEAR_HISTORY[variables.id] ?? [];
+    return sendJson(res, 200, {
+      data: { issue: { comments: { nodes: comments }, history: { nodes: history } } },
+    });
   }
   if (query.includes("issue(id")) {
     // MOCK_LINEAR_ANY_KEY=1 answers every `PRO-` key, to test pull request badges on real lists.
@@ -389,6 +419,23 @@ NodeHttp.createServer(async (req, res) => {
     const comments = jiraActivity[decodeURIComponent(commentsMatch[1])]?.comments ?? [];
     return sendJson(res, 200, {
       comments: comments.toSorted((a, b) => Date.parse(b.created) - Date.parse(a.created)),
+    });
+  }
+  const changelogMatch = /^\/rest\/api\/3\/issue\/([^/]+)\/changelog$/.exec(url.pathname);
+  if (changelogMatch) {
+    // Oldest first and paged, like Jira's changelog endpoint.
+    const histories = jiraActivity[decodeURIComponent(changelogMatch[1])]?.histories ?? [];
+    const startAt = Number(url.searchParams.get("startAt") ?? 0);
+    const maxResults = Number(url.searchParams.get("maxResults") ?? 100);
+    const values = histories
+      .toSorted((a, b) => Date.parse(a.created) - Date.parse(b.created))
+      .slice(startAt, startAt + maxResults);
+    return sendJson(res, 200, {
+      startAt,
+      maxResults,
+      total: histories.length,
+      isLast: startAt + values.length >= histories.length,
+      values,
     });
   }
   const issueMatch = /^\/rest\/api\/3\/issue\/([^/]+)$/.exec(url.pathname);

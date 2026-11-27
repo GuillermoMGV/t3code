@@ -3,7 +3,7 @@ import type { IssueKey } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
-import { jiraIssueComments, linearIssueComments } from "./issueComments.ts";
+import { jiraIssueActivity, linearIssueActivity } from "./issueComments.ts";
 import {
   applyThreadLinkMutation,
   rememberDetectedLink,
@@ -514,8 +514,8 @@ describe("makeJiraApi", () => {
   );
 });
 
-describe("issue comments", () => {
-  it.effect("reads Linear comments newest first with display names", () =>
+describe("issue activity", () => {
+  it.effect("reads Linear comments and status changes newest first with display names", () =>
     Effect.gen(function* () {
       const { http } = httpAnswering(() => ({
         status: 200,
@@ -534,12 +534,32 @@ describe("issue comments", () => {
                   { id: "c2", body: "Bot note", createdAt: "2026-11-18T10:00:00.000Z", user: null },
                 ],
               },
+              history: {
+                nodes: [
+                  {
+                    id: "h1",
+                    createdAt: "2026-11-16T10:00:00.000Z",
+                    actor: null,
+                    fromState: null,
+                    toState: { name: "Todo", color: "#e2e2e2" },
+                  },
+                  { id: "h2", createdAt: "2026-11-17T09:00:00.000Z", actor: null, toState: null },
+                  {
+                    id: "h3",
+                    createdAt: "2026-11-18T09:00:00.000Z",
+                    actor: { name: "ada@example.com", displayName: "ada", avatarUrl: null },
+                    fromState: { name: "Todo", color: "#e2e2e2" },
+                    toState: { name: "In Progress", color: "#f2c94c" },
+                  },
+                ],
+              },
             },
           },
         },
       }));
       const api = yield* makeLinearApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
-      expect(yield* linearIssueComments(api, "lin_api_key", key("PRO-1"))).toEqual([
+      const activity = yield* linearIssueActivity(api, "lin_api_key", key("PRO-1"));
+      expect(activity.comments).toEqual([
         {
           id: "c2",
           author: null,
@@ -555,38 +575,69 @@ describe("issue comments", () => {
           url: "https://linear.app/acme/issue/PRO-1#comment-c1",
         },
       ]);
+      // History entries that did not move the status are left out.
+      expect(activity.statusChanges).toEqual([
+        {
+          id: "h3",
+          actor: { name: "ada", avatarUrl: null },
+          createdAt: "2026-11-18T09:00:00.000Z",
+          from: { name: "Todo", color: "#e2e2e2" },
+          to: { name: "In Progress", color: "#f2c94c" },
+        },
+        {
+          id: "h1",
+          actor: null,
+          createdAt: "2026-11-16T10:00:00.000Z",
+          from: null,
+          to: { name: "Todo", color: "#e2e2e2" },
+        },
+      ]);
     }),
   );
 
-  it.effect("reads Jira comments as text, one line per block", () =>
+  it.effect("reads Jira comments as text and status changes from the last changelog page", () =>
     Effect.gen(function* () {
-      const { requests, http } = httpAnswering(() => ({
-        status: 200,
-        body: {
-          comments: [
-            {
-              id: "10",
-              created: "2026-11-17T10:00:00.000+0000",
-              author: { displayName: "Ada Lovelace", avatarUrls: { "48x48": "https://a/48" } },
+      const { requests, http } = httpAnswering((url) =>
+        url.pathname.endsWith("/changelog")
+          ? {
+              status: 200,
               body: {
-                type: "doc",
-                content: [
-                  {
-                    type: "paragraph",
-                    content: [
-                      { type: "mention", attrs: { text: "@Grace" } },
-                      { type: "text", text: " tested in QA2" },
-                    ],
-                  },
-                  { type: "paragraph", content: [{ type: "text", text: "All good" }] },
-                ],
+                total: 150,
+                values:
+                  url.searchParams.get("startAt") === "50"
+                    ? [
+                        {
+                          id: "200",
+                          created: "2026-11-18T08:30:00.000+0100",
+                          author: { displayName: "Ada Lovelace" },
+                          items: [
+                            { field: "assignee", fieldId: "assignee", toString: "Ada Lovelace" },
+                            {
+                              field: "status",
+                              fieldId: "status",
+                              fromString: "To Do",
+                              toString: "In Progress",
+                            },
+                          ],
+                        },
+                      ]
+                    : [],
               },
-            },
-          ],
-        },
-      }));
+            }
+          : JIRA_COMMENTS_RESPONSE,
+      );
       const api = yield* makeJiraApi.pipe(Effect.provideService(HttpClient.HttpClient, http));
-      expect(yield* jiraIssueComments(api, JIRA_CREDENTIALS, key("OPS-7"))).toEqual([
+      const activity = yield* jiraIssueActivity(api, JIRA_CREDENTIALS, key("OPS-7"));
+      expect(activity.statusChanges).toEqual([
+        {
+          id: "200:status",
+          actor: { name: "Ada Lovelace", avatarUrl: null },
+          createdAt: "2026-11-18T07:30:00.000Z",
+          from: { name: "To Do", color: null },
+          to: { name: "In Progress", color: null },
+        },
+      ]);
+      expect(activity.comments).toEqual([
         {
           id: "10",
           author: { name: "Ada Lovelace", avatarUrl: "https://a/48" },
@@ -595,8 +646,35 @@ describe("issue comments", () => {
           url: "https://acme.atlassian.net/browse/OPS-7?focusedCommentId=10",
         },
       ]);
-      expect(requests[0]?.url.pathname).toBe("/rest/api/3/issue/OPS-7/comment");
-      expect(requests[0]?.url.searchParams.get("orderBy")).toBe("-created");
+      const comments = requests.find((request) => request.url.pathname.endsWith("/comment"));
+      expect(comments?.url.pathname).toBe("/rest/api/3/issue/OPS-7/comment");
+      expect(comments?.url.searchParams.get("orderBy")).toBe("-created");
     }),
   );
 });
+
+const JIRA_COMMENTS_RESPONSE = {
+  status: 200,
+  body: {
+    comments: [
+      {
+        id: "10",
+        created: "2026-11-17T10:00:00.000+0000",
+        author: { displayName: "Ada Lovelace", avatarUrls: { "48x48": "https://a/48" } },
+        body: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "mention", attrs: { text: "@Grace" } },
+                { type: "text", text: " tested in QA2" },
+              ],
+            },
+            { type: "paragraph", content: [{ type: "text", text: "All good" }] },
+          ],
+        },
+      },
+    ],
+  },
+};

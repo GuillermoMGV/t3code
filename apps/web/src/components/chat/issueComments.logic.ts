@@ -1,6 +1,10 @@
-import type { TrackerIssue, TrackerIssueComment } from "@t3tools/contracts";
+import type {
+  TrackerIssue,
+  TrackerIssueComment,
+  TrackerIssueStatusChange,
+} from "@t3tools/contracts";
 
-// Fork-only ticket comments popover; see CUSTOM_DEVELOPMENT.md.
+// Fork-only ticket comments and status changes modal; see CUSTOM_DEVELOPMENT.md.
 
 /** The composer text asking the agent to look at one ticket comment. */
 export function issueCommentPrompt(
@@ -28,4 +32,45 @@ export function formatCommentDate(value: string, now: Date): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+export type IssueActivityEntry =
+  | { readonly kind: "comment"; readonly createdAt: string; readonly comment: TrackerIssueComment }
+  | {
+      readonly kind: "statusChange";
+      readonly createdAt: string;
+      readonly change: TrackerIssueStatusChange;
+    };
+
+/** Comments and status changes in one list, newest first. */
+export function issueActivityTimeline(
+  comments: ReadonlyArray<TrackerIssueComment>,
+  statusChanges: ReadonlyArray<TrackerIssueStatusChange>,
+): IssueActivityEntry[] {
+  const entries: IssueActivityEntry[] = [
+    ...comments.map((comment) => ({
+      kind: "comment" as const,
+      createdAt: comment.createdAt,
+      comment,
+    })),
+    ...statusChanges.map((change) => ({
+      kind: "statusChange" as const,
+      createdAt: change.createdAt,
+      change,
+    })),
+  ];
+  return entries.toSorted(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+}
+
+/** "3 comments · 1 status change"; either part is left out when there is none. */
+export function issueActivityCountLabel(comments: number, statusChanges: number): string {
+  const parts = [
+    comments > 0 ? `${comments} ${comments === 1 ? "comment" : "comments"}` : null,
+    statusChanges > 0
+      ? `${statusChanges} ${statusChanges === 1 ? "status change" : "status changes"}`
+      : null,
+  ].filter((part) => part !== null);
+  return parts.length === 0 ? "No activity" : parts.join(" · ");
 }
