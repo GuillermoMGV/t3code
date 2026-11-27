@@ -310,6 +310,8 @@ export function PullRequestsPage() {
     sentParsed,
     menuFilters,
     menuFiltered,
+    hostMenuFilters,
+    hostMenuFiltered,
     filters,
     hasFilters,
     localFilters,
@@ -392,7 +394,7 @@ export function PullRequestsPage() {
         ...(scopedProjectId ? { projectId: scopedProjectId } : {}),
         ...(projectIds ? { projectIds } : {}),
         ...(search.host ? { host: search.host } : {}),
-        ...(menuFiltered ? { filters: menuFilters } : {}),
+        ...(hostMenuFiltered ? { filters: hostMenuFilters } : {}),
       } satisfies PullRequestListInput,
     }));
   const baselineTargets = baselineTargetsFor(environmentQueries);
@@ -452,7 +454,7 @@ export function PullRequestsPage() {
           ...(scopedProjectId ? { projectId: scopedProjectId } : {}),
           ...(projectIds ? { projectIds } : {}),
           ...(search.host ? { host: search.host } : {}),
-          ...(menuFiltered ? { filters: menuFilters } : {}),
+          ...(hostMenuFiltered ? { filters: hostMenuFilters } : {}),
         } satisfies PullRequestListInput,
       }));
     return { authored: targetsFor("authored"), reviewing: targetsFor("reviewing") };

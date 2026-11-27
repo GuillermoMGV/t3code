@@ -57,6 +57,11 @@ import {
   type PullRequestAuthorFacet,
   type PullRequestLabelFacet,
 } from "./pullRequestList.logic";
+import {
+  joinPullRequestAuthors,
+  pullRequestAuthorLogins,
+  pullRequestAuthorSummary,
+} from "./pullRequestAuthorFilter.logic";
 import { PullRequestActorAvatar } from "./pullRequestPresentation";
 import { PullRequestGlyph } from "./pullRequestIcons";
 
@@ -287,15 +292,25 @@ function PullRequestAuthorChoices({
 }) {
   const [query, setQuery] = useState("");
   const hosted = useHostedFilterOptions(scope, "authors", query);
-  const login = value?.toLowerCase() ?? "";
-  const selected = selectedPullRequestAuthor(options, hosted.authors, value);
+  const logins = pullRequestAuthorLogins(value);
+  const chosen = new Set(logins.map((login) => login.toLowerCase()));
+  const selected = logins.flatMap(
+    (login) => selectedPullRequestAuthor(options, hosted.authors, login) ?? [],
+  );
   const visible = [
-    ...(selected ? [selected] : []),
+    ...selected,
     ...pullRequestAuthorChoices(options, hosted.authors, query).filter(
-      (option) => option.actor.login.toLowerCase() !== login,
+      (option) => !chosen.has(option.actor.login.toLowerCase()),
     ),
-  ].slice(0, 30);
-  const select = (next: string) => next.toLowerCase() !== login && onChange(next || undefined);
+  ].slice(0, Math.max(30, selected.length));
+  const toggle = (login: string, checked: boolean) =>
+    onChange(
+      joinPullRequestAuthors(
+        checked
+          ? [...logins, login]
+          : logins.filter((held) => held.toLowerCase() !== login.toLowerCase()),
+      ),
+    );
   return (
     <>
       <MenuSearchInput
@@ -306,32 +321,37 @@ function PullRequestAuthorChoices({
         placeholder="Search authors"
         aria-label="Search authors"
       />
-      <MenuRadioGroup value={selected?.actor.login ?? value ?? ""} onValueChange={select}>
-        <MenuRadioItem value="">
+      <MenuCheckboxItem
+        checked={logins.length === 0}
+        onCheckedChange={(checked) => checked && onChange(undefined)}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <LayersIcon aria-hidden className="size-3.5" />
+          Anyone
+        </span>
+      </MenuCheckboxItem>
+      {visible.map((option) => (
+        <MenuCheckboxItem
+          key={option.actor.login.toLowerCase()}
+          checked={chosen.has(option.actor.login.toLowerCase())}
+          onCheckedChange={(checked) => toggle(option.actor.login, checked)}
+        >
           <span className="flex min-w-0 items-center gap-2">
-            <LayersIcon aria-hidden className="size-3.5" />
-            Anyone
+            <PullRequestActorAvatar actor={option.actor} />
+            <span className="min-w-0 flex-1 truncate">{option.actor.login}</span>
+            {option.mergedCount > 0 ? (
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {option.mergedCount} {option.mergedCount === 1 ? "merge" : "merges"} loaded
+              </span>
+            ) : null}
           </span>
-        </MenuRadioItem>
-        {visible.map((option) => (
-          <MenuRadioItem key={option.actor.login.toLowerCase()} value={option.actor.login}>
-            <span className="flex min-w-0 items-center gap-2">
-              <PullRequestActorAvatar actor={option.actor} />
-              <span className="min-w-0 flex-1 truncate">{option.actor.login}</span>
-              {option.mergedCount > 0 ? (
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {option.mergedCount} {option.mergedCount === 1 ? "merge" : "merges"} loaded
-                </span>
-              ) : null}
-            </span>
-          </MenuRadioItem>
-        ))}
-        {visible.length === 0 && !hosted.isPending ? (
-          <MenuItem disabled>
-            {hosted.error === null ? "No authors found" : "Couldn't search authors on the host"}
-          </MenuItem>
-        ) : null}
-      </MenuRadioGroup>
+        </MenuCheckboxItem>
+      ))}
+      {visible.length === 0 && !hosted.isPending ? (
+        <MenuItem disabled>
+          {hosted.error === null ? "No authors found" : "Couldn't search authors on the host"}
+        </MenuItem>
+      ) : null}
     </>
   );
 }
@@ -353,7 +373,7 @@ function PullRequestAuthorFilter({
         <UserRoundIcon aria-hidden className="size-3.5" />
         <span className="flex-1">Author</span>
         <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-          {value ?? "Anyone"}
+          {pullRequestAuthorSummary(value)}
         </span>
       </MenuSubTrigger>
       <MenuSubPopup>

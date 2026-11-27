@@ -1,6 +1,5 @@
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 
-import { resolvePullRequestAuthorFilter } from "@t3tools/contracts";
 import type {
   EnvironmentId,
   PullRequestListEntry,
@@ -22,6 +21,7 @@ import type {
 
 import { isStalePullRequestReply } from "@t3tools/client-runtime/pull-request-reply";
 import { toSortableTimestamp } from "@t3tools/client-runtime/state/thread-sort";
+import { matchesPullRequestAuthors } from "./pullRequestAuthorFilter.logic";
 import type { PullRequestListSort } from "./pullRequestListPreferences";
 
 export interface EnvironmentPullRequestEntry extends PullRequestListEntry {
@@ -273,9 +273,7 @@ export function matchesPullRequestFilters(
         : entry.reviewDecision === filters.review)) &&
     (filters.labels === undefined || filters.labels.every((group) => group.some(holds))) &&
     (filters.excludedLabels === undefined || !filters.excludedLabels.some(holds)) &&
-    (filters.author === undefined ||
-      entry.author?.login.toLowerCase() ===
-        resolvePullRequestAuthorFilter(filters.author, viewer).toLowerCase())
+    matchesPullRequestAuthors(entry.author?.login, filters.author, viewer)
   );
 }
 

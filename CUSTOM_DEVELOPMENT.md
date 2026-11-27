@@ -693,6 +693,25 @@ Qué hace: al enviar un mensaje con Enter o con el botón, el hilo sigue trabaja
 | `apps/web/src/components/chat/useComposerSend.ts` | en `onSendWithRouting`, convierte el envío `foreground` en `background` |
 | `apps/web/src/components/AppSidebarLayout.tsx`    | import, `useSidebarBlankClick()` y sus handlers en `<Sidebar>`          |
 
+### Varios autores en el filtro de pull requests
+
+Qué hace: en la pantalla Pull requests, Filters → Author muestra casillas: puedes marcar varios autores y la lista enseña las PR de cualquiera de ellos. «Anyone» quita el filtro y el submenú resume «N selected». Como los demás filtros, se guarda y vuelve al abrir Pull requests desde la barra lateral o la paleta de comandos.
+
+- Los autores viajan en el mismo campo `author` (URL y preferencias guardadas) separados por comas, así el contrato, el servidor y los proveedores no cambian. Caben 200 caracteres; si no entra uno más, no se añade.
+- Con un autor el filtro lo resuelve el host como siempre. Con varios, el host devuelve la lista sin filtro de autor y la página la estrecha: si hay muchas PR, puede hacer falta «Load more» para ver las más antiguas.
+- `author:` escrito en el buscador sigue admitiendo un solo autor. Móvil no tiene este filtro.
+
+| Parte | Archivos nuevos                                                                                                                  |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Web   | `apps/web/src/components/pullRequest/pullRequestAuthorFilter.logic.ts` (+ `.test.ts`): leer/unir autores, comparar, filtros host |
+
+| Toca (archivos oficiales)                                        | Qué añade                                                                                        |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `apps/web/src/components/pullRequest/PullRequestListFilters.tsx` | `PullRequestAuthorChoices` con `MenuCheckboxItem` en vez de radio; resumen del submenú           |
+| `apps/web/src/components/pullRequest/pullRequestList.logic.ts`   | `matchesPullRequestFilters` usa `matchesPullRequestAuthors`                                      |
+| `apps/web/src/components/pullRequest/usePullRequestListView.ts`  | `hostMenuFilters`/`hostMenuFiltered` (sin autor cuando hay varios) y `filters` a partir de ellos |
+| `apps/web/src/components/pullRequest/PullRequestsPage.tsx`       | las consultas base y de particiones usan `hostMenuFilters`                                       |
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:

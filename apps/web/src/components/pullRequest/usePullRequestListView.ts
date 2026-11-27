@@ -42,6 +42,7 @@ import {
 } from "./pullRequestProjectAssignment.logic";
 import { pullRequestFilterProjects } from "@t3tools/client-runtime/pull-request-project-filter";
 import { pullRequestListEntryId } from "./pullRequestListGroups.logic";
+import { hostPullRequestFilters } from "./pullRequestAuthorFilter.logic";
 
 export interface PullRequestsSearch extends PullRequestListPreferences {
   readonly selectedUrl?: string;
@@ -223,7 +224,9 @@ export function usePullRequestQueryFilters(search: PullRequestsSearch, typedQuer
     ...(search.labels ? { labels: search.labels.map((label) => [label]) } : {}),
   };
   const menuFiltered = Object.keys(menuFilters).length > 0;
-  const filters = { ...menuFilters, ...sentParsed.filters };
+  const hostMenuFilters = hostPullRequestFilters(menuFilters);
+  const hostMenuFiltered = Object.keys(hostMenuFilters).length > 0;
+  const filters = { ...hostMenuFilters, ...sentParsed.filters };
   const hasFilters = Object.keys(filters).length > 0;
   const localFilters = { ...menuFilters, ...typedParsed.filters };
   const hasLocalFilters = Object.keys(localFilters).length > 0;
@@ -235,6 +238,8 @@ export function usePullRequestQueryFilters(search: PullRequestsSearch, typedQuer
     sentParsed,
     menuFilters,
     menuFiltered,
+    hostMenuFilters,
+    hostMenuFiltered,
     filters,
     hasFilters,
     localFilters,
