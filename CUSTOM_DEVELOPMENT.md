@@ -674,6 +674,24 @@ Qué hace: la pantalla de nuevo hilo («What should we build in …?») muestra 
 | -------------------------------------- | --------------------------------------------------------------------------------------- |
 | `apps/web/src/components/ChatView.tsx` | import y `{isDraftHeroState ? <DraftHeroBackdrop /> : null}` en el overlay del composer |
 
+### Volver a la pantalla de nuevo hilo al enviar o al pulsar en vacío
+
+Qué hace: al enviar un mensaje con Enter o con el botón, el hilo sigue trabajando (pasa a «Working») y la app abre la pantalla de nuevo hilo, como el logo de T3 Code. Un clic en cualquier zona vacía de la barra lateral (sin hilo, botón ni enlace debajo) hace lo mismo.
+
+- El envío reutiliza el modo oficial «enviar en segundo plano» (`composer.sendBackground` en borradores, `composer.sendAndNewThread` en hilos): un envío normal se trata igual. En un borrador sale el aviso «Started in background» con «Open». Si el envío falla, te quedas en el hilo con el error.
+- No cambian: el envío alternativo mientras el agente trabaja (cola/redirigir), las anotaciones enviadas desde la vista previa y las respuestas a preguntas o aprobaciones.
+- El clic en vacío solo cuenta si se pulsa y se suelta sobre el mismo punto vacío (soltar un arrastre no navega), sin teclas modificadoras ni texto seleccionado.
+- Para volver al hilo, ábrelo desde «Working». Móvil no cambia.
+
+| Parte | Archivos nuevos                                           |
+| ----- | --------------------------------------------------------- |
+| Web   | `apps/web/src/components/sidebar/useSidebarBlankClick.ts` |
+
+| Toca (archivos oficiales)                         | Qué añade                                                               |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| `apps/web/src/components/chat/useComposerSend.ts` | en `onSendWithRouting`, convierte el envío `foreground` en `background` |
+| `apps/web/src/components/AppSidebarLayout.tsx`    | import, `useSidebarBlankClick()` y sus handlers en `<Sidebar>`          |
+
 ## Entorno y arranque
 
 Usa PowerShell desde la raíz. Activa las versiones del `package.json` en cada terminal:

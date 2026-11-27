@@ -1550,6 +1550,8 @@ export function useComposerSend(input: ComposerSendInput) {
   const onSendLatest = useStableCallback(onSend);
   const onSendWithRouting = async (...args: Parameters<typeof onSend>) => {
     args[0]?.preventDefault();
+    // Fork: a plain send leaves the thread for a fresh composer; see CUSTOM_DEVELOPMENT.md.
+    if ((args[2] ?? "foreground") === "foreground" && !args[3]) args[2] = "background";
     const refresh =
       args[3] || sendInFlightRef.current || readPendingEnvironmentChange() !== null
         ? null
